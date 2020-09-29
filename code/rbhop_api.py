@@ -19,6 +19,7 @@ styles = {
     "auto" : 1,
     "scroll" : 2,
     "sideways" : 3,
+    "sw" : 3,
     "half-sideways" : 4,
     "hsw" : 4,
     "w-only" : 5,
@@ -147,12 +148,18 @@ def get_maps(game):
 def username_from_id(user_id):
     res = requests.get(f"https://api.roblox.com/users/{user_id}")
     data = res.json()
-    return data["Username"]
+    try:
+        return data["Username"]
+    except:
+        raise Exception("Invalid user ID")
 
 def id_from_username(username):
     res = requests.get(f"https://api.roblox.com/users/get-by-username?username={username}")
     data = res.json()
-    return data["Id"]
+    try:
+        return data["Id"]
+    except:
+        raise Exception("Invalid username")
 
 def get_user_username_id(user):
     username = ""
@@ -218,19 +225,20 @@ def sexy_print(record_list, title=""):
         map_name = record.map_name
         print(f"{username:20}| {time:15}| {date:20}| {map_name:20}")
 
-def sexy_format(record_list):
+def sexy_format(record_list, *args):
     records = len(record_list)
     s = ""
     s += f"Total records: {records}\n"
-    s += "Username:           | Time:     | Date:               | Map Name:           | Style:         | Game:\n"
+    titles = ["Username:", "Time:", "Date", "Map name:", "Style:", "Game:"]
+    s += f"{titles[0]:15}| {titles[1]:10}| {titles[2]:20}| {titles[3]:20}| {titles[4]:14}| Game\n"
     for record in record_list:
-        username = record.username
-        time = record.time_string
-        date = record.date_string
-        map_name = record.map_name
-        style = record.style_string
+        username = record.username[:15]
+        time = record.time_string[:10]
+        date = record.date_string[:20]
+        map_name = record.map_name[:20]
+        style = record.style_string[:15]
         game = record.game_string
-        s += f"{username:20}| {time:10}| {date:20}| {map_name:20}| {style:15}| {game}\n"
+        s += f"{username:15}| {time:10}| {date:20}| {map_name:20}| {style:14}| {game}\n"
     return s[:-1]
 
 def page_records(record_list, sort="name"):

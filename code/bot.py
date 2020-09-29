@@ -20,7 +20,7 @@ with open("..\\files\\commands.txt") as file:
     commands_text = data
 
 games = ["bhop", "surf"]
-styles = ["autohop", "scroll", "sideways", "half-sideways", "w-only", "a-only", "backwards"]
+styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
 
 bot = commands.Bot(command_prefix="!")
 
@@ -69,13 +69,19 @@ async def wr_list(ctx, user=None, game=None, style=None):
                 if record_list != None:
                     count += len(record_list)
                     wrs.append(record_list)
+    convert_ls = []
     for record_ls in wrs:
-        messages = rbhop.page_records(record_ls)
-        for message in messages:
-            await ctx.send(format_markdown_code(message))
+        record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
+        for record in record_ls_sort:
+            convert_ls.append(record)
+    messages = rbhop.page_records(convert_ls, sort="")
+    for message in messages:
+        await ctx.send(format_markdown_code(message))
 
 @bot.command(name="wrcount")
 async def wr_count(ctx, user=None):
+    if user == None:
+        user = get_roblox_username(ctx.author.id)
     msg = ""
     count = 0
     for game in games:
@@ -113,14 +119,15 @@ async def list_commands(ctx):
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
-        await ctx.send("```Invalid command```")
-    elif isinstance(error, commands.BadArgument):
+    #if isinstance(error, commands.CommandNotFound):
+        #await ctx.send("```Invalid command```")
+    if isinstance(error, commands.BadArgument):
         await ctx.send("```Error: Bad argument```")
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"```Error: Missing argument(s): {error.param}```")
-    #elif isinstance(error, commands.CommandInvokeError):
-        #await ctx.send(f"```Error: Error in argument: {error.original}. Check that your arguments are spelled correctly.```")
+    elif isinstance(error, commands.CommandInvokeError):
+        await ctx.send(f"```Error in argument: {error.original}. Check that your arguments are spelled correctly.```")
+        traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     else:
         print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
