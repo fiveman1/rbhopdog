@@ -380,7 +380,7 @@ def get_new_wrs():
             else:
                 break
         files.write_surf_wrs()
-    if len(bhop_globals_dict) > 0 or len(surf_globals_dict):
+    if len(bhop_globals_dict) > 0 or len(surf_globals_dict) > 0:
         s = "NEW WR!!!\n"
         for d in [bhop_globals_dict, surf_globals_dict]:
             for record, diff in d.items():
