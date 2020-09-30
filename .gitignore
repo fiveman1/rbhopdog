@@ -1,2 +1,3 @@
-code/.env
-code/__pycache__
+src/.env
+src/__pycache__
+src/cogs/__pycache__
