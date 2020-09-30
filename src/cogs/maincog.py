@@ -28,6 +28,7 @@ class MainCog(commands.Cog):
                 if ch.name == "globals":
                     self.globals_channels.append(ch)
         self.global_announcements.start()
+        print("maincog loaded")
     
     def cog_unload(self):
         print("unloading maincog")

@@ -69,12 +69,12 @@ game_id_to_string = {
 ranks = ["New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God"]
 
 bhop_maps = {}
-with open(fix_path("../files/bhop_maps.json")) as file:
+with open(fix_path("files/bhop_maps.json")) as file:
     data = file.read()
     bhop_maps = json.loads(data)
 
 surf_maps = {}
-with open(fix_path("../files/surf_maps.json")) as file:
+with open(fix_path("files/surf_maps.json")) as file:
     data = file.read()
     surf_maps = json.loads(data)
 
@@ -356,7 +356,7 @@ def get_new_wrs():
                     })
                 new_wrs.append(wrs.json())
     old_wrs = []
-    with open(fix_path("../files/recent_wrs.json")) as file:
+    with open(fix_path("files/recent_wrs.json")) as file:
         old_wrs = json.load(file)
     globals_ls = []
     for i in range(len(new_wrs)):
