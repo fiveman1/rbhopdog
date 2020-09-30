@@ -362,34 +362,33 @@ def get_new_wrs():
     old_surf_wrs = []
     with open(fix_path("files/surf_recent_wrs.json")) as file:
         old_surf_wrs = make_record_list(json.load(file))
-    bhop_globals_dict = {}
-    surf_globals_dict = {}
+    globals_ls = []
     if new_bhop_wrs[0].id != old_bhop_wrs[0].id:
-        bhop_globals_dict[new_bhop_wrs[0]] = calculate_wr_diff(new_bhop_wrs[0].map_id)
+        globals_ls.append(new_bhop_wrs[0])
         for record in new_bhop_wrs[1:]:
             if record.id != old_bhop_wrs[0].id:
-                bhop_globals_dict[record] = calculate_wr_diff(record.map_id)
+                globals_ls.append(record)
             else:
                 break
         files.write_bhop_wrs()
     if new_surf_wrs[0].id != old_surf_wrs[0].id:
-        surf_globals_dict[new_surf_wrs[0]] = calculate_wr_diff(new_surf_wrs[0].map_id)
+        globals_ls.append(new_surf_wrs[0])
         for record in new_surf_wrs[1:]:
             if record.id != old_surf_wrs[0].id:
-                surf_globals_dict[record] = calculate_wr_diff(record.map_id)
+                globals_ls.append(record)
             else:
                 break
         files.write_surf_wrs()
-    if len(bhop_globals_dict) > 0 or len(surf_globals_dict) > 0:
+    if len(globals_ls) > 0:
         s = "NEW WR!!!\n"
-        for d in [bhop_globals_dict, surf_globals_dict]:
-            for record, diff in d.items():
-                username = record.username
-                time = record.time_string
-                map_name = record.map_name
-                style = record.style_string
-                game = record.game_string
-                s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
+        for record in globals_ls:
+            username = record.username
+            time = record.time_string
+            map_name = record.map_name
+            style = record.style_string
+            game = record.game_string
+            diff = calculate_wr_diff(record.map_id)
+            s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
         return s
     else:
         return None
