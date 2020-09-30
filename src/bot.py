@@ -10,8 +10,9 @@ from discord.ext import commands
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
+COMMAND = os.getenv("COMMAND")
 
-bot = commands.Bot(command_prefix="test!")
+bot = commands.Bot(command_prefix=COMMAND)
 
 @bot.event
 async def on_ready():
