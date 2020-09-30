@@ -138,6 +138,7 @@ def get(end_of_url, params):
 
 #returns a dict of all maps from the given game
 #only use this to update bhop_map/surf_map.json when new maps are added
+#TODO: move this to files, or combine the functions in these modules
 def get_maps(game):
     maps = get("map", {
         "game":games[game],
@@ -336,9 +337,9 @@ def get_user_rank(user, game, style):
 
 #returns the difference between 1st and 2nd place on a given map
 #in seconds
-def calculate_wr_diff(map_id):
+def calculate_wr_diff(map_id, style):
     res = get(f"time/map/{map_id}", {
-        "style":1,
+        "style":style,
     })
     data = res.json()
     first = convert_to_record(data[0])
@@ -378,7 +379,7 @@ def get_new_wrs():
             map_name = record.map_name
             style = record.style_string
             game = record.game_string
-            diff = calculate_wr_diff(record.map_id)
+            diff = calculate_wr_diff(record.map_id, record.style)
             s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
         return s
     else:
