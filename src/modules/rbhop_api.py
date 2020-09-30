@@ -69,12 +69,12 @@ game_id_to_string = {
 ranks = ["New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God"]
 
 bhop_maps = {}
-with open(fix_path("files/bhop_maps.json")) as file:
+with open(fix_path("../files/bhop_maps.json")) as file:
     data = file.read()
     bhop_maps = json.loads(data)
 
 surf_maps = {}
-with open(fix_path("files/surf_maps.json")) as file:
+with open(fix_path("../files/surf_maps.json")) as file:
     data = file.read()
     surf_maps = json.loads(data)
 
@@ -346,40 +346,31 @@ def calculate_wr_diff(map_id):
     return round((int(second.time) - int(first.time)) / 1000.0, 3)
 
 def get_new_wrs():
-    res1 = get("time/recent/wr", {
-        "game":1,
-        "style":1
-    })
-    new_bhop_wrs = make_record_list(res1.json())
-    res2 = get("time/recent/wr", {
-        "game":2,
-        "style":1
-    })
-    new_surf_wrs = make_record_list(res2.json())
-    old_bhop_wrs = []
-    with open(fix_path("files/bhop_recent_wrs.json")) as file:
-        old_bhop_wrs = make_record_list(json.load(file))
-    old_surf_wrs = []
-    with open(fix_path("files/surf_recent_wrs.json")) as file:
-        old_surf_wrs = make_record_list(json.load(file))
+    new_wrs = []
+    for game in range(1,3):
+        for style in range(1,8):
+            if not (game == 2 and style == 2): #skip surf/scroll
+                wrs = get("time/recent/wr", {
+                        "game":game,
+                        "style":style
+                    })
+                new_wrs.append(wrs.json())
+    old_wrs = []
+    with open(fix_path("../files/recent_wrs.json")) as file:
+        old_wrs = json.load(file)
     globals_ls = []
-    if new_bhop_wrs[0].id != old_bhop_wrs[0].id:
-        globals_ls.append(new_bhop_wrs[0])
-        for record in new_bhop_wrs[1:]:
-            if record.id != old_bhop_wrs[0].id:
-                globals_ls.append(record)
-            else:
-                break
-        files.write_bhop_wrs()
-    if new_surf_wrs[0].id != old_surf_wrs[0].id:
-        globals_ls.append(new_surf_wrs[0])
-        for record in new_surf_wrs[1:]:
-            if record.id != old_surf_wrs[0].id:
-                globals_ls.append(record)
-            else:
-                break
-        files.write_surf_wrs()
+    for i in range(len(new_wrs)):
+        new_records = make_record_list(new_wrs[i])
+        old_records = make_record_list(old_wrs[i])
+        if new_records[0].id != old_records[0].id:
+            globals_ls.append(new_records[0])
+            for record in new_records[1:]:
+                if record.id != old_records[0].id:
+                    globals_ls.append(record)
+                else:
+                    break
     if len(globals_ls) > 0:
+        files.write_wrs()
         s = "NEW WR!!!\n"
         for record in globals_ls:
             username = record.username

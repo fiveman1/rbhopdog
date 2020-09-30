@@ -39,7 +39,7 @@ def write_bhop_maps():
         })
         bhop_map_data = bhop_map_data + m.json()
 
-    with open(fix_path("files/bhop_maps.json"), "w") as file:
+    with open(fix_path("../files/bhop_maps.json"), "w") as file:
         json.dump(bhop_map_data, file)
     file.close()
 
@@ -57,28 +57,32 @@ def write_surf_maps():
         })
         surf_map_data = surf_map_data + m.json()
 
-    with open(fix_path("files/surf_maps.json"), "w") as file:
+    with open(fix_path("../files/surf_maps.json"), "w") as file:
         json.dump(surf_map_data, file)
     file.close()
 
-def write_bhop_wrs():
-    bhop_wrs = get("time/recent/wr", {
-            "game":1,
-            "style":1
-        })
-    bhop_wrs_data = bhop_wrs.json()
-
-    with open(fix_path("files/bhop_recent_wrs.json"), "w") as file:
-        json.dump(bhop_wrs_data, file)
+def write_wrs():
+    wrs_data = []
+    for game in range(1,3):
+        for style in range(1,8):
+            if not (game == 2 and style == 2): #skip surf/scroll
+                wrs = get("time/recent/wr", {
+                        "game":game,
+                        "style":style
+                    })
+                wrs_data.append(wrs.json())
+    # LIST OF LIST OF WRS, EACH LIST IS A GAME AND STYLE
+    with open(fix_path("../files/recent_wrs.json"), "w") as file:
+        json.dump(wrs_data, file)
     file.close()
 
-def write_surf_wrs():
-    surf_wrs = get("time/recent/wr", {
-            "game":2,
-            "style":1
-        })
-    surf_wrs_data = surf_wrs.json()
+# def write_surf_wrs():
+#     surf_wrs = get("time/recent/wr", {
+#             "game":2,
+#             "style":1
+#         })
+#     surf_wrs_data = surf_wrs.json()
 
-    with open(fix_path("files/surf_recent_wrs.json"), "w") as file:
-        json.dump(surf_wrs_data, file)
-    file.close()
+#     with open(fix_path("../files/surf_recent_wrs.json"), "w") as file:
+#         json.dump(surf_wrs_data, file)
+#     file.close()

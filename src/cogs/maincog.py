@@ -33,7 +33,7 @@ class MainCog(commands.Cog):
         print("unloading maincog")
         self.global_announcements.cancel()
 
-    @tasks.loop(seconds=20)
+    @tasks.loop(minutes=2)
     async def global_announcements(self):
         message = rbhop.get_new_wrs()
         if message != None:
