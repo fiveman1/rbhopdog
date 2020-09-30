@@ -1,4 +1,5 @@
 # bot.py
+import asyncio
 import datetime
 import json
 import os
@@ -9,7 +10,7 @@ from dotenv import load_dotenv
 
 import rbhop_api as rbhop
 
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -23,10 +24,24 @@ games = ["bhop", "surf"]
 styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
 
 bot = commands.Bot(command_prefix="!")
+#guild_ids = [759491070374969404, 728022833254629517] #0, my testing server, 1: sev's server
+globals_channels = []
 
 @bot.event
 async def on_ready():
+    for guild in bot.guilds:
+        for ch in guild.channels:
+            if ch.name == "globals":
+                globals_channels.append(ch)
     print(f"{bot.user} has connected to Discord!")
+    global_announcements.start()
+
+@tasks.loop(minutes=5)
+async def global_announcements():
+    message = rbhop.get_new_wrs()
+    if message != None:
+        for ch in globals_channels:
+            await ch.send(format_markdown_code(message))
 
 @bot.command(name="recentwrs")
 async def get_recent_wrs(ctx, game, style="autohop"):
@@ -112,6 +127,12 @@ async def faste_check(ctx, game, style, user=None):
         await ctx.send(format_markdown_code(f"WRs: {wrs}\n{user} is eligible for faste in {game} in the style {style}."))
     else:
         await ctx.send(format_markdown_code(f"WRs: {wrs}\n{user} is NOT eligible for faste in {game} in the style {style}."))
+
+@bot.command(name="userrank")
+async def user_rank(ctx, game, style, user=None):
+    if user == None:
+        user = get_roblox_username(ctx.author.id)
+    await ctx.send(format_markdown_code(rbhop.get_user_rank(user, game, style)))
 
 @bot.command(name="commands")
 async def list_commands(ctx):

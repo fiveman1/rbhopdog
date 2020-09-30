@@ -5,6 +5,8 @@ import os
 import requests
 from dotenv import load_dotenv
 
+import files
+
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 
@@ -60,6 +62,8 @@ game_id_to_string = {
     1 : "bhop",
     2 : "surf"
 }
+
+ranks = ["New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God"]
 
 bhop_maps = {}
 with open("..\\files\\bhop_maps.json") as file:
@@ -150,7 +154,7 @@ def username_from_id(user_id):
     data = res.json()
     try:
         return data["Username"]
-    except:
+    except KeyError:
         raise Exception("Invalid user ID")
 
 def id_from_username(username):
@@ -158,7 +162,7 @@ def id_from_username(username):
     data = res.json()
     try:
         return data["Id"]
-    except:
+    except KeyError:
         raise Exception("Invalid username")
 
 def get_user_username_id(user):
@@ -225,7 +229,7 @@ def sexy_print(record_list, title=""):
         map_name = record.map_name
         print(f"{username:20}| {time:15}| {date:20}| {map_name:20}")
 
-def sexy_format(record_list, *args):
+def sexy_format(record_list):
     records = len(record_list)
     s = ""
     s += f"Total records: {records}\n"
@@ -236,7 +240,7 @@ def sexy_format(record_list, *args):
         time = record.time_string[:10]
         date = record.date_string[:20]
         map_name = record.map_name[:20]
-        style = record.style_string[:15]
+        style = record.style_string[:14]
         game = record.game_string
         s += f"{username:15}| {time:10}| {date:20}| {map_name:20}| {style:14}| {game}\n"
     return s[:-1]
@@ -311,6 +315,81 @@ def total_wrs(user, game, style):
         return 0
     else:
         return len(data)
+
+def get_user_rank(user, game, style):
+    _, user_id = get_user_username_id(user)
+    res = get(f"rank/{user_id}", {
+        "game":games[game],
+        "style":styles[style]
+    })
+    data = res.json()
+    if data == None:
+        return "User has no rank/times."
+    else:
+        r = int(float(data["Rank"]) * 20)
+        rank = ranks[r - 1]
+        skill = round(float(data["Skill"]) * 100.0, 3)
+        return f"Rank: {rank} ({r}), Skill: {skill}%"
+
+#returns the difference between 1st and 2nd place on a given map
+#in seconds
+def calculate_wr_diff(map_id):
+    res = get(f"time/map/{map_id}", {
+        "style":1,
+    })
+    data = res.json()
+    first = convert_to_record(data[0])
+    second = convert_to_record(data[1])
+    return round((int(second.time) - int(first.time)) / 1000.0, 3)
+
+def get_new_wrs():
+    res1 = get("time/recent/wr", {
+        "game":1,
+        "style":1
+    })
+    new_bhop_wrs = make_record_list(res1.json())
+    res2 = get("time/recent/wr", {
+        "game":2,
+        "style":1
+    })
+    new_surf_wrs = make_record_list(res2.json())
+    old_bhop_wrs = []
+    with open("..\\files\\bhop_recent_wrs.json") as file:
+        old_bhop_wrs = make_record_list(json.load(file))
+    old_surf_wrs = []
+    with open("..\\files\\surf_recent_wrs.json") as file:
+        old_surf_wrs = make_record_list(json.load(file))
+    bhop_globals_dict = {}
+    surf_globals_dict = {}
+    if new_bhop_wrs[0].id != old_bhop_wrs[0].id:
+        bhop_globals_dict[new_bhop_wrs[0]] = calculate_wr_diff(new_bhop_wrs[0].map_id)
+        for record in new_bhop_wrs[1:]:
+            if record.id != old_bhop_wrs[0].id:
+                bhop_globals_dict[record] = calculate_wr_diff(record.map_id)
+            else:
+                break
+        files.write_bhop_wrs()
+    if new_surf_wrs[0].id != old_surf_wrs[0].id:
+        surf_globals_dict[new_surf_wrs[0]] = calculate_wr_diff(new_surf_wrs[0].map_id)
+        for record in new_surf_wrs[1:]:
+            if record.id != old_surf_wrs[0].id:
+                surf_globals_dict[record] = calculate_wr_diff(record.map_id)
+            else:
+                break
+        files.write_surf_wrs()
+    if len(bhop_globals_dict) > 0 or len(surf_globals_dict):
+        s = "NEW WR!!!\n"
+        for d in [bhop_globals_dict, surf_globals_dict]:
+            for record, diff in d.items():
+                username = record.username
+                time = record.time_string
+                map_name = record.map_name
+                style = record.style_string
+                game = record.game_string
+                s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
+        return s
+    else:
+        return None
 
 def bot_get_recent_wrs(game, style):
     return sexy_format(get_recent_wrs(game, style))
