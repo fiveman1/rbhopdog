@@ -10,6 +10,9 @@ import files
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 
+def fix_path(path):
+    return os.path.abspath(os.path.expanduser(path))
+
 URL = "https://api.strafes.net/v1/"
 
 headers = {
@@ -66,12 +69,12 @@ game_id_to_string = {
 ranks = ["New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God"]
 
 bhop_maps = {}
-with open("..\\files\\bhop_maps.json") as file:
+with open(fix_path("../files/bhop_maps.json")) as file:
     data = file.read()
     bhop_maps = json.loads(data)
 
 surf_maps = {}
-with open("..\\files\\surf_maps.json") as file:
+with open(fix_path("../files/surf_maps.json")) as file:
     data = file.read()
     surf_maps = json.loads(data)
 
@@ -354,10 +357,10 @@ def get_new_wrs():
     })
     new_surf_wrs = make_record_list(res2.json())
     old_bhop_wrs = []
-    with open("..\\files\\bhop_recent_wrs.json") as file:
+    with open(fix_path("../files/bhop_recent_wrs.json")) as file:
         old_bhop_wrs = make_record_list(json.load(file))
     old_surf_wrs = []
-    with open("..\\files\\surf_recent_wrs.json") as file:
+    with open(fix_path("../files/surf_recent_wrs.json")) as file:
         old_surf_wrs = make_record_list(json.load(file))
     bhop_globals_dict = {}
     surf_globals_dict = {}

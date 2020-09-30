@@ -9,6 +9,9 @@ API_KEY = os.getenv("API_KEY")
 
 URL = "https://api.strafes.net/v1/"
 
+def fix_path(path):
+    return os.path.abspath(os.path.expanduser(path))
+
 headers = {
     "api-key":API_KEY,
 }
@@ -36,7 +39,7 @@ def write_bhop_maps():
         })
         bhop_map_data = bhop_map_data + m.json()
 
-    with open("..\\files\\bhop_maps.json", "w") as file:
+    with open(fix_path("../files/bhop_maps.json"), "w") as file:
         json.dump(bhop_map_data, file)
     file.close()
 
@@ -54,7 +57,7 @@ def write_surf_maps():
         })
         surf_map_data = surf_map_data + m.json()
 
-    with open("..\\files\\surf_maps.json", "w") as file:
+    with open(fix_path("../files/surf_maps.json"), "w") as file:
         json.dump(surf_map_data, file)
     file.close()
 
@@ -65,7 +68,7 @@ def write_bhop_wrs():
         })
     bhop_wrs_data = bhop_wrs.json()
 
-    with open("..\\files\\bhop_recent_wrs.json", "w") as file:
+    with open(fix_path("../files/bhop_recent_wrs.json"), "w") as file:
         json.dump(bhop_wrs_data, file)
     file.close()
 
@@ -76,6 +79,6 @@ def write_surf_wrs():
         })
     surf_wrs_data = surf_wrs.json()
 
-    with open("..\\files\\surf_recent_wrs.json", "w") as file:
+    with open(fix_path("../files/surf_recent_wrs.json"), "w") as file:
         json.dump(surf_wrs_data, file)
     file.close()

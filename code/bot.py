@@ -15,8 +15,11 @@ from discord.ext import commands, tasks
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
+def fix_path(path):
+    return os.path.abspath(os.path.expanduser(path))
+
 commands_text = ""
-with open("..\\files\\commands.txt") as file:
+with open(fix_path("../files/commands.txt")) as file:
     data = file.read()
     commands_text = data
 
