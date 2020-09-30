@@ -1,3 +1,4 @@
 src/.env
 src/__pycache__
 src/cogs/__pycache__
+src/modules/__pycache__
