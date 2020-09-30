@@ -363,13 +363,17 @@ def get_new_wrs():
     for i in range(len(new_wrs)):
         new_records = make_record_list(new_wrs[i])
         old_records = make_record_list(old_wrs[i])
-        if new_records[0].id != old_records[0].id:
-            globals_ls.append(new_records[0])
-            for record in new_records[1:]:
-                if record.id != old_records[0].id:
-                    globals_ls.append(record)
-                else:
-                    break
+        new_ids = []
+        for record in new_records:
+            new_ids.append(record.id)
+        old_ids = []
+        for record in old_records:
+            old_ids.append(record.id)
+        for j in range(len(new_ids)):
+            if new_ids[j] not in old_ids[j]:
+                globals_ls.append(new_records[j])
+            else:
+                break
     if len(globals_ls) > 0:
         files.write_wrs()
         s = "NEW WR!!!\n"
