@@ -1,4 +1,5 @@
 # main.py
+import discord
 import os
 import requests
 import sys
@@ -22,11 +23,6 @@ class MainCog(commands.Cog):
         self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
 
         #guild_ids = [759491070374969404, 728022833254629517] #0, my testing server, 1: sev's server
-        self.globals_channels = []
-        for guild in self.bot.guilds:
-            for ch in guild.channels:
-                if ch.name == "globals":
-                    self.globals_channels.append(ch)
         self.global_announcements.start()
         print("maincog loaded")
     
@@ -36,10 +32,13 @@ class MainCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
-        message = rbhop.get_new_wrs()
-        if message != None:
-            for ch in self.globals_channels:
-                await ch.send(self.format_markdown_code(message))
+        records = rbhop.get_new_wrs()
+        if len(records) > 0:
+            for guild in self.bot.guilds:
+                for ch in guild.channels:
+                    if ch.name == "globals":
+                        for record in records:
+                            await ch.send(embed=self.make_global_embed(record))
 
     @commands.command(name="recentwrs")
     async def get_recent_wrs(self, ctx, game, style="autohop"):
@@ -145,6 +144,16 @@ class MainCog(commands.Cog):
 
     def format_markdown_code(self, s):
         return f"```{s}```"
+    
+    def make_global_embed(self, record):
+        embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
+        embed.set_thumbnail(url="https://i.imgur.com/PtLyW2j.png")
+        embed.add_field(name="Player", value=record.username, inline=True)
+        embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
+        embed.add_field(name="\u200B", value="\u200B", inline=True)
+        embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}", inline=True)
+        embed.set_footer(text="World Record")
+        return embed
 
 def setup(bot):
     print("loading maincog")

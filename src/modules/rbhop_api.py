@@ -68,15 +68,24 @@ game_id_to_string = {
 
 ranks = ["New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God"]
 
+def open_json(path):
+    with open(fix_path(path)) as file:
+        data = file.read()
+        return json.loads(data)
+
 bhop_maps = {}
-with open(fix_path("files/bhop_maps.json")) as file:
-    data = file.read()
-    bhop_maps = json.loads(data)
+try:
+    bhop_maps = open_json("files/bhop_maps.json")
+except FileNotFoundError:
+    files.write_bhop_maps()
+    bhop_maps = open_json("files/bhop_maps.json")
 
 surf_maps = {}
-with open(fix_path("files/surf_maps.json")) as file:
-    data = file.read()
-    surf_maps = json.loads(data)
+try:
+    surf_maps = open_json("files/surf_maps.json")
+except FileNotFoundError:
+    files.write_surf_maps()
+    surf_maps = open_json("files/surf_maps.json")
 
 #since dicts are sorta glorified hash tables we can optimize id -> displayname lookup
 #by storing this data in a dict; now the operation should be O(1) instead of O(n)
@@ -122,6 +131,7 @@ class Record():
         self.time_string = format_time(self.time)
         self.style_string = style_id_to_string[self.style]
         self.game_string = game_id_to_string[self.game]
+        self.diff = -1.0
         if username == None:
             self.username = username_from_id(self.user_id)
         else:
@@ -362,8 +372,11 @@ def get_new_wrs():
                     })
                 new_wrs.append(wrs.json())
     old_wrs = []
-    with open(fix_path("files/recent_wrs.json")) as file:
-        old_wrs = json.load(file)
+    try:
+        old_wrs = open_json("files/recent_wrs.json")
+    except FileNotFoundError:
+        files.write_wrs()
+        old_wrs = open_json("files/recent_wrs.json")
     globals_ls = []
     for i in range(len(new_wrs)):
         new_records = make_record_list(new_wrs[i])
@@ -372,23 +385,26 @@ def get_new_wrs():
             match = search(old_records, record)
             if match:
                 if record.time != match.time:
-                    globals_ls.append((record, round((int(match.time) - int(record.time)) / 1000.0, 3)))
+                    record.diff = round((int(match.time) - int(record.time)) / 1000.0, 3)
+                    globals_ls.append(record)
             else:
-                globals_ls.append((record, calculate_wr_diff(record.map_id, record.style)))
+                record.diff = calculate_wr_diff(record.map_id, record.style)
+                globals_ls.append(record)
     if len(globals_ls) > 0:
         files.write_wrs()
-        s = "NEW WR!!!\n"
-        for record in globals_ls:
-            username = record[0].username
-            time = record[0].time_string
-            map_name = record[0].map_name
-            style = record[0].style_string
-            game = record[0].game_string
-            diff = record[1]
-            s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
-        return s
-    else:
-        return None
+    return globals_ls
+    #     s = "NEW WR!!!\n"
+    #     for record in globals_ls:
+    #         username = record[0].username
+    #         time = record[0].time_string
+    #         map_name = record[0].map_name
+    #         style = record[0].style_string
+    #         game = record[0].game_string
+    #         diff = record[1]
+    #         s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
+    #     return s
+    # else:
+    #     return None
 
 def bot_get_recent_wrs(game, style):
     return sexy_format(get_recent_wrs(game, style))

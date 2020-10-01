@@ -75,14 +75,3 @@ def write_wrs():
     with open(fix_path("files/recent_wrs.json"), "w") as file:
         json.dump(wrs_data, file)
     file.close()
-
-# def write_surf_wrs():
-#     surf_wrs = get("time/recent/wr", {
-#             "game":2,
-#             "style":1
-#         })
-#     surf_wrs_data = surf_wrs.json()
-
-#     with open(fix_path("../files/surf_recent_wrs.json"), "w") as file:
-#         json.dump(surf_wrs_data, file)
-#     file.close()
