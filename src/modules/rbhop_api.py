@@ -358,7 +358,7 @@ def calculate_wr_diff(map_id, style):
 
 def search(ls, record):
     for i in ls:
-        if record.id == i.id:
+        if record["ID"] == i["ID"]:
             return i
     return None
 
@@ -380,17 +380,19 @@ def get_new_wrs():
         return []
     globals_ls = []
     for i in range(len(new_wrs)):
-        new_records = make_record_list(new_wrs[i])
-        old_records = make_record_list(old_wrs[i])
-        for record in new_records:
-            match = search(old_records, record)
+        for record in new_wrs[i]:
+            match = search(old_wrs[i], record)
             if match:
-                if record.time != match.time:
-                    record.diff = round((int(match.time) - int(record.time)) / 1000.0, 3)
-                    globals_ls.append(record)
+                if record["Time"] != match["Time"]:
+                    r = convert_to_record(record)
+                    r.diff = round((int(match["Time"]) - int(record["Time"])) / 1000.0, 3)
+                    globals_ls.append(r)
+                else:
+                    break
             else:
-                record.diff = calculate_wr_diff(record.map_id, record.style)
-                globals_ls.append(record)
+                r = convert_to_record(record)
+                r.diff = calculate_wr_diff(record["Map"], record["Style"])
+                globals_ls.append(r)
     if len(globals_ls) > 0:
         files.write_wrs()
     return globals_ls

@@ -30,20 +30,23 @@ class MainCog(commands.Cog):
         print("unloading maincog")
         self.global_announcements.cancel()
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(minutes=2)
     async def global_announcements(self):
-        print("doing globals")
+        #print("doing globals")
         records = rbhop.get_new_wrs()
+        #print("records found")
         if len(records) > 0:
+            print("new wr")
             for guild in self.bot.guilds:
                 for ch in guild.channels:
                     if ch.name == "globals":
                         for record in records:
                             await ch.send(embed=self.make_global_embed(record))
+        #print("done with globals")
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
-        print("waiting for read")
+        print("waiting for ready")
         await self.bot.wait_until_ready()
 
     @commands.command(name="recentwrs")
