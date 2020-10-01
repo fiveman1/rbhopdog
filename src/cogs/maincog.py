@@ -32,6 +32,7 @@ class MainCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
+        print("doing globals")
         records = rbhop.get_new_wrs()
         if len(records) > 0:
             for guild in self.bot.guilds:
@@ -39,6 +40,11 @@ class MainCog(commands.Cog):
                     if ch.name == "globals":
                         for record in records:
                             await ch.send(embed=self.make_global_embed(record))
+    
+    @global_announcements.before_loop
+    async def before_global_announcements(self):
+        print("waiting for read")
+        await self.bot.wait_until_ready()
 
     @commands.command(name="recentwrs")
     async def get_recent_wrs(self, ctx, game, style="autohop"):
