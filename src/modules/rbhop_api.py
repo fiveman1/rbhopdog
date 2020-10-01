@@ -346,6 +346,11 @@ def calculate_wr_diff(map_id, style):
     second = convert_to_record(data[1])
     return round((int(second.time) - int(first.time)) / 1000.0, 3)
 
+def search(ls, record):
+    for i in ls:
+        if record.id == i.id:
+            return i
+    return None
 def get_new_wrs():
     new_wrs = []
     for game in range(1,3):
@@ -363,27 +368,23 @@ def get_new_wrs():
     for i in range(len(new_wrs)):
         new_records = make_record_list(new_wrs[i])
         old_records = make_record_list(old_wrs[i])
-        new_ids = []
         for record in new_records:
-            new_ids.append(record.id)
-        old_ids = []
-        for record in old_records:
-            old_ids.append(record.id)
-        for j in range(len(new_ids)):
-            if new_ids[j] not in old_ids:
-                globals_ls.append(new_records[j])
+            match = search(old_records, record)
+            if match:
+                if record.time != match.time:
+                    globals_ls.append((record, round((int(match.time) - int(record.time)) / 1000.0, 3)))
             else:
-                break
+                globals_ls.append((record, calculate_wr_diff(record.map_id, record.style)))
     if len(globals_ls) > 0:
         files.write_wrs()
         s = "NEW WR!!!\n"
         for record in globals_ls:
-            username = record.username
-            time = record.time_string
-            map_name = record.map_name
-            style = record.style_string
-            game = record.game_string
-            diff = calculate_wr_diff(record.map_id, record.style)
+            username = record[0].username
+            time = record[0].time_string
+            map_name = record[0].map_name
+            style = record[0].style_string
+            game = record[0].game_string
+            diff = record[1]
             s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
         return s
     else:
