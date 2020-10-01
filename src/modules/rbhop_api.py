@@ -361,6 +361,7 @@ def search(ls, record):
         if record.id == i.id:
             return i
     return None
+
 def get_new_wrs():
     new_wrs = []
     for game in range(1,3):
@@ -376,7 +377,7 @@ def get_new_wrs():
         old_wrs = open_json("files/recent_wrs.json")
     except FileNotFoundError:
         files.write_wrs()
-        old_wrs = open_json("files/recent_wrs.json")
+        return []
     globals_ls = []
     for i in range(len(new_wrs)):
         new_records = make_record_list(new_wrs[i])
