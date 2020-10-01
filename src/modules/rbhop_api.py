@@ -370,7 +370,7 @@ def get_new_wrs():
         for record in old_records:
             old_ids.append(record.id)
         for j in range(len(new_ids)):
-            if new_ids[j] not in old_ids[j]:
+            if new_ids[j] not in old_ids:
                 globals_ls.append(new_records[j])
             else:
                 break
