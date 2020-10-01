@@ -13,11 +13,11 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 COMMAND = os.getenv("COMMAND")
 
 bot = commands.Bot(command_prefix=COMMAND)
+bot.load_extension("cogs.maincog")
 
 @bot.event
 async def on_ready():
     print(f"{bot.user} has connected to Discord!")
-    bot.load_extension("cogs.maincog")
 
 @bot.event
 async def on_command_error(ctx, error):
