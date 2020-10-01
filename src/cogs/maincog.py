@@ -22,7 +22,6 @@ class MainCog(commands.Cog):
         self.games = ["bhop", "surf"]
         self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
 
-        #guild_ids = [759491070374969404, 728022833254629517] #0, my testing server, 1: sev's server
         self.global_announcements.start()
         print("maincog loaded")
     
@@ -32,9 +31,7 @@ class MainCog(commands.Cog):
 
     @tasks.loop(minutes=2)
     async def global_announcements(self):
-        #print("doing globals")
         records = rbhop.get_new_wrs()
-        #print("records found")
         if len(records) > 0:
             print("new wr")
             for guild in self.bot.guilds:
@@ -42,7 +39,6 @@ class MainCog(commands.Cog):
                     if ch.name == "globals":
                         for record in records:
                             await ch.send(embed=self.make_global_embed(record))
-        #print("done with globals")
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
@@ -55,11 +51,11 @@ class MainCog(commands.Cog):
         style = style.lower()
         await ctx.send(self.format_markdown_code(rbhop.bot_get_recent_wrs(game, style)))
 
-    @commands.command(name="userrecord")
-    async def get_user_record(self, ctx, game, style, mapname, user=None):
+    @commands.command(name="record")
+    async def get_user_record(self, ctx, user, game, style, *, mapname):
         game = game.lower()
         style = style.lower()
-        if user == None:
+        if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         record = rbhop.bot_get_user_record(user, game, style, mapname)
         if record == None:
@@ -67,11 +63,12 @@ class MainCog(commands.Cog):
         else:
             await ctx.send(self.format_markdown_code(record))
 
+    @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
-    async def wr_list(self, ctx, user=None, game=None, style=None):
+    async def wr_list(self, ctx, user, game=None, style=None):
         g = []
         s = []
-        if user == None:
+        if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         if game == None:
             g = self.games
@@ -100,8 +97,8 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(message))
 
     @commands.command(name="wrcount")
-    async def wr_count(self, ctx, user=None):
-        if user == None:
+    async def wr_count(self, ctx, user):
+        if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         msg = ""
         count = 0
@@ -120,13 +117,13 @@ class MainCog(commands.Cog):
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="fastecheck")
-    async def faste_check(self, ctx, game, style, user=None):
+    async def faste_check(self, ctx, user, game, style):
         game = game.lower()
         style = style.lower()
         if style == "scroll":
             await ctx.send(self.format_markdown_code("Scroll is not eligible for faste"))
             return
-        if user == None:
+        if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         wrs = rbhop.total_wrs(user, game, style)
         if (style in ["autohop", "auto"] and wrs >= 10) or wrs >= 50:
@@ -134,9 +131,9 @@ class MainCog(commands.Cog):
         else:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{user} is NOT eligible for faste in {game} in the style {style}."))
 
-    @commands.command(name="userrank")
-    async def user_rank(self, ctx, game, style, user=None):
-        if user == None:
+    @commands.command(name="rank")
+    async def user_rank(self, ctx, user, game, style):
+        if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         await ctx.send(self.format_markdown_code(rbhop.get_user_rank(user, game, style)))
 

@@ -288,9 +288,17 @@ def page_records(record_list, sort="name"):
     return ls
 
 def get_recent_wrs(game, style):
+    try:
+        game = games[game]
+    except:
+        raise Exception("Invalid game")
+    try:
+        style = styles[style]
+    except:
+        raise Exception("Invalid style")
     res = get("time/recent/wr", {
-        "game":games[game],
-        "style":styles[style]
+        "game":game,
+        "style":style
     })
     data = res.json()
     return make_record_list(data)
