@@ -21,7 +21,7 @@ class MainCog(commands.Cog):
 
         self.games = ["bhop", "surf"]
         self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
-
+        files.write_wrs()
         self.global_announcements.start()
         print("maincog loaded")
     

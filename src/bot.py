@@ -25,6 +25,8 @@ async def on_command_error(ctx, error):
         #await ctx.send("```Invalid command```")
     if isinstance(error, commands.BadArgument):
         await ctx.send("```Error: Bad argument```")
+    elif isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f'This command is on cooldown. Please wait {error.retry_after:.2f}s.')
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"```Error: Missing argument(s): {error.param}```")
     elif isinstance(error, commands.CommandInvokeError):
