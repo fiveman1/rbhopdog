@@ -333,9 +333,12 @@ def calculate_wr_diff(map_id, style):
         "style":style,
     })
     data = res.json()
-    first = convert_to_record(data[0])
-    second = convert_to_record(data[1])
-    return round((int(second.time) - int(first.time)) / 1000.0, 3)
+    if len(data) > 1:
+        first = convert_to_record(data[0])
+        second = convert_to_record(data[1])
+        return round((int(second.time) - int(first.time)) / 1000.0, 3)
+    else:
+        return "n/a"
 
 def search(ls, record):
     for i in ls:
