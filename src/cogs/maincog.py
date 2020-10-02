@@ -93,6 +93,9 @@ class MainCog(commands.Cog):
                     if record_list != None:
                         count += len(record_list)
                         wrs.append(record_list)
+        if count == 0:
+            await ctx.send(self.format_markdown_code(f"{user} has no WRs in the specified game and style."))
+            return
         convert_ls = []
         for record_ls in wrs:
             record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
@@ -100,9 +103,6 @@ class MainCog(commands.Cog):
                 convert_ls.append(record)
         messages = rbhop.page_records(convert_ls, sort=sort)
         counter = 0
-        if len(messages) == 1:
-            await ctx.send(self.format_markdown_code(f"{user} has no WRs in the specified game and style."))
-            return
         for message in messages:
             counter += 1
             await ctx.send(self.format_markdown_code(message))
