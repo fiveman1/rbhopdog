@@ -245,8 +245,7 @@ def sexy_print(record_list, title=""):
 
 def sexy_format(record_list):
     records = len(record_list)
-    s = ""
-    s += f"Total records: {records}\n"
+    s = f"Total records: {records}\n"
     titles = ["Username:", "Time:", "Date", "Map name:", "Style:", "Game:"]
     s += f"{titles[0]:15}| {titles[1]:10}| {titles[2]:20}| {titles[3]:20}| {titles[4]:14}| Game\n"
     for record in record_list:
@@ -339,7 +338,7 @@ def total_wrs(user, game, style):
         return len(data)
 
 def get_user_rank(user, game, style):
-    _, user_id = get_user_username_id(user)
+    username, user_id = get_user_username_id(user)
     res = get(f"rank/{user_id}", {
         "game":games[game],
         "style":styles[style]
@@ -349,9 +348,11 @@ def get_user_rank(user, game, style):
         return "User has no rank/times."
     else:
         r = int(float(data["Rank"]) * 20)
+        if r == 0:
+            return f"{username}\nUser has no rank/times."
         rank = ranks[r - 1]
         skill = round(float(data["Skill"]) * 100.0, 3)
-        return f"Rank: {rank} ({r}), Skill: {skill}%"
+        return f"{username}\nRank: {rank} ({r}), Skill: {skill:.3f}%"
 
 #returns the difference between 1st and 2nd place on a given map
 #in seconds

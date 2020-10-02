@@ -93,8 +93,13 @@ class MainCog(commands.Cog):
             for record in record_ls_sort:
                 convert_ls.append(record)
         messages = rbhop.page_records(convert_ls, sort="")
+        counter = 0
         for message in messages:
+            counter += 1
             await ctx.send(self.format_markdown_code(message))
+            if counter >= 5:
+                await ctx.send(self.format_markdown_code("Limiting messages, consider specifying game/style to reduce message count."))
+                return
 
     @commands.command(name="wrcount")
     async def wr_count(self, ctx, user):
@@ -110,10 +115,11 @@ class MainCog(commands.Cog):
                     if wrs > 0:
                         count += wrs
                         msg += f"    {style}: {wrs}\n"
+        print(user)
         if count > 0:
-            msg = f"Total WRs: {count}\n" + msg
+            msg = f"{user}\nTotal WRs: {count}\n" + msg
         else:
-            msg = "Total WRs: 0"
+            msg = f"{user}\nTotal WRs: 0"
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="fastecheck")
