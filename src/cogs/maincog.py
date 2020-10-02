@@ -181,7 +181,6 @@ class MainCog(commands.Cog):
                 return False
         if mapname:
             m = rbhop.map_id_from_name(mapname, game)
-            print(m)
             if m == "Map id not found":
                 await ctx.send(self.format_markdown_code(f"'{mapname}' is not a valid {game} map."))
                 return False
