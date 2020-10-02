@@ -262,7 +262,7 @@ def page_records(record_list, sort="name"):
     if sort == "name":
         record_list = sorted(record_list, key = lambda i: i.map_name) #sort by map name
     elif sort == "date":
-        record_list = sorted(record_list, key = lambda i: i.date) #sort by date
+        record_list = sorted(record_list, key = lambda i: i.date, reverse=True) #sort by date (most recent)
     elif sort == "time":
         record_list = sorted(record_list, key = lambda i: i.time) #sort by time
     elif sort == "style":
