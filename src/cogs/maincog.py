@@ -115,7 +115,6 @@ class MainCog(commands.Cog):
                     if wrs > 0:
                         count += wrs
                         msg += f"    {style}: {wrs}\n"
-        print(user)
         if count > 0:
             msg = f"{user}\nTotal WRs: {count}\n" + msg
         else:
@@ -155,7 +154,7 @@ class MainCog(commands.Cog):
             raise Exception("No username found")
 
     def format_markdown_code(self, s):
-        return f"```{s}```"
+        return f"```\n{s}```"
     
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
