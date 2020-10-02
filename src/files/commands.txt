@@ -7,9 +7,11 @@ your Roblox username using RoVer if it is connected to your Discord account.
     Get a user's time on a given map.
 !wrcount username
     Gives a count of a user's WRs in every game and style.
-!wrlist username game style
+!wrlist username game:both style:all sort:default
     Lists all of a player's world records
     If no game is given it will check both, if no style is given it will check both.
+    default sort: sort by styles alphabetically, within each style sort by map name alphabetically
+    other sorts: "name", "date", "time", "style"
 !fastecheck username game style
     Determines if a player is eligible for faste in a given game and style.
 !rank username game style

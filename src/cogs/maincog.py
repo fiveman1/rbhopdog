@@ -65,16 +65,16 @@ class MainCog(commands.Cog):
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
-    async def wr_list(self, ctx, user, game=None, style=None):
+    async def wr_list(self, ctx, user, game=None, style=None, sort=""):
         g = []
         s = []
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
-        if game == None:
+        if game in [None, "both", "all"]:
             g = self.games
         else:
             g.append(game.lower())
-        if style == None:
+        if style in [None, "all"]:
             s = self.styles
         else:
             s.append(style.lower())
@@ -92,7 +92,7 @@ class MainCog(commands.Cog):
             record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
             for record in record_ls_sort:
                 convert_ls.append(record)
-        messages = rbhop.page_records(convert_ls, sort="")
+        messages = rbhop.page_records(convert_ls, sort=sort)
         counter = 0
         for message in messages:
             counter += 1
