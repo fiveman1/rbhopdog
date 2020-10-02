@@ -5,6 +5,8 @@ your Roblox username using RoVer if it is connected to your Discord account.
     Get a list of the 10 most recent WRs in a given game and style.
 !record username game style {map_name}
     Get a user's time on a given map.
+!wrmap game style {map_name}
+    Gives the 15 best times on a given map and style
 !wrcount username
     Gives a count of a user's WRs in every game and style.
 !wrlist username game:both style:all sort:default

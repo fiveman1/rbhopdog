@@ -66,6 +66,17 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code("No time found on this map."))
         else:
             await ctx.send(self.format_markdown_code(record))
+    
+    @commands.command(name="wrmap")
+    async def get_wrmap(self, ctx, game, style, *, mapname):
+        game = game.lower()
+        style = style.lower()
+        if not await self.argument_checker(ctx, None, game, style, mapname):
+            return
+        times = rbhop.get_map_times(game, style, mapname)
+        msg = f"Record list for map: '{mapname}' in style: '{style}'\n"
+        msg += rbhop.sexy_format(rbhop.make_record_list(times[:15]))
+        await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")

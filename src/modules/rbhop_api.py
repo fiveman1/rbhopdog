@@ -215,17 +215,6 @@ def convert_to_record(record, username=None):
         username
     )
 
-#stop using this, just do print(sexy_format(record_list)) instead
-def sexy_print(record_list, title=""):
-    print(title)
-    print("Username:           | Time:          | Date:               | Map Name:      ")
-    for record in record_list:
-        username = record.username
-        time = record.time_string
-        date = record.date_string
-        map_name = record.map_name
-        print(f"{username:20}| {time:15}| {date:20}| {map_name:20}")
-
 def sexy_format(record_list):
     records = len(record_list)
     s = f"Total records: {records}\n"
@@ -388,18 +377,12 @@ def get_new_wrs():
     if len(globals_ls) > 0:
         files.write_wrs()
     return globals_ls
-    #     s = "NEW WR!!!\n"
-    #     for record in globals_ls:
-    #         username = record[0].username
-    #         time = record[0].time_string
-    #         map_name = record[0].map_name
-    #         style = record[0].style_string
-    #         game = record[0].game_string
-    #         diff = record[1]
-    #         s += f"{username} | {map_name} | {time} (-{diff:.3f} seconds) | {style} | {game}\n"
-    #     return s
-    # else:
-    #     return None
+
+def get_map_times(game, style, map_name):
+    map_id = map_id_from_name(map_name, game)
+    return get(f"time/map/{map_id}", {
+        "style":styles[style]
+    }).json()
 
 def bot_get_recent_wrs(game, style):
     return sexy_format(get_recent_wrs(game, style))
