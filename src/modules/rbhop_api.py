@@ -326,8 +326,7 @@ def get_user_rank(user, game, style):
         skill = round(float(data["Skill"]) * 100.0, 3)
         return f"{username}\nRank: {rank} ({r}), Skill: {skill:.3f}%"
 
-#returns the difference between 1st and 2nd place on a given map
-#in seconds
+#returns the difference between 1st and 2nd place on a given map in seconds
 def calculate_wr_diff(map_id, style):
     res = get(f"time/map/{map_id}", {
         "style":style,
@@ -337,6 +336,8 @@ def calculate_wr_diff(map_id, style):
         first = convert_to_record(data[0])
         second = convert_to_record(data[1])
         return round((int(second.time) - int(first.time)) / 1000.0, 3)
+    #if there is only one time on the map someone is the only person to beat it
+    #so there is no time to compare it to for diff
     else:
         return "n/a"
 
@@ -367,18 +368,23 @@ def get_new_wrs():
         for record in new_wrs[i]:
             match = search(old_wrs[i], record)
             if match:
+                #records by the same person on the same map have the same id even if they beat it
                 if record["Time"] != match["Time"]:
                     r = convert_to_record(record)
                     r.diff = round((int(match["Time"]) - int(record["Time"])) / 1000.0, 3)
                     globals_ls.append(r)
+                #we can break here because the lists are sorted in the same fashion
                 else:
                     break
             else:
                 r = convert_to_record(record)
                 r.diff = calculate_wr_diff(record["Map"], record["Style"])
                 globals_ls.append(r)
+    #overwrite recent_wrs.json with new wrs if they exist
     if len(globals_ls) > 0:
-        files.write_wrs()
+        with open(fix_path("files/recent_wrs.json"), "w") as file:
+            json.dump(new_wrs, file)
+        file.close()
     return globals_ls
 
 def get_map_times(game, style, map_name):
