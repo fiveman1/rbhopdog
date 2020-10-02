@@ -49,12 +49,16 @@ class MainCog(commands.Cog):
     async def get_recent_wrs(self, ctx, game, style="autohop"):
         game = game.lower()
         style = style.lower()
+        if not await self.argument_checker(ctx, None, game, style):
+            return
         await ctx.send(self.format_markdown_code(rbhop.bot_get_recent_wrs(game, style)))
 
     @commands.command(name="record")
     async def get_user_record(self, ctx, user, game, style, *, mapname):
         game = game.lower()
         style = style.lower()
+        if not await self.argument_checker(ctx, user, game, style, mapname):
+            return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         record = rbhop.bot_get_user_record(user, game, style, mapname)
@@ -68,8 +72,6 @@ class MainCog(commands.Cog):
     async def wr_list(self, ctx, user, game=None, style=None, sort=""):
         g = []
         s = []
-        if user == "me":
-            user = self.get_roblox_username(ctx.author.id)
         if game in [None, "both", "all"]:
             g = self.games
         else:
@@ -78,6 +80,10 @@ class MainCog(commands.Cog):
             s = self.styles
         else:
             s.append(style.lower())
+        if not await self.argument_checker(ctx, user, g[0], s[0]):
+            return
+        if user == "me":
+            user = self.get_roblox_username(ctx.author.id)
         wrs = []
         count = 0
         for game in g:
@@ -94,6 +100,8 @@ class MainCog(commands.Cog):
                 convert_ls.append(record)
         messages = rbhop.page_records(convert_ls, sort=sort)
         counter = 0
+        if len(messages) == 1:
+            await ctx.send(self.format_markdown_code(f"{user} has no WRs in the game '{game}' and style '{style}'"))
         for message in messages:
             counter += 1
             await ctx.send(self.format_markdown_code(message))
@@ -103,6 +111,8 @@ class MainCog(commands.Cog):
 
     @commands.command(name="wrcount")
     async def wr_count(self, ctx, user):
+        if not await self.argument_checker(ctx, user, None, None):
+            return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         msg = ""
@@ -125,6 +135,8 @@ class MainCog(commands.Cog):
     async def faste_check(self, ctx, user, game, style):
         game = game.lower()
         style = style.lower()
+        if not await self.argument_checker(ctx, user, game, style):
+            return
         if style == "scroll":
             await ctx.send(self.format_markdown_code("Scroll is not eligible for faste"))
             return
@@ -138,6 +150,8 @@ class MainCog(commands.Cog):
 
     @commands.command(name="rank")
     async def user_rank(self, ctx, user, game, style):
+        if not await self.argument_checker(ctx, user, game, style):
+            return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         await ctx.send(self.format_markdown_code(rbhop.get_user_rank(user, game, style)))
@@ -145,13 +159,39 @@ class MainCog(commands.Cog):
     @commands.command(name="commands")
     async def list_commands(self, ctx):
         await ctx.send(self.format_markdown_code(self.commands_text))
+    
+    async def argument_checker(self, ctx, user, game, style, mapname=None):
+        if game and game not in self.games:
+            await ctx.send(self.format_markdown_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
+            return False
+        if style and style not in rbhop.styles:
+            await ctx.send(self.format_markdown_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
+            return False
+        if user == "me":
+            username = self.get_roblox_username(ctx.author.id)
+            if not username:
+                await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
+                return False
+        elif user:
+            try:
+                rbhop.id_from_username(user)
+            except:
+                await ctx.send(self.format_markdown_code(f"'{user} is not a valid username. No Roblox account associated with this username."))
+                return False
+        if mapname:
+            m = rbhop.map_id_from_name(mapname, game)
+            print(m)
+            if m == "Map id not found":
+                await ctx.send(self.format_markdown_code(f"'{mapname}' is not a valid {game} map."))
+                return False
+        return True
 
     def get_roblox_username(self, user_id):
         res = requests.get(f"https://verify.eryn.io/api/user/{user_id}")
         if res:
             return res.json()["robloxUsername"]
         else:
-            raise Exception("No username found")
+            return None
 
     def format_markdown_code(self, s):
         return f"```\n{s}```"
