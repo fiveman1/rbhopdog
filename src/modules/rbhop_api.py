@@ -77,14 +77,14 @@ bhop_maps = {}
 try:
     bhop_maps = open_json("files/bhop_maps.json")
 except FileNotFoundError:
-    files.write_bhop_maps()
+    files.write_maps("bhop")
     bhop_maps = open_json("files/bhop_maps.json")
 
 surf_maps = {}
 try:
     surf_maps = open_json("files/surf_maps.json")
 except FileNotFoundError:
-    files.write_surf_maps()
+    files.write_maps("surf")
     surf_maps = open_json("files/surf_maps.json")
 
 #since dicts are sorta glorified hash tables we can optimize id -> displayname lookup
@@ -145,23 +145,6 @@ def get(end_of_url, params):
         raise Exception("Request failed")
     else:
         return res
-
-#returns a dict of all maps from the given game
-#only use this to update bhop_map/surf_map.json when new maps are added
-#TODO: move this to files, or combine the functions in these modules
-def get_maps(game):
-    maps = get("map", {
-        "game":games[game],
-        "page":"1"
-    })
-    total_pages = int(maps.headers["Pagination-Count"])
-    map_data = maps.json()
-    for i in range(2, total_pages + 1):
-        m = get("map", {
-            "game":games[game],
-            "page":str(i)
-        })
-        map_data = map_data + m.json()
 
 def username_from_id(user_id):
     res = requests.get(f"https://api.roblox.com/users/{user_id}")

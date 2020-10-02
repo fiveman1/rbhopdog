@@ -25,41 +25,64 @@ def get(end_of_url, params):
     else:
         return res
 
-def write_bhop_maps():
-    bhop_maps = get("map", {
-        "game":"1",
-        "page":"1"
-    })
-    total_pages = int(bhop_maps.headers["Pagination-Count"])
-    bhop_map_data = bhop_maps.json()
-    for i in range(2, total_pages + 1):
-        m = get("map", {
-            "game":"1",
-            "page":str(i)
-        })
-        bhop_map_data = bhop_map_data + m.json()
-
-    with open(fix_path("files/bhop_maps.json"), "w") as file:
-        json.dump(bhop_map_data, file)
+#game better be "bhop" or "surf"
+def write_maps(game):
+    game_id = game
+    if game == "bhop":
+        game_id = 1
+    else:
+        game_id = 2
+    page = 1
+    map_data = []
+    while True:
+        maps = get("map", {
+            "game":game_id,
+            "page":page
+        }).json()
+        if len(maps) == 0:
+            break
+        else:
+            map_data += maps
+            page += 1
+    with open(fix_path(f"files/{game}_maps.json"), "w") as file:
+        json.dump(map_data, file)
     file.close()
 
-def write_surf_maps():
-    surf_maps = get("map", {
-        "game":"2",
-        "page":"1"
-    })
-    total_pages = int(surf_maps.headers["Pagination-Count"])
-    surf_map_data = surf_maps.json()
-    for i in range(2, total_pages + 1):
-        m = get("map", {
-            "game":"2",
-            "page":str(i)
-        })
-        surf_map_data = surf_map_data + m.json()
 
-    with open(fix_path("files/surf_maps.json"), "w") as file:
-        json.dump(surf_map_data, file)
-    file.close()
+#     bhop_maps = get("map", {
+#         "game":"1",
+#         "page":"1"
+#     })
+#     total_pages = int(bhop_maps.headers["Pagination-Count"])
+#     bhop_map_data = bhop_maps.json()
+#     for i in range(2, total_pages + 1):
+#         m = get("map", {
+#             "game":"1",
+#             "page":str(i)
+#         })
+#         bhop_map_data = bhop_map_data + m.json()
+
+#     with open(fix_path("files/bhop_maps.json"), "w") as file:
+#         json.dump(bhop_map_data, file)
+#     file.close()
+
+# def write_surf_maps():
+#     surf_maps = get("map", {
+#         "game":"2",
+#         "page":"1"
+#     })
+#     total_pages = int(surf_maps.headers["Pagination-Count"])
+#     surf_map_data = surf_maps.json()
+#     for i in range(2, total_pages + 1):
+#         m = get("map", {
+#             "game":"2",
+#             "page":str(i)
+#         })
+#         surf_map_data = surf_map_data + m.json()
+
+#     with open(fix_path("files/surf_maps.json"), "w") as file:
+#         json.dump(surf_map_data, file)
+#     file.close()
 
 def write_wrs():
     wrs_data = []
