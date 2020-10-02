@@ -101,7 +101,8 @@ class MainCog(commands.Cog):
         messages = rbhop.page_records(convert_ls, sort=sort)
         counter = 0
         if len(messages) == 1:
-            await ctx.send(self.format_markdown_code(f"{user} has no WRs in the game '{game}' and style '{style}'"))
+            await ctx.send(self.format_markdown_code(f"{user} has no WRs in the specified game and style."))
+            return
         for message in messages:
             counter += 1
             await ctx.send(self.format_markdown_code(message))
