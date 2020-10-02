@@ -18,10 +18,9 @@ class MainCog(commands.Cog):
         with open(rbhop.fix_path("files/commands.txt")) as file:
             data = file.read()
             self.commands_text = data
-
         self.games = ["bhop", "surf"]
         self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
-        files.write_wrs()
+        files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
         self.global_announcements.start()
         print("maincog loaded")
     
@@ -33,16 +32,17 @@ class MainCog(commands.Cog):
     async def global_announcements(self):
         records = rbhop.get_new_wrs()
         if len(records) > 0:
-            print("new wr")
             for guild in self.bot.guilds:
                 for ch in guild.channels:
                     if ch.name == "globals":
                         for record in records:
+                            print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
                             await ch.send(embed=self.make_global_embed(record))
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
         print("waiting for ready")
+        #we have to wait for the bot to on_ready() or we won't be able to find channels/guilds
         await self.bot.wait_until_ready()
 
     @commands.command(name="recentwrs")
@@ -81,6 +81,7 @@ class MainCog(commands.Cog):
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
     async def wr_list(self, ctx, user, game=None, style=None, sort=""):
+        #loop through all games or all styles if not specified (or if "both" or "all")
         g = []
         s = []
         if game in [None, "both", "all"]:
@@ -107,11 +108,13 @@ class MainCog(commands.Cog):
         if count == 0:
             await ctx.send(self.format_markdown_code(f"{user} has no WRs in the specified game and style."))
             return
-        convert_ls = []
-        for record_ls in wrs:
-            record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
-            for record in record_ls_sort:
-                convert_ls.append(record)
+        #default sort: sort by style, then within each style sort alphabetically
+        if sort == "":
+            convert_ls = []
+            for record_ls in wrs:
+                record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
+                for record in record_ls_sort:
+                    convert_ls.append(record)
         messages = rbhop.page_records(convert_ls, sort=sort)
         counter = 0
         for message in messages:
@@ -172,6 +175,8 @@ class MainCog(commands.Cog):
     async def list_commands(self, ctx):
         await ctx.send(self.format_markdown_code(self.commands_text))
     
+    #checks if user, game, style, and mapname are valid arguments
+    #passing None as argument to any of these fields will pass the check for that field
     async def argument_checker(self, ctx, user, game, style, mapname=None):
         if game and game not in self.games:
             await ctx.send(self.format_markdown_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
