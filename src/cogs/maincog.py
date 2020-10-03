@@ -205,21 +205,11 @@ class MainCog(commands.Cog):
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return False
             else:
-                user_data = rbhop.get_user(username)
-                if user_data["State"] == 2:
-                    await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
-                    return False
-                elif user_data["State"] == 3:
-                    await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
+                if not await self.check_user_status(ctx, username):
                     return False
         elif user:
             try:
-                user_data = rbhop.get_user(user)
-                if user_data["State"] == 2:
-                    await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
-                    return False
-                elif user_data["State"] == 3:
-                    await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
+                if not await self.check_user_status(ctx, user):
                     return False
             except:
                 await ctx.send(self.format_markdown_code(f"'{user} is not a valid username. No Roblox account associated with this username."))
@@ -229,6 +219,16 @@ class MainCog(commands.Cog):
             if m == "Map id not found":
                 await ctx.send(self.format_markdown_code(f"'{mapname}' is not a valid {game} map."))
                 return False
+        return True
+    
+    async def check_user_status(self, ctx, user):
+        user_data = rbhop.get_user(user)
+        if user_data["State"] == 2:
+            await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
+            return False
+        elif user_data["State"] == 3:
+            await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
+            return False
         return True
 
     def get_roblox_username(self, user_id):
