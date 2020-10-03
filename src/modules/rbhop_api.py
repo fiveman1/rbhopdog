@@ -318,15 +318,15 @@ def get_user_rank(user, game, style):
     })
     data = res.json()
     if data == None:
-        return "User has no rank/times."
+        return 0,0,0,0
     else:
         r = int(float(data["Rank"]) * 20)
         if r == 0:
-            return 0,0,0
+            return 0,0,0,0
         rank = ranks[r - 1]
         skill = round(float(data["Skill"]) * 100.0, 3)
         #return f"{username}\nRank: {rank} ({r}), Skill: {skill:.3f}%"
-        return r, rank, skill
+        return r, rank, skill, data["Placement"]
 
 #returns the difference between 1st and 2nd place on a given map in seconds
 def calculate_wr_diff(map_id, style):

@@ -180,11 +180,11 @@ class MainCog(commands.Cog):
         elif user_data["State"] == 3:
             await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
             return
-        r, rank, skill = rbhop.get_user_rank(user, game, style)
+        r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         if r == 0:
             await ctx.send(self.format_markdown_code(f"No data available for user {user} in style {style} in game {game}."))
             return
-        await ctx.send(embed=self.make_user_embed(user, r, rank, skill, game, style))
+        await ctx.send(embed=self.make_user_embed(user, r, rank, skill, placement, game, style))
 
     @commands.command(name="commands")
     async def list_commands(self, ctx):
@@ -212,7 +212,7 @@ class MainCog(commands.Cog):
                 if not await self.check_user_status(ctx, user):
                     return False
             except:
-                await ctx.send(self.format_markdown_code(f"'{user} is not a valid username. No Roblox account associated with this username."))
+                await ctx.send(self.format_markdown_code(f"'{user}' is not a valid username. No Roblox account associated with this username."))
                 return False
         if mapname:
             m = rbhop.map_id_from_name(mapname, game)
@@ -252,14 +252,19 @@ class MainCog(commands.Cog):
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user, r, rank, skill, game, style):
+    def make_user_embed(self, user, r, rank, skill, placement, game, style):
+        ordinal = "th"
+        if placement % 10 == 1:
+            ordinal = "st"
+        elif placement % 10 == 2:
+            ordinal = "nd"
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
         embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png')
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
-        embed.add_field(name="\u200B", value="\u200B", inline=True)
-        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}", inline=True)
+        embed.add_field(name="Placement", value=f"{placement}{ordinal}")
+        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}")
         embed.set_footer(text="User Profile")
         return embed
 
