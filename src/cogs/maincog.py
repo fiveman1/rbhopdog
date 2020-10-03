@@ -274,6 +274,8 @@ class MainCog(commands.Cog):
             ordinal = "st"
         elif placement % 10 == 2:
             ordinal = "nd"
+        elif placement % 10 == 3:
+            ordinal = "rd"
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
         embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png')
