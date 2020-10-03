@@ -3,6 +3,7 @@ import discord
 import os
 import requests
 import sys
+import traceback
 
 sys.path.insert(1, os.path.join(sys.path[0], '../modules'))
 
@@ -32,15 +33,16 @@ class MainCog(commands.Cog):
     async def global_announcements(self):
         records = rbhop.get_new_wrs()
         if len(records) > 0:
-            for guild in self.bot.guilds:
-                for ch in guild.channels:
-                    if ch.name == "globals":
-                        for record in records:
-                            print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
+            for record in records:
+                print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
+                for guild in self.bot.guilds:
+                    for ch in guild.channels:
+                        if ch.name == "globals":
                             try:
                                 await ch.send(embed=self.make_global_embed(record))
-                            except:
-                                pass
+                            except Exception as error:
+                                print("Couldn't post global")
+                                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
@@ -251,7 +253,10 @@ class MainCog(commands.Cog):
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png')
         embed.add_field(name="Player", value=record.username, inline=True)
-        embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
+        if record.diff == -1:
+            embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
+        else:
+            embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
         embed.add_field(name="\u200B", value="\u200B", inline=True)
         embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}", inline=True)
         embed.set_footer(text="World Record")

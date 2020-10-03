@@ -341,7 +341,7 @@ def calculate_wr_diff(map_id, style):
     #if there is only one time on the map someone is the only person to beat it
     #so there is no time to compare it to for diff
     else:
-        return "n/a"
+        return -1
 
 def search(ls, record):
     for i in ls:
