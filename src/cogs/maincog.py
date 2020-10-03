@@ -99,6 +99,9 @@ class MainCog(commands.Cog):
             s.append(style.lower())
         if not await self.argument_checker(ctx, user, g[0], s[0]):
             return
+        if sort not in ["", "date", "time", "style", "name"]:
+            await ctx.send(self.format_markdown_code(f"'{sort}' is an invalid sort. Try 'name', 'date', 'time', or 'style'."))
+            return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         wrs = []
@@ -114,12 +117,15 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(f"{user} has no WRs in the specified game and style."))
             return
         #default sort: sort by style, then within each style sort alphabetically
-        convert_ls = wrs
+        convert_ls = []
         if sort == "":
-            convert_ls = []
             for record_ls in wrs:
                 record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
                 for record in record_ls_sort:
+                    convert_ls.append(record)
+        else:
+            for record_ls in wrs:
+                for record in record_ls:
                     convert_ls.append(record)
         messages = rbhop.page_records(convert_ls, sort=sort)
         counter = 0
