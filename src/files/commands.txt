@@ -16,7 +16,7 @@ your Roblox username using RoVer if it is connected to your Discord account.
     other sorts: "name", "date", "time", "style"
 !fastecheck username game style
     Determines if a player is eligible for faste in a given game and style.
-!rank username game style
+!profile username game style
     Gives a player's rank and skill% in the given game and style.
 !commands
     List all commands and describes them.

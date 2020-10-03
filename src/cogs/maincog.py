@@ -37,7 +37,10 @@ class MainCog(commands.Cog):
                     if ch.name == "globals":
                         for record in records:
                             print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
-                            await ch.send(embed=self.make_global_embed(record))
+                            try:
+                                await ch.send(embed=self.make_global_embed(record))
+                            except:
+                                pass
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
@@ -109,6 +112,7 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(f"{user} has no WRs in the specified game and style."))
             return
         #default sort: sort by style, then within each style sort alphabetically
+        convert_ls = wrs
         if sort == "":
             convert_ls = []
             for record_ls in wrs:
@@ -163,13 +167,24 @@ class MainCog(commands.Cog):
         else:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{user} is NOT eligible for faste in {game} in the style {style}."))
 
-    @commands.command(name="rank")
+    @commands.command(name="profile")
     async def user_rank(self, ctx, user, game, style):
         if not await self.argument_checker(ctx, user, game, style):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
-        await ctx.send(self.format_markdown_code(rbhop.get_user_rank(user, game, style)))
+        user_data = rbhop.get_user(user)
+        if user_data["State"] == 2:
+            await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
+            return
+        elif user_data["State"] == 3:
+            await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
+            return
+        r, rank, skill = rbhop.get_user_rank(user, game, style)
+        if r == 0:
+            await ctx.send(self.format_markdown_code(f"No data available for user {user} in style {style} in game {game}."))
+            return
+        await ctx.send(embed=self.make_user_embed(user, r, rank, skill, game, style))
 
     @commands.command(name="commands")
     async def list_commands(self, ctx):
@@ -189,9 +204,23 @@ class MainCog(commands.Cog):
             if not username:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return False
+            else:
+                user_data = rbhop.get_user(username)
+                if user_data["State"] == 2:
+                    await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
+                    return False
+                elif user_data["State"] == 3:
+                    await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
+                    return False
         elif user:
             try:
-                rbhop.id_from_username(user)
+                user_data = rbhop.get_user(user)
+                if user_data["State"] == 2:
+                    await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
+                    return False
+                elif user_data["State"] == 3:
+                    await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
+                    return False
             except:
                 await ctx.send(self.format_markdown_code(f"'{user} is not a valid username. No Roblox account associated with this username."))
                 return False
@@ -214,12 +243,24 @@ class MainCog(commands.Cog):
     
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
-        embed.set_thumbnail(url="https://i.imgur.com/PtLyW2j.png")
+        embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
+        embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png')
         embed.add_field(name="Player", value=record.username, inline=True)
         embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
         embed.add_field(name="\u200B", value="\u200B", inline=True)
         embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}", inline=True)
         embed.set_footer(text="World Record")
+        return embed
+    
+    def make_user_embed(self, user, r, rank, skill, game, style):
+        wrs = rbhop.total_wrs(user, game, style)
+        embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
+        embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png')
+        embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
+        embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
+        embed.add_field(name="\u200B", value="\u200B", inline=True)
+        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}", inline=True)
+        embed.set_footer(text="User Profile")
         return embed
 
 def setup(bot):

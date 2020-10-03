@@ -27,6 +27,7 @@ styles = {
     "sw" : 3,
     "half-sideways" : 4,
     "hsw" : 4,
+    "half" : 4,
     "w-only" : 5,
     "wonly" : 5,
     "w" : 5,
@@ -310,7 +311,7 @@ def total_wrs(user, game, style):
         return len(data)
 
 def get_user_rank(user, game, style):
-    username, user_id = get_user_username_id(user)
+    _, user_id = get_user_username_id(user)
     res = get(f"rank/{user_id}", {
         "game":games[game],
         "style":styles[style]
@@ -321,10 +322,11 @@ def get_user_rank(user, game, style):
     else:
         r = int(float(data["Rank"]) * 20)
         if r == 0:
-            return f"{username}\nUser has no rank/times."
+            return 0,0,0
         rank = ranks[r - 1]
         skill = round(float(data["Skill"]) * 100.0, 3)
-        return f"{username}\nRank: {rank} ({r}), Skill: {skill:.3f}%"
+        #return f"{username}\nRank: {rank} ({r}), Skill: {skill:.3f}%"
+        return r, rank, skill
 
 #returns the difference between 1st and 2nd place on a given map in seconds
 def calculate_wr_diff(map_id, style):
@@ -392,6 +394,10 @@ def get_map_times(game, style, map_name):
     return get(f"time/map/{map_id}", {
         "style":styles[style]
     }).json()
+
+def get_user(user):
+    _, user_id = get_user_username_id(user)
+    return get(f"user/{user_id}", {}).json()
 
 def bot_get_recent_wrs(game, style):
     return sexy_format(get_recent_wrs(game, style))
