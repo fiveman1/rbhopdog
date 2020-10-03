@@ -209,10 +209,15 @@ class MainCog(commands.Cog):
                     return False
         elif user:
             try:
+                rbhop.id_from_username(user)
+            except:
+                await ctx.send(self.format_markdown_code(f"'{user}' is not a valid username. No Roblox account associated with this username."))
+                return False
+            try:
                 if not await self.check_user_status(ctx, user):
                     return False
             except:
-                await ctx.send(self.format_markdown_code(f"'{user}' is not a valid username. No Roblox account associated with this username."))
+                await ctx.send(self.format_markdown_code(f"'{user}' has not played bhop/surf."))
                 return False
         if mapname:
             m = rbhop.map_id_from_name(mapname, game)
