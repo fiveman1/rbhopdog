@@ -1,4 +1,5 @@
 # bot.py
+import discord
 import os
 import traceback
 import sys
@@ -18,6 +19,7 @@ bot.load_extension("cogs.maincog")
 @bot.event
 async def on_ready():
     print(f"{bot.user} has connected to Discord!")
+    await bot.change_presence(status=discord.Status.online, activity=discord.Game(name=f"{COMMAND}help"))
 
 @bot.event
 async def on_command_error(ctx, error):

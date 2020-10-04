@@ -1,4 +1,4 @@
-# main.py
+# maincog.py
 import discord
 import os
 import requests
@@ -15,6 +15,7 @@ from discord.ext import commands, tasks
 class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.bot.remove_command("help")
         self.commands_text = ""
         with open(rbhop.fix_path("files/commands.txt")) as file:
             data = file.read()
@@ -78,9 +79,17 @@ class MainCog(commands.Cog):
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style, mapname):
             return
-        times = rbhop.get_map_times(game, style, mapname)
+        record_list = rbhop.make_record_list(rbhop.get_map_times(game, style, mapname)[:25])
         msg = f"Record list for map: '{mapname}' in style: '{style}'\n"
-        msg += rbhop.sexy_format(rbhop.make_record_list(times[:15]))
+        titles = ["Rank:", "Username:", "Time:", "Date:"]
+        msg += f"{titles[0]:6}| {titles[1]:20}| {titles[2]:10}| {titles[3]:20}\n"
+        rank = 1
+        for record in record_list:
+            username = record.username[:15]
+            time = record.time_string
+            date = record.date_string[:20]
+            msg += f"{rank:5} | {username:20}| {time:10}| {date:20}\n"
+            rank += 1
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -136,6 +145,7 @@ class MainCog(commands.Cog):
                 await ctx.send(self.format_markdown_code("Limiting messages, consider specifying game/style to reduce message count."))
                 return
 
+    @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrcount")
     async def wr_count(self, ctx, user):
         if not await self.argument_checker(ctx, user, None, None):
@@ -181,22 +191,15 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
-        user_data = rbhop.get_user(user)
-        if user_data["State"] == 2:
-            await ctx.send(self.format_markdown_code(f"{user} is blacklisted."))
-            return
-        elif user_data["State"] == 3:
-            await ctx.send(self.format_markdown_code(f"{user} is pending moderation."))
-            return
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         if r == 0:
-            await ctx.send(self.format_markdown_code(f"No data available for user {user} in style {style} in game {game}."))
+            await ctx.send(self.format_markdown_code(f"No data available for user {user} in {style} in {game}."))
             return
         await ctx.send(embed=self.make_user_embed(user, r, rank, skill, placement, game, style))
 
-    @commands.command(name="commands")
-    async def list_commands(self, ctx):
-        await ctx.send(self.format_markdown_code(self.commands_text))
+    @commands.command(name="help")
+    async def help(self, ctx):
+        await ctx.send(embed=self.make_help_embed())
     
     #checks if user, game, style, and mapname are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
@@ -284,6 +287,17 @@ class MainCog(commands.Cog):
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")
         embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}")
         embed.set_footer(text="User Profile")
+        return embed
+    
+    def make_help_embed(self):
+        embed = discord.Embed(title="\U00002753  Help", color=0xe32f22)
+        embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
+        embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
+        embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
+        embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
+        embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', 'style', 'time'.", inline=False)
+        embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
+        embed.add_field(name="!wrmap game style {map_name}", value="Gives the 15 best times on a given map and style.", inline=False)
         return embed
 
 def setup(bot):

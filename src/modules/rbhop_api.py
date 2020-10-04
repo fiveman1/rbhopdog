@@ -107,13 +107,14 @@ def map_name_from_id(map_id, game):
     return "Map name not found"
 
 def map_id_from_name(map_name, game):
+    map_name = map_name.lower()
     game = games[game]
     if game == 1:
         map_data = bhop_maps
     elif game == 2:
         map_data = surf_maps
     for m in map_data:
-        if m["DisplayName"] == map_name:
+        if m["DisplayName"].lower() == map_name:
             return m["ID"]
     return "Map id not found"
 
@@ -219,11 +220,11 @@ def convert_to_record(record, username=None):
 def sexy_format(record_list):
     records = len(record_list)
     s = f"Total records: {records}\n"
-    titles = ["Username:", "Time:", "Date", "Map name:", "Style:", "Game:"]
-    s += f"{titles[0]:15}| {titles[1]:10}| {titles[2]:20}| {titles[3]:20}| {titles[4]:14}| Game\n"
+    titles = ["Username:", "Time:", "Date:", "Map name:", "Style:"]
+    s += f"{titles[0]:15}| {titles[1]:10}| {titles[2]:20}| {titles[3]:20}| {titles[4]:14}| Game:\n"
     for record in record_list:
         username = record.username[:15]
-        time = record.time_string[:10]
+        time = record.time_string
         date = record.date_string[:20]
         map_name = record.map_name[:20]
         style = record.style_string[:14]
