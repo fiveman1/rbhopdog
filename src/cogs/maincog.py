@@ -210,6 +210,9 @@ class MainCog(commands.Cog):
         if style and style not in rbhop.styles:
             await ctx.send(self.format_markdown_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
             return False
+        if game == "surf" and style == "scroll":
+            await ctx.send(self.format_markdown_code("Surf and scroll cannot be combined."))
+            return False
         if user == "me":
             username = self.get_roblox_username(ctx.author.id)
             if not username:
@@ -260,7 +263,7 @@ class MainCog(commands.Cog):
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png')
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png")
         embed.add_field(name="Player", value=record.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
@@ -281,7 +284,7 @@ class MainCog(commands.Cog):
             ordinal = "rd"
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
-        embed.set_thumbnail(url=f'https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png')
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png")
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")
@@ -291,6 +294,7 @@ class MainCog(commands.Cog):
     
     def make_help_embed(self):
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22)
+        embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
