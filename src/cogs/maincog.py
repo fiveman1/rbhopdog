@@ -197,9 +197,52 @@ class MainCog(commands.Cog):
             return
         await ctx.send(embed=self.make_user_embed(user, r, rank, skill, placement, game, style))
 
+    @commands.command(name="ranks")
+    async def ranks(self, ctx, game, style, page=1):
+        if page < 1:
+            await ctx.send(self.format_markdown_code("Page cannot be less than 1."))
+            return
+        if not await self.argument_checker(ctx, None, game, style):
+            return
+        ranks = rbhop.get_ranks(game, style, page)
+        if len(ranks) == 0:
+            await ctx.send(self.format_markdown_code("No ranks found. Perhaps your page number is too large?"))
+            return
+        msg = f"Ranks for {game} in {style}, page {page}\n"
+        titles = ["Placement:", "Username:", "Rank:", "Skill:"]
+        msg += f"{titles[0]:11}| {titles[1]:20}| {titles[2]:19}| {titles[3]}\n"
+        for rank in ranks:
+            r = rank["R"]
+            rank_string = rank["Rank"]
+            skill = rank["Skill"]
+            placement = rank["Placement"]
+            username = rank["Username"]
+            formatted = f"{rank_string} ({r})"
+            msg += f"{placement:10} | {username:20}| {formatted:19}| {skill:.3f}%\n"
+        await ctx.send(self.format_markdown_code(msg))      
+
     @commands.command(name="help")
     async def help(self, ctx):
         await ctx.send(embed=self.make_help_embed())
+    
+    def page_messages(self, msg):
+        ls = []
+        lines = msg.split("\n")
+        items = len(lines)
+        length = 0
+        page = ""
+        i = 0
+        #add each line together until the total length exceeds 1900
+        #then create a new string (message)
+        while i < items:
+            while i < items and length < 1900:
+                page += lines[i] + "\n"
+                length += len(lines[i]) + 2
+                i += 1
+            ls.append(page)
+            length = 0
+            page = ""
+        return ls
     
     #checks if user, game, style, and mapname are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
@@ -297,6 +340,7 @@ class MainCog(commands.Cog):
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
+        embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', 'style', 'time'.", inline=False)

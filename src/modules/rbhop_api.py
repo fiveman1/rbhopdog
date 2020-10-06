@@ -318,6 +318,28 @@ def get_user_rank(user, game, style):
         "style":styles[style]
     })
     data = res.json()
+    return convert_rank(data)
+
+#returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
+def get_ranks(game, style, page):
+    res = get(f"rank", {
+        "game":games[game],
+        "style":styles[style],
+        "page":(int((page - 1) / 2)) + 1
+    })
+    data = res.json()
+    ls = []
+    if page % 2 == 1:
+        data = data[:25]
+    elif page % 2 == 0:
+        data = data[25:]
+    for i in data:
+        user = username_from_id(i["User"])
+        r, rank, skill, placement, = convert_rank(i)
+        ls.append({"Username": user, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
+    return ls
+
+def convert_rank(data):
     if data == None:
         return 0,0,0,0
     else:
@@ -325,6 +347,7 @@ def get_user_rank(user, game, style):
         rank = ranks[r - 1]
         skill = round(float(data["Skill"]) * 100.0, 3)
         return r, rank, skill, data["Placement"]
+
 
 #returns the difference between 1st and 2nd place on a given map in seconds
 def calculate_wr_diff(map_id, style):
