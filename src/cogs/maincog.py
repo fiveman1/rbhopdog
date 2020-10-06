@@ -67,11 +67,18 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
-        record = rbhop.bot_get_user_record(user, game, style, mapname)
+        record = rbhop.get_user_record(user, game, style, mapname)
         if record == None:
             await ctx.send(self.format_markdown_code("No time found on this map."))
         else:
-            await ctx.send(self.format_markdown_code(record))
+            msg = f"{user}'s record on {mapname} [game: {game}, style: {style}]\n"
+            titles = ["Map name:", "Time:", "Date:"]
+            msg += f"{titles[0]:20}| {titles[1]:10}| {titles[2]:20}\n"
+            map_name = record.map_name[:20]
+            time = record.time_string
+            date = record.date_string[:20]
+            msg += f"{map_name:20}| {time:10}| {date:20}\n"
+            await ctx.send(self.format_markdown_code(msg))
     
     @commands.command(name="wrmap")
     async def get_wrmap(self, ctx, game, style, *, mapname):
@@ -136,9 +143,24 @@ class MainCog(commands.Cog):
             for record_ls in wrs:
                 for record in record_ls:
                     convert_ls.append(record)
-        messages = rbhop.page_records(convert_ls, sort=sort)
+        if len(g) > 1:
+            game = "both"
+        if len(s) > 1:
+            style = "all"
+        if sort == "":
+            sort = "default"
+        msg = f"WR list for {user} [game: {game}, style: {style}, sort: {sort}]\n"
+        titles = ["Map name:", "Time:", "Date:", "Style:"]
+        msg += f"{titles[0]:20}| {titles[1]:10}| {titles[2]:20}| {titles[3]:14}| Game:\n"
+        for record in convert_ls:
+            map_name = record.map_name[:20]
+            time = record.time_string
+            date = record.date_string[:20]
+            style = record.style_string[:14]
+            game = record.game_string
+            msg += f"{map_name:20}| {time:10}| {date:20}| {style:14}| {game}\n"
         counter = 0
-        for message in messages:
+        for message in self.page_messages(msg):
             counter += 1
             await ctx.send(self.format_markdown_code(message))
             if counter >= 5:
@@ -371,6 +393,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
+        embed.add_field(name="!record user game style {mapname}", value="Get a user's time on a given map.", inline=False)
         embed.add_field(name="!times user game:both style:all", value="Get a list of a user's 25 most recent times.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', 'style', 'time'.", inline=False)

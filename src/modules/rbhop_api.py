@@ -286,6 +286,7 @@ def get_user_wrs(user, game, style):
     data = res.json()
     return make_record_list(data, username)
 
+#returns a record object of a user's time on a given map
 def get_user_record(user, game, style, map_name=""):
     if map_name == "":
         return get_user_wrs(user, game, style)
@@ -297,7 +298,10 @@ def get_user_record(user, game, style, map_name=""):
         "map":map_id
     })
     data = res.json()
-    return make_record_list(data)
+    if len(data) == None:
+        return None
+    else:
+        return convert_to_record(data[0])
 
 def total_wrs(user, game, style):
     _, user_id = get_user_username_id(user)
@@ -436,9 +440,3 @@ def get_user(user):
 
 def bot_get_recent_wrs(game, style):
     return sexy_format(get_recent_wrs(game, style))
-
-def bot_get_user_wrs(user, game, style):
-    return page_records(get_user_wrs(user, game, style))
-
-def bot_get_user_record(user, game, style, map_name):
-    return sexy_format(get_user_record(user, game, style, map_name))
