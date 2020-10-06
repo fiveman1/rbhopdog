@@ -339,6 +339,20 @@ def get_ranks(game, style, page):
         ls.append({"Username": user, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
     return ls
 
+def get_user_times(user, game, style):
+    params = {}
+    if game != None:
+        params["game"] = games[game]
+    if style != None:
+        params["style"] = styles[style]
+    userid = id_from_username(user)
+    res = get(f"time/user/{userid}", params)
+    data = res.json()
+    if len(data) != 0:
+        return make_record_list(data[:25], user)
+    else:
+        return []
+
 def convert_rank(data):
     if data == None:
         return 0,0,0,0

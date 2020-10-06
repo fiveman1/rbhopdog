@@ -85,7 +85,7 @@ class MainCog(commands.Cog):
         msg += f"{titles[0]:6}| {titles[1]:20}| {titles[2]:10}| {titles[3]:20}\n"
         rank = 1
         for record in record_list:
-            username = record.username[:15]
+            username = record.username[:20]
             time = record.time_string
             date = record.date_string[:20]
             msg += f"{rank:5} | {username:20}| {time:10}| {date:20}\n"
@@ -219,7 +219,36 @@ class MainCog(commands.Cog):
             username = rank["Username"]
             formatted = f"{rank_string} ({r})"
             msg += f"{placement:10} | {username:20}| {formatted:19}| {skill:.3f}%\n"
-        await ctx.send(self.format_markdown_code(msg))      
+        await ctx.send(self.format_markdown_code(msg))
+    
+    @commands.command(name="times")
+    async def times(self, ctx, user, game=None, style=None):
+        if game in ["all", "both"]:
+            game = None
+        if style == "all":
+            style = None
+        if not await self.argument_checker(ctx, user, game, style):
+            return
+        if user == "me":
+            user = self.get_roblox_username(ctx.author.id)
+        record_list = rbhop.get_user_times(user, game, style)
+        if game == None:
+            game = "both"
+        if style == None:
+            style = "all"
+        msg = f"Recent times for {user} [game: {game}, style: {style}]\n"
+        titles = ["Map name:", "Time:", "Date:", "Style:"]
+        msg += f"{titles[0]:20}| {titles[1]:10}| {titles[2]:20}| {titles[3]:14}| Game:\n"
+        for record in record_list:
+            map_name = record.map_name[:20]
+            time = record.time_string
+            date = record.date_string[:20]
+            style = record.style_string[:14]
+            game = record.game_string
+            msg += f"{map_name:20}| {time:10}| {date:20}| {style:14}| {game}\n"
+        for message in self.page_messages(msg):
+            await ctx.send(self.format_markdown_code(message))
+
 
     @commands.command(name="help")
     async def help(self, ctx):
