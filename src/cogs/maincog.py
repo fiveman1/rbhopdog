@@ -397,8 +397,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!times user game:both style:all", value="Get a list of a user's 25 most recent times.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', 'style', 'time'.", inline=False)
-        embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
-        embed.add_field(name="!wrmap game style {map_name}", value="Gives the 15 best times on a given map and style.", inline=False)
+        embed.add_field(name="!wrmap game style {map_name}", value="Gives the 25 best times on a given map and style.", inline=False)
         return embed
 
 def setup(bot):
