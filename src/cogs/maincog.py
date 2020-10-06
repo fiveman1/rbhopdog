@@ -371,6 +371,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
+        embed.add_field(name="!times user game:both style:all", value="Get a list of a user's 25 most recent times.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', 'style', 'time'.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
