@@ -143,7 +143,7 @@ class MainCog(commands.Cog):
             cols.append(("Style:", 14))
         if sort == "":
             sort = "default"
-        msg = self.message_builder(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}]", cols, convert_ls)
+        msg = self.message_builder(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}] (Records: {count})", cols, convert_ls)
         counter = 0
         for message in self.page_messages(msg):
             counter += 1
@@ -251,6 +251,7 @@ class MainCog(commands.Cog):
     async def help(self, ctx):
         await ctx.send(embed=self.make_help_embed())
     
+    #title: first line, cols: list of tuples: (column_name, length of string), record_ls: a list of Records
     def message_builder(self, title, cols, record_ls, i=1):
         msg = title + "\n"
         for col_title in cols[:-1]:
