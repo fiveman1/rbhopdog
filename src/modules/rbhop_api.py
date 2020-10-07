@@ -154,6 +154,7 @@ def username_from_id(user_id):
     try:
         return data["Username"]
     except KeyError:
+        print(res)
         raise Exception("Invalid user ID")
 
 def id_from_username(username):
@@ -162,6 +163,7 @@ def id_from_username(username):
     try:
         return data["Id"]
     except KeyError:
+        print(res)
         raise Exception("Invalid username")
 
 def get_user_username_id(user):
@@ -261,14 +263,8 @@ def page_records(record_list, sort="name"):
     return ls
 
 def get_recent_wrs(game, style):
-    try:
-        game = games[game]
-    except:
-        raise Exception("Invalid game")
-    try:
-        style = styles[style]
-    except:
-        raise Exception("Invalid style")
+    game = games[game]
+    style = styles[style]
     res = get("time/recent/wr", {
         "game":game,
         "style":style
@@ -430,13 +426,10 @@ def get_new_wrs():
 
 def get_map_times(game, style, map_name):
     map_id = map_id_from_name(map_name, game)
-    return get(f"time/map/{map_id}", {
+    return make_record_list(get(f"time/map/{map_id}", {
         "style":styles[style]
-    }).json()
+    }).json())
 
 def get_user(user):
-    _, user_id = get_user_username_id(user)
+    user_id = id_from_username(user)
     return get(f"user/{user_id}", {}).json()
-
-def bot_get_recent_wrs(game, style):
-    return sexy_format(get_recent_wrs(game, style))

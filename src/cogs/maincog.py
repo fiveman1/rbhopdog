@@ -57,7 +57,8 @@ class MainCog(commands.Cog):
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style):
             return
-        await ctx.send(self.format_markdown_code(rbhop.bot_get_recent_wrs(game, style)))
+        msg = self.message_builder(f"10 Recent WRs [game: {game}, style: {style}]", [("Username:", 20), ("Map name:", 20), ("Time:", 10), ("Date:", 20)], rbhop.get_recent_wrs(game, style))
+        await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="record")
     async def get_user_record(self, ctx, user, game, style, *, mapname):
@@ -71,32 +72,16 @@ class MainCog(commands.Cog):
         if record == None:
             await ctx.send(self.format_markdown_code("No time found on this map."))
         else:
-            msg = f"{user}'s record on {mapname} [game: {game}, style: {style}]\n"
-            titles = ["Map name:", "Time:", "Date:"]
-            msg += f"{titles[0]:20}| {titles[1]:10}| {titles[2]:20}\n"
-            map_name = record.map_name[:20]
-            time = record.time_string
-            date = record.date_string[:20]
-            msg += f"{map_name:20}| {time:10}| {date:20}\n"
+            msg = self.message_builder(f"{user}'s record on {mapname} [game: {game}, style: {style}]", [("Map name:", 20), ("Time:", 10), ("Date:", 20)], [record])
             await ctx.send(self.format_markdown_code(msg))
-    
+
     @commands.command(name="wrmap")
     async def get_wrmap(self, ctx, game, style, *, mapname):
         game = game.lower()
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style, mapname):
             return
-        record_list = rbhop.make_record_list(rbhop.get_map_times(game, style, mapname)[:25])
-        msg = f"Record list for map: '{mapname}' in style: '{style}'\n"
-        titles = ["Rank:", "Username:", "Time:", "Date:"]
-        msg += f"{titles[0]:6}| {titles[1]:20}| {titles[2]:10}| {titles[3]:20}\n"
-        rank = 1
-        for record in record_list:
-            username = record.username[:20]
-            time = record.time_string
-            date = record.date_string[:20]
-            msg += f"{rank:5} | {username:20}| {time:10}| {date:20}\n"
-            rank += 1
+        msg = self.message_builder(f"Record list for map: '{mapname}' [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 20)], rbhop.get_map_times(game, style, mapname)[:25])
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -115,8 +100,8 @@ class MainCog(commands.Cog):
             s.append(style.lower())
         if not await self.argument_checker(ctx, user, g[0], s[0]):
             return
-        if sort not in ["", "date", "time", "style", "name"]:
-            await ctx.send(self.format_markdown_code(f"'{sort}' is an invalid sort. Try 'name', 'date', 'time', or 'style'."))
+        if sort not in ["", "date", "time", "name"]:
+            await ctx.send(self.format_markdown_code(f"'{sort}' is an invalid sort. Try 'name', 'date', or 'time'."))
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
@@ -143,22 +128,22 @@ class MainCog(commands.Cog):
             for record_ls in wrs:
                 for record in record_ls:
                     convert_ls.append(record)
+            if sort == "name":
+                convert_ls = sorted(convert_ls, key = lambda i: i.map_name) #sort by map name
+            elif sort == "date":
+                convert_ls = sorted(convert_ls, key = lambda i: i.date, reverse=True) #sort by date (most recent)
+            elif sort == "time":
+                convert_ls = sorted(convert_ls, key = lambda i: i.time) #sort by time
+        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 20)]
         if len(g) > 1:
             game = "both"
+            cols.append(("Game:", 6))
         if len(s) > 1:
             style = "all"
+            cols.append(("Style:", 14))
         if sort == "":
             sort = "default"
-        msg = f"WR list for {user} [game: {game}, style: {style}, sort: {sort}]\n"
-        titles = ["Map name:", "Time:", "Date:", "Style:"]
-        msg += f"{titles[0]:20}| {titles[1]:10}| {titles[2]:20}| {titles[3]:14}| Game:\n"
-        for record in convert_ls:
-            map_name = record.map_name[:20]
-            time = record.time_string
-            date = record.date_string[:20]
-            style = record.style_string[:14]
-            game = record.game_string
-            msg += f"{map_name:20}| {time:10}| {date:20}| {style:14}| {game}\n"
+        msg = self.message_builder(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}]", cols, convert_ls)
         counter = 0
         for message in self.page_messages(msg):
             counter += 1
@@ -258,23 +243,40 @@ class MainCog(commands.Cog):
             game = "both"
         if style == None:
             style = "all"
-        msg = f"Recent times for {user} [game: {game}, style: {style}]\n"
-        titles = ["Map name:", "Time:", "Date:", "Style:"]
-        msg += f"{titles[0]:20}| {titles[1]:10}| {titles[2]:20}| {titles[3]:14}| Game:\n"
-        for record in record_list:
-            map_name = record.map_name[:20]
-            time = record.time_string
-            date = record.date_string[:20]
-            style = record.style_string[:14]
-            game = record.game_string
-            msg += f"{map_name:20}| {time:10}| {date:20}| {style:14}| {game}\n"
+        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}]", [("Map name:", 20), ("Time:", 10), ("Date:", 20), ("Game:", 6), ("Style:", 14)], record_list)
         for message in self.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
-
 
     @commands.command(name="help")
     async def help(self, ctx):
         await ctx.send(embed=self.make_help_embed())
+    
+    def message_builder(self, title, cols, record_ls, i=1):
+        msg = title + "\n"
+        for col_title in cols[:-1]:
+            msg += self.add_spaces(col_title[0], col_title[1]) + "| "
+        msg += f"{cols[len(cols) - 1][0]}\n"
+        for record in record_ls:
+            d = {
+                    "Rank:":str(i),
+                    "Username:":record.username,
+                    "Map name:":record.map_name,
+                    "Time:":record.time_string,
+                    "Date:":record.date_string,
+                    "Style:":record.style_string,
+                    "Game:":record.game_string
+                }
+            for col_title in cols[:-1]:
+                msg += self.add_spaces(d[col_title[0]], col_title[1]) + "| "
+            msg += f"{d[cols[len(cols) - 1][0]]}\n"
+            i += 1
+        return msg
+    
+    def add_spaces(self, s, length):
+        s = s[:length]
+        while len(s) < length:
+            s += " "
+        return s
     
     def page_messages(self, msg):
         ls = []
@@ -293,6 +295,8 @@ class MainCog(commands.Cog):
             ls.append(page)
             length = 0
             page = ""
+        if ls[len(ls) - 1] == "\n":
+            ls = ls[:-1]
         return ls
     
     #checks if user, game, style, and mapname are valid arguments
@@ -387,7 +391,7 @@ class MainCog(commands.Cog):
         return embed
     
     def make_help_embed(self):
-        embed = discord.Embed(title="\U00002753  Help", color=0xe32f22)
+        embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
@@ -396,7 +400,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!record user game style {mapname}", value="Get a user's time on a given map.", inline=False)
         embed.add_field(name="!times user game:both style:all", value="Get a list of a user's 25 most recent times.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
-        embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', 'style', 'time'.", inline=False)
+        embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.", inline=False)
         embed.add_field(name="!wrmap game style {map_name}", value="Gives the 25 best times on a given map and style.", inline=False)
         return embed
 
