@@ -42,8 +42,9 @@ class MainCog(commands.Cog):
                             try:
                                 await ch.send(embed=self.make_global_embed(record))
                             except Exception as error:
-                                print("Couldn't post global")
-                                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+                                if not isinstance(error, discord.errors.Forbidden):
+                                    print("Couldn't post global")
+                                    traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
@@ -239,11 +240,14 @@ class MainCog(commands.Cog):
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         record_list = rbhop.get_user_times(user, game, style)
+        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 20)]
         if game == None:
             game = "both"
+            cols.append(("Game:", 6))
         if style == None:
             style = "all"
-        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}]", [("Map name:", 20), ("Time:", 10), ("Date:", 20), ("Game:", 6), ("Style:", 14)], record_list)
+            cols.append(("Style:", 14))
+        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}]", cols, record_list)
         for message in self.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
 
