@@ -30,7 +30,7 @@ class MainCog(commands.Cog):
         print("unloading maincog")
         self.global_announcements.cancel()
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=1)
     async def global_announcements(self):
         records = rbhop.get_new_wrs()
         if len(records) > 0:
@@ -160,10 +160,10 @@ class MainCog(commands.Cog):
         counter = 0
         for message in self.page_messages(msg):
             counter += 1
-            await ctx.send(self.format_markdown_code(message))
-            if counter >= 5:
+            if counter > 5:
                 await ctx.send(self.format_markdown_code("Limiting messages, consider specifying game/style to reduce message count."))
                 return
+            await ctx.send(self.format_markdown_code(message))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrcount")
