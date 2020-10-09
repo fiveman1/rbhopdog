@@ -30,7 +30,7 @@ class MainCog(commands.Cog):
         print("unloading maincog")
         self.global_announcements.cancel()
 
-    @tasks.loop(minutes=2)
+    @tasks.loop(seconds=30)
     async def global_announcements(self):
         records = rbhop.get_new_wrs()
         if len(records) > 0:
@@ -38,13 +38,25 @@ class MainCog(commands.Cog):
                 print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
                 for guild in self.bot.guilds:
                     for ch in guild.channels:
-                        if ch.name == "globals":
-                            try:
-                                await ch.send(embed=self.make_global_embed(record))
-                            except Exception as error:
-                                if not isinstance(error, discord.errors.Forbidden):
-                                    print("Couldn't post global")
-                                    traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+                        if isinstance(ch, discord.TextChannel):
+                            if ch.name == "globals":
+                                await self.post_global(ch, record)
+                            if ch.name == "bhop-auto-globals" and record.game == 1 and record.style == 1:
+                                await self.post_global(ch, record)
+                            elif ch.name == "bhop-styles-globals" and record.game == 1 and record.style != 1:
+                                await self.post_global(ch, record)
+                            elif ch.name == "surf-auto-globals" and record.game == 2 and record.style == 1:
+                                await self.post_global(ch, record)
+                            elif ch.name == "surf-styles-globals" and record.game == 2 and record.style != 1:
+                                await self.post_global(ch, record)
+    
+    async def post_global(self, ch, record):
+        try:
+            await ch.send(embed=self.make_global_embed(record))
+        except Exception as error:
+            if not isinstance(error, discord.errors.Forbidden):
+                print("Couldn't post global")
+                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     
     @global_announcements.before_loop
     async def before_global_announcements(self):

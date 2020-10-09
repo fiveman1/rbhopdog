@@ -220,49 +220,6 @@ def convert_to_record(record, username=None):
         username
     )
 
-def sexy_format(record_list):
-    records = len(record_list)
-    s = f"Total records: {records}\n"
-    titles = ["Username:", "Time:", "Date:", "Map name:", "Style:"]
-    s += f"{titles[0]:15}| {titles[1]:10}| {titles[2]:20}| {titles[3]:20}| {titles[4]:14}| Game:\n"
-    for record in record_list:
-        username = record.username[:15]
-        time = record.time_string
-        date = record.date_string[:20]
-        map_name = record.map_name[:20]
-        style = record.style_string[:14]
-        game = record.game_string
-        s += f"{username:15}| {time:10}| {date:20}| {map_name:20}| {style:14}| {game}\n"
-    return s[:-1]
-
-def page_records(record_list, sort="name"):
-    if sort == "name":
-        record_list = sorted(record_list, key = lambda i: i.map_name) #sort by map name
-    elif sort == "date":
-        record_list = sorted(record_list, key = lambda i: i.date, reverse=True) #sort by date (most recent)
-    elif sort == "time":
-        record_list = sorted(record_list, key = lambda i: i.time) #sort by time
-    elif sort == "style":
-        record_list = sorted(record_list, key = lambda i: i.style) #style
-    s = sexy_format(record_list) #get raw string
-    ls = []
-    lines = s.split("\n")
-    items = len(lines)
-    length = 0
-    page = ""
-    i = 0
-    #add each line together until the total length exceeds 1900
-    #then create a new string (message)
-    while i < items:
-        while i < items and length < 1900:
-            page += lines[i] + "\n"
-            length += len(lines[i]) + 2
-            i += 1
-        ls.append(page)
-        length = 0
-        page = ""
-    return ls
-
 def get_recent_wrs(game, style):
     game = games[game]
     style = styles[style]
@@ -364,7 +321,8 @@ def convert_rank(data):
         return r, rank, skill, data["Placement"]
 
 
-#returns the difference between 1st and 2nd place on a given map in seconds
+#changes a WR's diff and previous_record in place by comparing first and second place
+#times on the given map
 def calculate_wr_diff(record):
     res = get(f"time/map/{record.map_id}", {
         "style":record.style,
