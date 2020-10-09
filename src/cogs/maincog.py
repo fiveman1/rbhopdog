@@ -58,7 +58,7 @@ class MainCog(commands.Cog):
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style):
             return
-        msg = self.message_builder(f"10 Recent WRs [game: {game}, style: {style}]", [("Username:", 20), ("Map name:", 20), ("Time:", 10), ("Date:", 20)], rbhop.get_recent_wrs(game, style))
+        msg = self.message_builder(f"10 Recent WRs [game: {game}, style: {style}]", [("Username:", 20), ("Map name:", 20), ("Time:", 10), ("Date:", 11)], rbhop.get_recent_wrs(game, style))
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="record")
@@ -73,7 +73,7 @@ class MainCog(commands.Cog):
         if record == None:
             await ctx.send(self.format_markdown_code("No time found on this map."))
         else:
-            msg = self.message_builder(f"{user}'s record on {mapname} [game: {game}, style: {style}]", [("Map name:", 20), ("Time:", 10), ("Date:", 20)], [record])
+            msg = self.message_builder(f"{user}'s record on {mapname} [game: {game}, style: {style}]", [("Map name:", 20), ("Time:", 10), ("Date:", 11)], [record])
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="wrmap")
@@ -82,7 +82,7 @@ class MainCog(commands.Cog):
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style, mapname):
             return
-        msg = self.message_builder(f"Record list for map: '{mapname}' [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 20)], rbhop.get_map_times(game, style, mapname)[:25])
+        msg = self.message_builder(f"Record list for map: '{mapname}' [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], rbhop.get_map_times(game, style, mapname)[:25])
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -135,7 +135,7 @@ class MainCog(commands.Cog):
                 convert_ls = sorted(convert_ls, key = lambda i: i.date, reverse=True) #sort by date (most recent)
             elif sort == "time":
                 convert_ls = sorted(convert_ls, key = lambda i: i.time) #sort by time
-        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 20)]
+        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 11)]
         if len(g) > 1:
             game = "both"
             cols.append(("Game:", 6))
@@ -240,7 +240,7 @@ class MainCog(commands.Cog):
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         record_list = rbhop.get_user_times(user, game, style)
-        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 20)]
+        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 11)]
         if game == None:
             game = "both"
             cols.append(("Game:", 6))
@@ -257,10 +257,11 @@ class MainCog(commands.Cog):
     
     #title: first line, cols: list of tuples: (column_name, length of string), record_ls: a list of Records
     def message_builder(self, title, cols, record_ls, i=1):
-        msg = title + "\n"
+        msg = f"{title}\n"
         for col_title in cols[:-1]:
             msg += self.add_spaces(col_title[0], col_title[1]) + "| "
-        msg += f"{cols[len(cols) - 1][0]}\n"
+        last_title = cols[-1]
+        msg += f"{last_title[0]}\n"
         for record in record_ls:
             d = {
                     "Rank:":str(i),
@@ -273,7 +274,7 @@ class MainCog(commands.Cog):
                 }
             for col_title in cols[:-1]:
                 msg += self.add_spaces(d[col_title[0]], col_title[1]) + "| "
-            msg += f"{d[cols[len(cols) - 1][0]]}\n"
+            msg += f"{d[last_title[0]][:last_title[1]]}\n"
             i += 1
         return msg
     
@@ -373,7 +374,10 @@ class MainCog(commands.Cog):
         else:
             embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
         embed.add_field(name="\u200B", value="\u200B", inline=True)
-        embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}", inline=True)
+        if record.previous_record != None:
+            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=True)
+        else:
+            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=True)
         embed.set_footer(text="World Record")
         return embed
     

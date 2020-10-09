@@ -134,6 +134,7 @@ class Record():
         self.style_string = style_id_to_string[self.style]
         self.game_string = game_id_to_string[self.game]
         self.diff = -1.0
+        self.previous_record = None
         if username == None:
             self.username = username_from_id(self.user_id)
         else:
@@ -364,19 +365,15 @@ def convert_rank(data):
 
 
 #returns the difference between 1st and 2nd place on a given map in seconds
-def calculate_wr_diff(map_id, style):
-    res = get(f"time/map/{map_id}", {
-        "style":style,
+def calculate_wr_diff(record):
+    res = get(f"time/map/{record.map_id}", {
+        "style":record.style,
     })
     data = res.json()
     if len(data) > 1:
-        first = convert_to_record(data[0])
         second = convert_to_record(data[1])
-        return round((int(second.time) - int(first.time)) / 1000.0, 3)
-    #if there is only one time on the map someone is the only person to beat it
-    #so there is no time to compare it to for diff
-    else:
-        return -1
+        record.diff = round((int(second.time) - int(record.time)) / 1000.0, 3)
+        record.previous_record = second
 
 def search(ls, record):
     for i in ls:
@@ -409,13 +406,14 @@ def get_new_wrs():
                 if record["Time"] != match["Time"]:
                     r = convert_to_record(record)
                     r.diff = round((int(match["Time"]) - int(record["Time"])) / 1000.0, 3)
+                    r.previous_record = convert_to_record(match)
                     globals_ls.append(r)
                 #we can break here because the lists are sorted in the same fashion
                 else:
                     break
             else:
                 r = convert_to_record(record)
-                r.diff = calculate_wr_diff(record["Map"], record["Style"])
+                calculate_wr_diff(r)
                 globals_ls.append(r)
     #overwrite recent_wrs.json with new wrs if they exist
     if len(globals_ls) > 0:
