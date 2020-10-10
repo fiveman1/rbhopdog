@@ -199,7 +199,6 @@ class MainCog(commands.Cog):
                     if c[1] > 0:
                         body += f"    **{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
-            await ctx.send(embed=embed)
         else:
             embed.description = f"Total WRs: 0 \N{crying face}"
         await ctx.send(embed=embed)
