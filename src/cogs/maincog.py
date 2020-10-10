@@ -172,21 +172,37 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
-        msg = ""
         count = 0
-        for game in self.games:
-            msg += f"{game}:\n"
+        ls = [[],[]]
+        for i in range(len(self.games)):
+            game = self.games[i]
             for style in self.styles:
                 if not(game == "surf" and style == "scroll"):
                     wrs = rbhop.total_wrs(user, game, style)
                     if wrs > 0:
+                        ls[i].append((style, wrs))
                         count += wrs
-                        msg += f"    {style}: {wrs}\n"
+        embed = discord.Embed(color=0xff94b8)
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png")
+        embed.title = f"\U0001F4C4  {user}"
         if count > 0:
-            msg = f"{user}\nTotal WRs: {count}\n" + msg
+            embed.description = f"Total WRs: {count}"
+            if len(ls[0]) > 0:
+                body = ""
+                for c in ls[0]:
+                    if c[1] > 0:
+                        body += f"    **{c[0]}:** {c[1]}\n"
+                embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
+            if len(ls[1]) > 0:
+                body = ""
+                for c in ls[1]:
+                    if c[1] > 0:
+                        body += f"    **{c[0]}:** {c[1]}\n"
+                embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
+            await ctx.send(embed=embed)
         else:
-            msg = f"{user}\nTotal WRs: 0"
-        await ctx.send(self.format_markdown_code(msg))
+            embed.description = f"Total WRs: 0 \N{crying face}"
+        await ctx.send(embed=embed)
 
     @commands.command(name="fastecheck")
     async def faste_check(self, ctx, user, game, style):

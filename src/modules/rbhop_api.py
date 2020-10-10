@@ -200,8 +200,6 @@ def convert_date(date):
 
 #records is a list of dicts made from json output from rbhop api
 def make_record_list(records, username=None):
-    if records == None:
-        return None
     ls = []
     for record in records:
         ls.append(convert_to_record(record, username))
