@@ -70,31 +70,39 @@ class MainCog(commands.Cog):
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style):
             return
-        msg = self.message_builder(f"10 Recent WRs [game: {game}, style: {style}]", [("Username:", 20), ("Map name:", 20), ("Time:", 10), ("Date:", 11)], rbhop.get_recent_wrs(game, style))
+        msg = self.message_builder(f"10 Recent WRs [game: {game}, style: {style}]", [("Username:", 20), ("Map name:", 30), ("Time:", 10), ("Date:", 11)], rbhop.get_recent_wrs(game, style))
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="record")
-    async def get_user_record(self, ctx, user, game, style, *, mapname):
+    async def get_user_record(self, ctx, user, game, style, *, map_name):
         game = game.lower()
         style = style.lower()
-        if not await self.argument_checker(ctx, user, game, style, mapname):
+        if not await self.argument_checker(ctx, user, game, style, map_name):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
-        record = rbhop.get_user_record(user, game, style, mapname)
+        user, _ = rbhop.get_user_data(user)
+        map_id = rbhop.map_id_from_name(map_name, game)
+        map_name = rbhop.map_name_from_id(map_id, game)
+        record = rbhop.get_user_record(user, game, style, map_name)
         if record == None:
-            await ctx.send(self.format_markdown_code("No time found on this map."))
+            await ctx.send(self.format_markdown_code(f"No record by {user} found on map: {map_name} [game: {game}, style: {style}]"))
         else:
-            msg = self.message_builder(f"{user}'s record on {mapname} [game: {game}, style: {style}]", [("Map name:", 20), ("Time:", 10), ("Date:", 11)], [record])
+            msg = self.message_builder(f"{user}'s record on {record.map_name} [game: {game}, style: {style}]", [("Time:", 10), ("Date:", 11)], [record])
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="wrmap")
-    async def get_wrmap(self, ctx, game, style, *, mapname):
+    async def get_wrmap(self, ctx, game, style, *, map_name):
         game = game.lower()
         style = style.lower()
-        if not await self.argument_checker(ctx, None, game, style, mapname):
+        if not await self.argument_checker(ctx, None, game, style, map_name):
             return
-        msg = self.message_builder(f"Record list for map: '{mapname}' [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], rbhop.get_map_times(game, style, mapname)[:25])
+        map_id = rbhop.map_id_from_name(map_name, game)
+        map_name = rbhop.map_name_from_id(map_id, game)
+        records = rbhop.get_map_times(game, style, map_name)[:25]
+        if len(records) == 0:
+            await ctx.send(self.format_markdown_code(f"No records found on map: {map_name} [game: {game}, style: {style}]"))
+        msg = self.message_builder(f"Record list for map: {map_name} [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records)
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -118,6 +126,7 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        user, _ = rbhop.get_user_data(user)
         wrs = []
         count = 0
         for game in g:
@@ -147,7 +156,7 @@ class MainCog(commands.Cog):
                 convert_ls = sorted(convert_ls, key = lambda i: i.date, reverse=True) #sort by date (most recent)
             elif sort == "time":
                 convert_ls = sorted(convert_ls, key = lambda i: i.time) #sort by time
-        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 11)]
+        cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
         if len(g) > 1:
             game = "both"
             cols.append(("Game:", 6))
@@ -172,6 +181,7 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        user, user_id = rbhop.get_user_data(user)
         count = 0
         ls = [[],[]]
         for i in range(len(self.games)):
@@ -183,7 +193,7 @@ class MainCog(commands.Cog):
                         ls[i].append((style, wrs))
                         count += wrs
         embed = discord.Embed(color=0xff94b8)
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png")
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png")
         embed.title = f"\U0001F4C4  {user}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
@@ -214,6 +224,7 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        user, _ = rbhop.get_user_data(user)
         wrs = rbhop.total_wrs(user, game, style)
         if (style in ["autohop", "auto"] and wrs >= 10) or wrs >= 50:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{user} is eligible for faste in {game} in the style {style}."))
@@ -226,11 +237,12 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        user, user_id = rbhop.get_user_data(user)
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         if r == 0:
             await ctx.send(self.format_markdown_code(f"No data available for user {user} in {style} in {game}."))
             return
-        await ctx.send(embed=self.make_user_embed(user, r, rank, skill, placement, game, style))
+        await ctx.send(embed=self.make_user_embed(user, user_id, r, rank, skill, placement, game, style))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
@@ -266,8 +278,9 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        user, _ = rbhop.get_user_data(user)
         record_list = rbhop.get_user_times(user, game, style)
-        cols = [("Map name:", 20), ("Time:", 10), ("Date:", 11)]
+        cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
         if game == None:
             game = "both"
             cols.append(("Game:", 6))
@@ -332,9 +345,9 @@ class MainCog(commands.Cog):
             ls = ls[:-1]
         return ls
     
-    #checks if user, game, style, and mapname are valid arguments
+    #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
-    async def argument_checker(self, ctx, user, game, style, mapname=None):
+    async def argument_checker(self, ctx, user, game, style, map_name=None):
         if game and game not in self.games:
             await ctx.send(self.format_markdown_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
             return False
@@ -354,7 +367,7 @@ class MainCog(commands.Cog):
                     return False
         elif user:
             try:
-                rbhop.id_from_username(user)
+                rbhop.get_user_data(user)
             except:
                 await ctx.send(self.format_markdown_code(f"'{user}' is not a valid username. No Roblox account associated with this username."))
                 return False
@@ -364,10 +377,10 @@ class MainCog(commands.Cog):
             except:
                 await ctx.send(self.format_markdown_code(f"'{user}' has not played bhop/surf."))
                 return False
-        if mapname:
-            m = rbhop.map_id_from_name(mapname, game)
+        if map_name:
+            m = rbhop.map_id_from_name(map_name, game)
             if m == "Map id not found":
-                await ctx.send(self.format_markdown_code(f"'{mapname}' is not a valid {game} map."))
+                await ctx.send(self.format_markdown_code(f"'{map_name}' is not a valid {game} map."))
                 return False
         return True
     
@@ -408,7 +421,7 @@ class MainCog(commands.Cog):
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user, r, rank, skill, placement, game, style):
+    def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style):
         ordinal = "th"
         if placement % 10 == 1:
             ordinal = "st"
@@ -418,7 +431,7 @@ class MainCog(commands.Cog):
             ordinal = "rd"
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rbhop.id_from_username(user)}&width=420&height=420&format=png")
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png")
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")
@@ -433,7 +446,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
-        embed.add_field(name="!record user game style {mapname}", value="Get a user's time on a given map.", inline=False)
+        embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map.", inline=False)
         embed.add_field(name="!times user game:both style:all", value="Get a list of a user's 25 most recent times.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.", inline=False)

@@ -119,7 +119,7 @@ def map_id_from_name(map_name, game):
     return "Map id not found"
 
 class Record():
-    def __init__(self, id, time, user_id, map_id, date, style, mode, game, username=None):
+    def __init__(self, id, time, user_id, map_id, date, style, mode, game, user=None):
         self.id = id
         self.time = time
         self.user_id = user_id
@@ -135,10 +135,11 @@ class Record():
         self.game_string = game_id_to_string[self.game]
         self.diff = -1.0
         self.previous_record = None
-        if username == None:
-            self.username = username_from_id(self.user_id)
-        else:
+        if user == None:
+            username, _ = get_user_data(user_id)
             self.username = username
+        else:
+            self.username = user
 
 def get(end_of_url, params):
     res = requests.get(URL + end_of_url, headers=headers, params=params)
@@ -149,34 +150,21 @@ def get(end_of_url, params):
     else:
         return res
 
-def username_from_id(user_id):
-    res = requests.get(f"https://api.roblox.com/users/{user_id}")
-    data = res.json()
-    try:
-        return data["Username"]
-    except KeyError:
-        print(res)
-        raise Exception("Invalid user ID")
-
-def id_from_username(username):
-    res = requests.get(f"https://api.roblox.com/users/get-by-username?username={username}")
-    data = res.json()
-    try:
-        return data["Id"]
-    except KeyError:
-        print(res)
-        raise Exception("Invalid username")
-
-def get_user_username_id(user):
-    username = ""
-    user_id = 0
-    if type(user) == str:
-        user_id = id_from_username(user)
-        username = user
+def get_user_data(user):
+    if type(user) == int:
+        res = requests.get(f"https://api.roblox.com/users/{user}")
+        data = res.json()
+        try:
+            return data["Username"], data["Id"]
+        except KeyError:
+            raise Exception("Invalid user ID")
     else:
-        user_id = user
-        username = username_from_id(user)
-    return username, user_id
+        res = requests.get(f"https://api.roblox.com/users/get-by-username?username={user}")
+        data = res.json()
+        try:
+            return data["Username"], data["Id"]
+        except KeyError:
+            raise Exception("Invalid username")
 
 #takes time value as input from json in miliseconds
 def format_time(time):
@@ -230,19 +218,22 @@ def get_recent_wrs(game, style):
 
 #can input userID as int or username as string
 def get_user_wrs(user, game, style):
-    username, user_id = get_user_username_id(user)
+    username, user_id = get_user_data(user)
     res = get(f"time/user/{user_id}/wr", {
         "game":games[game],
         "style":styles[style]
     })
     data = res.json()
-    return make_record_list(data, username)
+    if data:
+        return make_record_list(data, username)
+    else:
+        return []
 
 #returns a record object of a user's time on a given map
 def get_user_record(user, game, style, map_name=""):
     if map_name == "":
         return get_user_wrs(user, game, style)
-    _, user_id = get_user_username_id(user)
+    _, user_id = get_user_data(user)
     map_id = map_id_from_name(map_name, game)
     res = get(f"time/user/{user_id}", {
         "game":games[game],
@@ -256,7 +247,7 @@ def get_user_record(user, game, style, map_name=""):
         return convert_to_record(data[0])
 
 def total_wrs(user, game, style):
-    _, user_id = get_user_username_id(user)
+    _, user_id = get_user_data(user)
     res = get(f"time/user/{user_id}/wr", {
         "game":games[game],
         "style":styles[style]
@@ -268,7 +259,7 @@ def total_wrs(user, game, style):
         return len(data)
 
 def get_user_rank(user, game, style):
-    _, user_id = get_user_username_id(user)
+    _, user_id = get_user_data(user)
     res = get(f"rank/{user_id}", {
         "game":games[game],
         "style":styles[style]
@@ -290,7 +281,7 @@ def get_ranks(game, style, page):
     elif page % 2 == 0:
         data = data[25:]
     for i in data:
-        user = username_from_id(i["User"])
+        user, _ = get_user_data(i["User"])
         r, rank, skill, placement, = convert_rank(i)
         ls.append({"Username": user, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
     return ls
@@ -301,7 +292,7 @@ def get_user_times(user, game, style):
         params["game"] = games[game]
     if style != None:
         params["style"] = styles[style]
-    userid = id_from_username(user)
+    _, userid = get_user_data(user)
     res = get(f"time/user/{userid}", params)
     data = res.json()
     if len(data) != 0:
@@ -385,5 +376,5 @@ def get_map_times(game, style, map_name):
     }).json())
 
 def get_user(user):
-    user_id = id_from_username(user)
+    _, user_id = get_user_data(user)
     return get(f"user/{user_id}", {}).json()
