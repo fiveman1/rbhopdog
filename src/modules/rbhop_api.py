@@ -373,7 +373,7 @@ def get_map_times(game, style, map_name):
     map_id = map_id_from_name(map_name, game)
     return make_record_list(get(f"time/map/{map_id}", {
         "style":styles[style]
-    }).json())
+    }).json()[:25])
 
 def get_user(user):
     _, user_id = get_user_data(user)

@@ -99,7 +99,7 @@ class MainCog(commands.Cog):
             return
         map_id = rbhop.map_id_from_name(map_name, game)
         map_name = rbhop.map_name_from_id(map_id, game)
-        records = rbhop.get_map_times(game, style, map_name)[:25]
+        records = rbhop.get_map_times(game, style, map_name)
         if len(records) == 0:
             await ctx.send(self.format_markdown_code(f"No records found on map: {map_name} [game: {game}, style: {style}]"))
         msg = self.message_builder(f"Record list for map: {map_name} [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records)
