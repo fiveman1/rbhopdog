@@ -32,7 +32,10 @@ class MainCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
-        records = rbhop.get_new_wrs()
+        try:
+            records = rbhop.get_new_wrs()
+        except:
+            pass
         if len(records) > 0:
             for record in records:
                 print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
@@ -194,6 +197,7 @@ class MainCog(commands.Cog):
                         count += wrs
         embed = discord.Embed(color=0xff94b8)
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png")
+        embed.set_footer(text="WR Count")
         embed.title = f"\U0001F4C4  {user}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
