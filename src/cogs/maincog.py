@@ -35,7 +35,7 @@ class MainCog(commands.Cog):
         try:
             records = rbhop.get_new_wrs()
         except:
-            pass
+            return
         if len(records) > 0:
             for record in records:
                 print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
