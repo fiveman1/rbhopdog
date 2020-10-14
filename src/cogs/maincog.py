@@ -102,7 +102,8 @@ class MainCog(commands.Cog):
         else:
             page = 1
             map_name = " ".join(args)
-        if int(page) < 1:
+        page = int(page)
+        if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
             return
         game = game.lower()
@@ -260,7 +261,8 @@ class MainCog(commands.Cog):
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
-        if int(page) < 1:
+        page = int(page)
+        if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
             return
         if not await self.argument_checker(ctx, None, game, style):
@@ -308,7 +310,8 @@ class MainCog(commands.Cog):
             game = args[0]
             style = args[1]
             page = args[2]
-        if int(page) < 1:
+        page = int(page)
+        if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
             return
         if game in ["all", "both"]:

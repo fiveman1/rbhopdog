@@ -36,13 +36,15 @@ styles = {
     "a" : 6,
     "backwards" : 7,
     "bw" : 7,
+    "faste" : 8,
     1 : 1,
     2 : 2,
     3 : 3,
     4 : 4,
     5 : 5,
     6 : 6,
-    7 : 7
+    7 : 7,
+    8 : 8
 }
 
 style_id_to_string = {
@@ -52,7 +54,8 @@ style_id_to_string = {
     4 : "half-sideways",
     5 : "w-only",
     6 : "a-only",
-    7 : "backwards"
+    7 : "backwards",
+    8 : "faste"
 }
 
 games = {
