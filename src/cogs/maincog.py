@@ -84,6 +84,10 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
         user, _ = rbhop.get_user_data(user)
         map_id = rbhop.map_id_from_name(map_name, game)
         map_name = rbhop.map_name_from_id(map_id, game)
@@ -147,6 +151,10 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
         user, _ = rbhop.get_user_data(user)
         wrs = []
         count = 0
@@ -202,6 +210,10 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
         user, user_id = rbhop.get_user_data(user)
         count = 0
         ls = [[],[]]
@@ -246,6 +258,10 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
         user, _ = rbhop.get_user_data(user)
         wrs = rbhop.total_wrs(user, game, style)
         if (style in ["autohop", "auto"] and wrs >= 10) or wrs >= 50:
@@ -259,6 +275,10 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
         user, user_id = rbhop.get_user_data(user)
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         if r == 0:
@@ -335,6 +355,10 @@ class MainCog(commands.Cog):
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
         user, _ = rbhop.get_user_data(user)
         record_list, page_count = rbhop.get_user_times(user, game, style, page)
         if page_count == 0:
@@ -357,6 +381,12 @@ class MainCog(commands.Cog):
     @commands.command(name="help")
     async def help(self, ctx):
         await ctx.send(embed=self.make_help_embed())
+    
+    def get_discord_user_id(self, s):
+        if s[:3] == "<@!" and s[-1] == ">":
+            return s[3:-1]
+        else:
+            return None
     
     #title: first line, cols: list of tuples: (column_name, length of string), record_ls: a list of Records
     def message_builder(self, title, cols, record_ls, i=1):
@@ -429,6 +459,9 @@ class MainCog(commands.Cog):
                 if not await self.check_user_status(ctx, username):
                     return False
         elif user:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                user = self.get_roblox_username(discord_user_id)
             try:
                 rbhop.get_user_data(user)
             except:
