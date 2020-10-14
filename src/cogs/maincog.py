@@ -326,7 +326,7 @@ class MainCog(commands.Cog):
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         user, _ = rbhop.get_user_data(user)
-        record_list = rbhop.get_user_times(user, game, style, page)
+        record_list, page_count = rbhop.get_user_times(user, game, style, page)
         if len(record_list) == 0:
             await ctx.send(self.format_markdown_code("No times found. Perhaps your page number is too large?"))
             return
@@ -337,7 +337,7 @@ class MainCog(commands.Cog):
         if style == None:
             style = "all"
             cols.append(("Style:", 14))
-        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}, page: {page}]", cols, record_list)
+        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}, page: {page}/{page_count}]", cols, record_list)
         for message in self.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
 

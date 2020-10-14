@@ -59,13 +59,16 @@ style_id_to_string = {
 }
 
 games = {
+    "maptest" : 0,
     "bhop" : 1,
     "surf" : 2,
+    0 : 0,
     1 : 1,
     2 : 2
 }
 
 game_id_to_string = {
+    0 : "maptest",
     1 : "bhop",
     2 : "surf"
 }
@@ -299,12 +302,17 @@ def get_user_times(user, game, style, page):
     if style != None:
         params["style"] = styles[style]
     _, userid = get_user_data(user)
-    res = get(f"time/user/{userid}", params)
+    res = get(f"time/user/{userid}", params) 
     data = res.json()
     if len(data) > 0:
-        return make_record_list(data[start:end], user)
+        page_count = int(res.headers["Pagination-Count"])
+        params["page"] = page_count
+        res2 = get(f"time/user/{userid}", params)
+        data2 = res2.json()
+        converted_page_count = int(((page_count - 1) * (200 / page_length)) + ((len(data2) - 1) // page_length) + 1)
+        return make_record_list(data[start:end], user), converted_page_count
     else:
-        return []
+        return [], 0
 
 def convert_rank(data):
     if data == None:
