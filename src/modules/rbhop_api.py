@@ -275,14 +275,37 @@ def get_user_rank(user, game, style):
     data = res.json()
     return convert_rank(data)
 
+def find_max_pages(url, params, page_count, page_length, custom_page_length):
+    params["page"] = page_count
+    res = get(url, params)
+    data = res.json()
+    if len(data) > 0:
+        converted_page_count = int(((page_count - 1) * (page_length / custom_page_length)) + ((len(data) - 1) // custom_page_length) + 1)
+        return converted_page_count
+    else:
+        return 0
+
 #returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
 def get_ranks(game, style, page):
-    res = get(f"rank", {
+    params = {
         "game":games[game],
         "style":styles[style],
         "page":(int((page - 1) / 2)) + 1
-    })
+    }
+    page_length = 25
+    res = get("rank", params)
     data = res.json()
+    if len(data) > 0:
+        page_count = int(res.headers["Pagination-Count"])
+        converted_page_count = find_max_pages("rank", params, page_count, 50, page_length)
+    else:
+        params["page"] = 1
+        first_page_res = get("rank", params)
+        if len(first_page_res.json()) == 0:
+            return [], 0
+        else:
+            page_count = int(first_page_res.headers["Pagination-Count"])
+            converted_page_count = find_max_pages("rank", params, page_count, 200, page_length)
     ls = []
     if page % 2 == 1:
         data = data[:25]
@@ -292,7 +315,7 @@ def get_ranks(game, style, page):
         user, _ = get_user_data(i["User"])
         r, rank, skill, placement, = convert_rank(i)
         ls.append({"Username": user, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
-    return ls
+    return ls, converted_page_count
 
 def get_user_times(user, game, style, page):
     page_length = 25
@@ -308,13 +331,16 @@ def get_user_times(user, game, style, page):
     data = res.json()
     if len(data) > 0:
         page_count = int(res.headers["Pagination-Count"])
-        params["page"] = page_count
-        res2 = get(f"time/user/{userid}", params)
-        data2 = res2.json()
-        converted_page_count = int(((page_count - 1) * (200 / page_length)) + ((len(data2) - 1) // page_length) + 1)
-        return make_record_list(data[start:end], user), converted_page_count
+        converted_page_count = find_max_pages(f"time/user/{userid}", params, page_count, 200, page_length)
     else:
-        return [], 0
+        params["page"] = 1
+        first_page_res = get(f"time/user/{userid}", params)
+        if len(first_page_res.json()) == 0:
+            return [], 0
+        else:
+            page_count = int(first_page_res.headers["Pagination-Count"])
+            converted_page_count = find_max_pages(f"time/user/{userid}", params, page_count, 200, page_length)
+    return make_record_list(data[start:end], user), converted_page_count
 
 def convert_rank(data):
     if data == None:
@@ -390,15 +416,26 @@ def get_map_times(game, style, map_name, page):
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     end = start + 25
     map_id = map_id_from_name(map_name, game)
-    res = get(f"time/map/{map_id}", {
+    params = {
         "style":styles[style],
         "page":page_num + 1
-    })
+    }
+    res = get(f"time/map/{map_id}", params)
     data = res.json()
     if len(data) > 0:
-        return make_record_list(data[start:end])
+        page_count = int(res.headers["Pagination-Count"])
+        params["page"] = page_count
+        converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
     else:
-        return []
+        params["page"] = 1
+        first_page_res = get(f"time/map/{map_id}", params)
+        if len(first_page_res.json()) == 0:
+            return [], 0
+        else:
+            page_count = int(first_page_res.headers["Pagination-Count"])
+            params["page"] = page_count
+            converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
+    return make_record_list(data[start:end]), converted_page_count
 
 def get_user(user):
     _, user_id = get_user_data(user)

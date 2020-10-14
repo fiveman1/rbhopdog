@@ -112,11 +112,15 @@ class MainCog(commands.Cog):
             return
         map_id = rbhop.map_id_from_name(map_name, game)
         map_name = rbhop.map_name_from_id(map_id, game)
-        records = rbhop.get_map_times(game, style, map_name, page)
-        if len(records) == 0:
-            await ctx.send(self.format_markdown_code(f"No records found for map: {map_name} [game: {game}, style: {style}, page: {page}]"))
+        records, page_count = rbhop.get_map_times(game, style, map_name, page)
+        if page_count == 0:
+            await ctx.send(self.format_markdown_code(f"{map_name} has not yet been completed in {style}."))
+            return
+        elif page > page_count:
+            await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
+            return
         else:
-            msg = self.message_builder(f"Record list for map: {map_name} [game: {game}, style: {style}, page: {page}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
+            msg = self.message_builder(f"Record list for map: {map_name} [game: {game}, style: {style}, page: {page}/{page_count}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -267,11 +271,14 @@ class MainCog(commands.Cog):
             return
         if not await self.argument_checker(ctx, None, game, style):
             return
-        ranks = rbhop.get_ranks(game, style, page)
-        if len(ranks) == 0:
-            await ctx.send(self.format_markdown_code("No ranks found. Perhaps your page number is too large?"))
+        ranks, page_count = rbhop.get_ranks(game, style, page)
+        if page_count == 0:
+            await ctx.send(self.format_markdown_code(f"No ranks found in {game} {style} (???)."))
             return
-        msg = f"Ranks for {game} in {style}, page {page}\n"
+        elif page > page_count:
+            await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
+            return
+        msg = f"Ranks [game: {game}, style: {style}, page: {page}/{page_count}]\n"
         titles = ["Placement:", "Username:", "Rank:", "Skill:"]
         msg += f"{titles[0]:11}| {titles[1]:20}| {titles[2]:19}| {titles[3]}\n"
         for rank in ranks:
@@ -327,8 +334,11 @@ class MainCog(commands.Cog):
             user = self.get_roblox_username(ctx.author.id)
         user, _ = rbhop.get_user_data(user)
         record_list, page_count = rbhop.get_user_times(user, game, style, page)
-        if len(record_list) == 0:
-            await ctx.send(self.format_markdown_code("No times found. Perhaps your page number is too large?"))
+        if page_count == 0:
+            await ctx.send(self.format_markdown_code(f"No times found for {user} in {game} {style}."))
+            return
+        elif page > page_count:
+            await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
             return
         cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
         if game == None:
@@ -384,7 +394,7 @@ class MainCog(commands.Cog):
         #add each line together until the total length exceeds 1900
         #then create a new string (message)
         while i < items:
-            while i < items and length < 1900:
+            while i < items and length + len(lines[i]) + 2 < 2000:
                 page += lines[i] + "\n"
                 length += len(lines[i]) + 2
                 i += 1
