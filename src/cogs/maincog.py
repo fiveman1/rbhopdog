@@ -95,18 +95,28 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="wrmap")
-    async def get_wrmap(self, ctx, game, style, *, map_name):
+    async def get_wrmap(self, ctx, game, style, *args):
+        if args[-1].isnumeric():
+            page = args[-1]
+            map_name = " ".join(args[:-1])
+        else:
+            page = 1
+            map_name = " ".join(args)
+        if page < 1:
+            await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
+            return
         game = game.lower()
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style, map_name):
             return
         map_id = rbhop.map_id_from_name(map_name, game)
         map_name = rbhop.map_name_from_id(map_id, game)
-        records = rbhop.get_map_times(game, style, map_name)
+        records = rbhop.get_map_times(game, style, map_name, page)
         if len(records) == 0:
-            await ctx.send(self.format_markdown_code(f"No records found on map: {map_name} [game: {game}, style: {style}]"))
-        msg = self.message_builder(f"Record list for map: {map_name} [game: {game}, style: {style}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records)
-        await ctx.send(self.format_markdown_code(msg))
+            await ctx.send(self.format_markdown_code(f"No records found for map: {map_name} [game: {game}, style: {style}, page: {page}]"))
+        else:
+            msg = self.message_builder(f"Record list for map: {map_name} [game: {game}, style: {style}, page: {page}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
+            await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
@@ -251,7 +261,7 @@ class MainCog(commands.Cog):
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
         if page < 1:
-            await ctx.send(self.format_markdown_code("Page cannot be less than 1."))
+            await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
             return
         if not await self.argument_checker(ctx, None, game, style):
             return
@@ -273,7 +283,34 @@ class MainCog(commands.Cog):
         await ctx.send(self.format_markdown_code(msg))
     
     @commands.command(name="times")
-    async def times(self, ctx, user, game=None, style=None):
+    async def times(self, ctx, user, *args):
+        if len(args) == 0:
+            game = None
+            style = None
+            page = 1
+        elif len(args) == 1:
+            style = None
+            if args[0].isnumeric():
+                game = None
+                page = args[0]
+            else:
+                game = args[0]
+                page = 1
+        elif len(args) == 2:
+            game = args[0]
+            if args[-1].isnumeric():
+                style = None
+                page = args[-1]
+            else:
+                style = args[1]
+                page = 1
+        else:
+            game = args[0]
+            style = args[1]
+            page = args[2]
+        if page < 1:
+            await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
+            return
         if game in ["all", "both"]:
             game = None
         if style == "all":
@@ -283,7 +320,10 @@ class MainCog(commands.Cog):
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
         user, _ = rbhop.get_user_data(user)
-        record_list = rbhop.get_user_times(user, game, style)
+        record_list = rbhop.get_user_times(user, game, style, page)
+        if len(record_list) == 0:
+            await ctx.send(self.format_markdown_code("No times found. Perhaps your page number is too large?"))
+            return
         cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
         if game == None:
             game = "both"
@@ -291,7 +331,7 @@ class MainCog(commands.Cog):
         if style == None:
             style = "all"
             cols.append(("Style:", 14))
-        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}]", cols, record_list)
+        msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}, page: {page}]", cols, record_list)
         for message in self.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
 
@@ -451,10 +491,10 @@ class MainCog(commands.Cog):
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
         embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map.", inline=False)
-        embed.add_field(name="!times user game:both style:all", value="Get a list of a user's 25 most recent times.", inline=False)
+        embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.", inline=False)
-        embed.add_field(name="!wrmap game style {map_name}", value="Gives the 25 best times on a given map and style.", inline=False)
+        embed.add_field(name="!wrmap game style {map_name} page:1", value="Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\"", inline=False)
         return embed
 
 def setup(bot):

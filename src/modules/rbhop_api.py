@@ -286,8 +286,11 @@ def get_ranks(game, style, page):
         ls.append({"Username": user, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
     return ls
 
-def get_user_times(user, game, style):
-    params = {}
+def get_user_times(user, game, style, page):
+    page_length = 25
+    page_num, start = divmod((int(page) - 1) * page_length, 200)
+    end = start + 25
+    params = {"page":page_num + 1}
     if game != None:
         params["game"] = games[game]
     if style != None:
@@ -295,8 +298,8 @@ def get_user_times(user, game, style):
     _, userid = get_user_data(user)
     res = get(f"time/user/{userid}", params)
     data = res.json()
-    if len(data) != 0:
-        return make_record_list(data[:25], user)
+    if len(data) > 0:
+        return make_record_list(data[start:end], user)
     else:
         return []
 
@@ -369,11 +372,20 @@ def get_new_wrs():
         file.close()
     return globals_ls
 
-def get_map_times(game, style, map_name):
+def get_map_times(game, style, map_name, page):
+    page_length = 25
+    page_num, start = divmod((int(page) - 1) * page_length, 200)
+    end = start + 25
     map_id = map_id_from_name(map_name, game)
-    return make_record_list(get(f"time/map/{map_id}", {
-        "style":styles[style]
-    }).json()[:25])
+    res = get(f"time/map/{map_id}", {
+        "style":styles[style],
+        "page":page_num + 1
+    })
+    data = res.json()
+    if len(data) > 0:
+        return make_record_list(data[start:end])
+    else:
+        return []
 
 def get_user(user):
     _, user_id = get_user_data(user)
