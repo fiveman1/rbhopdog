@@ -120,7 +120,7 @@ def map_id_from_name(map_name, game):
     elif game == 2:
         map_data = surf_maps
     for m in map_data:
-        if m["DisplayName"].lower() == map_name:
+        if m["DisplayName"].lower().startswith(map_name):
             return m["ID"]
     return "Map id not found"
 
