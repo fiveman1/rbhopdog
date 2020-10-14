@@ -86,6 +86,7 @@ try:
 except FileNotFoundError:
     files.write_maps("bhop")
     bhop_maps = open_json("files/bhop_maps.json")
+bhop_maps = sorted(bhop_maps, key = lambda i: i["DisplayName"])
 
 surf_maps = {}
 try:
@@ -93,6 +94,7 @@ try:
 except FileNotFoundError:
     files.write_maps("surf")
     surf_maps = open_json("files/surf_maps.json")
+surf_maps = sorted(surf_maps, key = lambda i: i["DisplayName"])
 
 #since dicts are sorta glorified hash tables we can optimize id -> displayname lookup
 #by storing this data in a dict; now the operation should be O(1) instead of O(n)
