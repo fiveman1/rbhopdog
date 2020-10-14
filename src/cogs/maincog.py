@@ -96,6 +96,9 @@ class MainCog(commands.Cog):
 
     @commands.command(name="wrmap")
     async def get_wrmap(self, ctx, game, style, *args):
+        if len(args) == 0:
+            await ctx.send(self.format_markdown_code("Missing map name."))
+            return
         if args[-1].isnumeric():
             page = args[-1]
             map_name = " ".join(args[:-1])
@@ -471,13 +474,12 @@ class MainCog(commands.Cog):
         embed.add_field(name="Player", value=record.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
+            embed.add_field(name="\u200B", value="\u200B", inline=True)
+            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=True)
         else:
             embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
-        embed.add_field(name="\u200B", value="\u200B", inline=True)
-        if record.previous_record != None:
+            embed.add_field(name="\u200B", value="\u200B", inline=True)
             embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=True)
-        else:
-            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=True)
         embed.set_footer(text="World Record")
         return embed
     
