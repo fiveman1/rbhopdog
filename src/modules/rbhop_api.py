@@ -305,7 +305,7 @@ def get_ranks(game, style, page):
             return [], 0
         else:
             page_count = int(first_page_res.headers["Pagination-Count"])
-            converted_page_count = find_max_pages("rank", params, page_count, 200, page_length)
+            converted_page_count = find_max_pages("rank", params, page_count, 50, page_length)
     ls = []
     if page % 2 == 1:
         data = data[:25]
