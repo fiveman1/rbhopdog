@@ -300,7 +300,7 @@ class MainCog(commands.Cog):
                 page = 1
         elif len(args) == 2:
             game = args[0]
-            if args[-1].isnumeric():
+            if args[1].isnumeric():
                 style = None
                 page = args[-1]
             else:
@@ -309,7 +309,10 @@ class MainCog(commands.Cog):
         else:
             game = args[0]
             style = args[1]
-            page = args[2]
+            if args[2].isnumeric():
+                page = args[2]
+            else:
+                page = 1
         page = int(page)
         if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
