@@ -4,6 +4,7 @@ import os
 import requests
 import sys
 import traceback
+from io import StringIO
 
 sys.path.insert(1, os.path.join(sys.path[0], '../modules'))
 
@@ -322,7 +323,7 @@ class MainCog(commands.Cog):
             page = 1
         elif len(args) == 1:
             style = None
-            if args[0].isnumeric():
+            if args[0].isnumeric() or args[0] == "all":
                 game = None
                 page = args[0]
             else:
@@ -330,23 +331,24 @@ class MainCog(commands.Cog):
                 page = 1
         elif len(args) == 2:
             game = args[0]
-            if args[1].isnumeric():
+            if args[1].isnumeric() or args[1] == "all":
                 style = None
-                page = args[-1]
+                page = args[1]
             else:
                 style = args[1]
                 page = 1
         else:
             game = args[0]
             style = args[1]
-            if args[2].isnumeric():
+            if args[2].isnumeric() or args[2] == "all":
                 page = args[2]
             else:
                 page = 1
-        page = int(page)
-        if page < 1:
-            await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
-            return
+        if page != "all":
+            page = int(page)
+            if page < 1:
+                await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
+                return
         if game in ["all", "both"]:
             game = None
         if style == "all":
@@ -360,6 +362,8 @@ class MainCog(commands.Cog):
             if discord_user_id:
                 user = self.get_roblox_username(discord_user_id)
         user, _ = rbhop.get_user_data(user)
+        if page == "all":
+            page = -1
         record_list, page_count = rbhop.get_user_times(user, game, style, page)
         if page_count == 0:
             await ctx.send(self.format_markdown_code(f"No times found for {user} in {game} {style}."))
@@ -374,6 +378,13 @@ class MainCog(commands.Cog):
         if style == None:
             style = "all"
             cols.append(("Style:", 14))
+        if page == -1:
+            msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}] (total: {len(record_list)})", cols, record_list)
+            f = StringIO()
+            f.write(msg)
+            f.seek(0)
+            await ctx.send(file=discord.File(f, filename=f"times_{user}_{game}_{style}.txt"))
+            return
         msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}, page: {page}/{page_count}]", cols, record_list)
         for message in self.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
@@ -547,7 +558,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
         embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map.", inline=False)
-        embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style.", inline=False)
+        embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'all', you will get a .txt with every time.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.", inline=False)
         embed.add_field(name="!wrmap game style {map_name} page:1", value="Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\"", inline=False)

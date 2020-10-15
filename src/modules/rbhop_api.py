@@ -318,6 +318,25 @@ def get_ranks(game, style, page):
     return ls, converted_page_count
 
 def get_user_times(user, game, style, page):
+    if page == -1:
+        i = 1
+        params = {"page":i}
+        if game != None:
+            params["game"] = games[game]
+        if style != None:
+            params["style"] = styles[style]
+        _, userid = get_user_data(user)
+        times_ls = []
+        while True:
+            params["page"] = i
+            res = get(f"time/user/{userid}", params)
+            data = res.json()
+            if len(data) == 0:
+                break
+            else:
+                times_ls += data
+                i += 1
+        return make_record_list(times_ls, user), i - 1
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     end = start + 25
