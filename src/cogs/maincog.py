@@ -235,13 +235,13 @@ class MainCog(commands.Cog):
                 body = ""
                 for c in ls[0]:
                     if c[1] > 0:
-                        body += f"    **{c[0]}:** {c[1]}\n"
+                        body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
             if len(ls[1]) > 0:
                 body = ""
                 for c in ls[1]:
                     if c[1] > 0:
-                        body += f"    **{c[0]}:** {c[1]}\n"
+                        body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
         else:
             embed.description = f"Total WRs: 0 \N{crying face}"
@@ -385,6 +385,8 @@ class MainCog(commands.Cog):
     def get_discord_user_id(self, s):
         if s[:3] == "<@!" and s[-1] == ">":
             return s[3:-1]
+        elif s[:2] == "<@" and s[-1] == ">":
+            return s[2:-1]
         else:
             return None
     
@@ -462,10 +464,13 @@ class MainCog(commands.Cog):
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
                 user = self.get_roblox_username(discord_user_id)
+                if not user:
+                    await ctx.send(self.format_markdown_code(f"Invalid username. '{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account."))
+                    return False
             try:
                 rbhop.get_user_data(user)
             except:
-                await ctx.send(self.format_markdown_code(f"'{user}' is not a valid username. No Roblox account associated with this username."))
+                await ctx.send(self.format_markdown_code("Invalid username (username does not exist on Roblox)."))
                 return False
             try:
                 if not await self.check_user_status(ctx, user):
