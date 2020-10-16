@@ -282,10 +282,11 @@ class MainCog(commands.Cog):
                 user = self.get_roblox_username(discord_user_id)
         user, user_id = rbhop.get_user_data(user)
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
+        completions, total_maps = rbhop.get_user_completion(user, game, style)
         if r == 0:
             await ctx.send(self.format_markdown_code(f"No data available for user {user} in {style} in {game}."))
             return
-        await ctx.send(embed=self.make_user_embed(user, user_id, r, rank, skill, placement, game, style))
+        await ctx.send(embed=self.make_user_embed(user, user_id, r, rank, skill, placement, game, style, completions, total_maps))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
@@ -532,7 +533,7 @@ class MainCog(commands.Cog):
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style):
+    def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style, completions, total_maps):
         ordinal = "th"
         if placement % 10 == 1:
             ordinal = "st"
@@ -546,7 +547,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")
-        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}")
+        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})")
         embed.set_footer(text="User Profile")
         return embed
     

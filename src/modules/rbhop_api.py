@@ -361,6 +361,14 @@ def get_user_times(user, game, style, page):
             converted_page_count = find_max_pages(f"time/user/{userid}", params, page_count, 200, page_length)
     return make_record_list(data[start:end], user), converted_page_count
 
+def get_user_completion(user, game, style):
+    records, _ = get_user_times(user, game, style, -1)
+    completions = len(records)
+    if game == "bhop":
+        return completions, len(bhop_maps)
+    else:
+        return completions, len(surf_maps)
+
 def convert_rank(data):
     if data == None:
         return 0,0,0,0
@@ -370,6 +378,7 @@ def convert_rank(data):
         skill = round(float(data["Skill"]) * 100.0, 3)
         return r, rank, skill, data["Placement"]
 
+#records is a list of records from a given map
 def sort_map(records):
     dups = []
     i = 0
@@ -473,6 +482,7 @@ def get_map_times(game, style, map_name, page):
             params["page"] = page_count
             converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
             return [], converted_page_count
+    #add the previous and next page so that we can sort the times across pages properly
     res2data = []
     if page_num > 0:
         params["page"] = page_num
