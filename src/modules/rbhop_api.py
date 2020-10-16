@@ -452,7 +452,6 @@ def get_new_wrs():
 def get_map_times(game, style, map_name, page):
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
-    end = start + 25
     map_id = map_id_from_name(map_name, game)
     params = {
         "style":styles[style],
@@ -473,7 +472,20 @@ def get_map_times(game, style, map_name, page):
             page_count = int(first_page_res.headers["Pagination-Count"])
             params["page"] = page_count
             converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
+            return [], converted_page_count
+    res2data = []
+    if page_num > 0:
+        params["page"] = page_num
+        res2 = get(f"time/map/{map_id}", params)
+        res2data = res2.json()
+        data = res2data + data
+    if page_num + 2 <= converted_page_count:
+        params["page"] = page_num + 2
+        res3 = get(f"time/map/{map_id}", params)
+        data += res3.json()
     sort_map(data)
+    start += len(res2data)
+    end = start + page_length
     return make_record_list(data[start:end]), converted_page_count
 
 def get_user(user):
