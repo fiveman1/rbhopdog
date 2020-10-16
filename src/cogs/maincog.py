@@ -573,6 +573,7 @@ class MainCog(commands.Cog):
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
+        embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
