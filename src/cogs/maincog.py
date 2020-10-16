@@ -89,6 +89,7 @@ class MainCog(commands.Cog):
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
                 user = self.get_roblox_username(discord_user_id)
+        style = self.convert_style(style)
         user, _ = rbhop.get_user_data(user)
         map_id = rbhop.map_id_from_name(map_name, game)
         map_name = rbhop.map_name_from_id(map_id, game)
@@ -118,6 +119,7 @@ class MainCog(commands.Cog):
         style = style.lower()
         if not await self.argument_checker(ctx, None, game, style, map_name):
             return
+        style = self.convert_style(style)
         map_id = rbhop.map_id_from_name(map_name, game)
         map_name = rbhop.map_name_from_id(map_id, game)
         records, page_count = rbhop.get_map_times(game, style, map_name, page)
@@ -144,7 +146,7 @@ class MainCog(commands.Cog):
         if style in [None, "all"]:
             s = self.styles
         else:
-            s.append(style.lower())
+            s.append(self.convert_style(style.lower()))
         if not await self.argument_checker(ctx, user, g[0], s[0]):
             return
         if sort not in ["", "date", "time", "name"]:
@@ -263,6 +265,7 @@ class MainCog(commands.Cog):
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
                 user = self.get_roblox_username(discord_user_id)
+        style = self.convert_style(style)
         user, _ = rbhop.get_user_data(user)
         wrs = rbhop.total_wrs(user, game, style)
         if (style in ["autohop", "auto"] and wrs >= 10) or wrs >= 50:
@@ -280,6 +283,7 @@ class MainCog(commands.Cog):
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
                 user = self.get_roblox_username(discord_user_id)
+        style = self.convert_style(style)
         user, user_id = rbhop.get_user_data(user)
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         completions, total_maps = rbhop.get_user_completion(user, game, style)
@@ -296,6 +300,7 @@ class MainCog(commands.Cog):
             return
         if not await self.argument_checker(ctx, None, game, style):
             return
+        style = self.convert_style(style)
         ranks, page_count = rbhop.get_ranks(game, style, page)
         if page_count == 0:
             await ctx.send(self.format_markdown_code(f"No ranks found in {game} {style} (???)."))
@@ -362,6 +367,8 @@ class MainCog(commands.Cog):
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
                 user = self.get_roblox_username(discord_user_id)
+        if style:
+            style = self.convert_style(style)
         user, _ = rbhop.get_user_data(user)
         if page == "all":
             page = -1
@@ -516,6 +523,9 @@ class MainCog(commands.Cog):
 
     def format_markdown_code(self, s):
         return f"```\n{s}```"
+    
+    def convert_style(self, style):
+        return rbhop.style_id_to_string[rbhop.styles[style]]
     
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
