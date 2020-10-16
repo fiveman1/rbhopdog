@@ -396,6 +396,14 @@ class MainCog(commands.Cog):
         msg = self.message_builder(f"Recent times for {user} [game: {game}, style: {style}, page: {page}/{page_count}]", cols, record_list)
         for message in self.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
+    
+    @commands.command(name="mapcount")
+    async def map_count(self, ctx):
+        embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
+        embed.add_field(name="Bhop Maps", value=str(len(rbhop.bhop_maps)))
+        embed.add_field(name="Surf Maps", value=str(len(rbhop.surf_maps)))
+        embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
+        await ctx.send(embed=embed)
 
     @commands.command(name="help")
     async def help(self, ctx):
