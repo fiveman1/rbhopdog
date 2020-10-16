@@ -370,6 +370,24 @@ def convert_rank(data):
         skill = round(float(data["Skill"]) * 100.0, 3)
         return r, rank, skill, data["Placement"]
 
+def sort_map(records):
+    dups = []
+    i = 0
+    while i < len(records) - 1:
+        if records[i]["Time"] == records[i + 1]["Time"]:
+            dups.append(records[i])
+            dups.append(records[i + 1])
+            j = i + 2
+            while j < len(records) and records[j]["Time"] == records[i]["Time"]:
+                dups.append(records[j])
+                j += 1
+            dups = sorted(dups, key = lambda i: i["Date"])
+            for record in dups:
+                records[i] = record
+                i += 1
+            dups = []
+        else:
+            i += 1
 
 #changes a WR's diff and previous_record in place by comparing first and second place
 #times on the given map
@@ -378,6 +396,7 @@ def calculate_wr_diff(record):
         "style":record.style,
     })
     data = res.json()
+    sort_map(data)
     if len(data) > 1:
         second = convert_to_record(data[1])
         record.diff = round((int(second.time) - int(record.time)) / 1000.0, 3)
@@ -454,6 +473,7 @@ def get_map_times(game, style, map_name, page):
             page_count = int(first_page_res.headers["Pagination-Count"])
             params["page"] = page_count
             converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
+    sort_map(data)
     return make_record_list(data[start:end]), converted_page_count
 
 def get_user(user):
