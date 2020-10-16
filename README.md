@@ -1,6 +1,6 @@
 # rbhopdog
 
-discord.py bot that uses primarly strafes.net api among other things
+discord.py bot that uses primarily the strafes.net api to access data from rbhop/rsurf among other things
 
 Commands:
 
