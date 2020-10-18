@@ -374,7 +374,9 @@ class MainCog(commands.Cog):
             page = -1
         record_list, page_count = rbhop.get_user_times(user, game, style, page)
         if page_count == 0:
-            await ctx.send(self.format_markdown_code(f"No times found for {user} in {game} {style}."))
+            if not style:
+                style = "all"
+            await ctx.send(self.format_markdown_code(f"No times found for {user} in game '{game}' style '{style}'."))
             return
         elif page > page_count:
             await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
@@ -470,7 +472,7 @@ class MainCog(commands.Cog):
     #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
     async def argument_checker(self, ctx, user, game, style, map_name=None):
-        if game and game not in self.games:
+        if game and game not in rbhop.games:
             await ctx.send(self.format_markdown_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
             return False
         if style and style not in rbhop.styles:
@@ -553,11 +555,12 @@ class MainCog(commands.Cog):
     
     def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style, completions, total_maps):
         ordinal = "th"
-        if placement % 10 == 1:
+        n = placement % 10
+        if n == 1:
             ordinal = "st"
-        elif placement % 10 == 2:
+        elif n == 2:
             ordinal = "nd"
-        elif placement % 10 == 3:
+        elif n == 3:
             ordinal = "rd"
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
