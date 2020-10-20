@@ -411,6 +411,14 @@ class MainCog(commands.Cog):
     async def help(self, ctx):
         await ctx.send(embed=self.make_help_embed())
     
+    @commands.command(name="guilds")
+    @commands.is_owner()
+    async def guilds(self, ctx):
+        msg = f"Total guilds: {len(self.bot.guilds)}\n"
+        for guild in self.bot.guilds:
+            msg += f"Name: '{guild.name}', member count: {len(guild.members)}\n"
+        await ctx.send(self.format_markdown_code(msg))
+    
     def get_discord_user_id(self, s):
         if s[:3] == "<@!" and s[-1] == ">":
             return s[3:-1]
