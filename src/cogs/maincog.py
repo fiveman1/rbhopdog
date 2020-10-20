@@ -415,8 +415,10 @@ class MainCog(commands.Cog):
     @commands.is_owner()
     async def guilds(self, ctx):
         msg = f"Total guilds: {len(self.bot.guilds)}\n"
+        titles = ["Name:", "Members:", "Owner:"]
+        msg += f"{titles[0]:30}| {titles[1]:10}| {titles[2]}\n"
         for guild in self.bot.guilds:
-            msg += f"Name: {guild.name:30} | members: {guild.member_count}\n"
+            msg += f"Name: {guild.name:30}| {guild.member_count:10}| {guild.owner.name}, {guild.owner.id} \n"
         await ctx.send(self.format_markdown_code(msg))
     
     def get_discord_user_id(self, s):
