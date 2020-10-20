@@ -442,7 +442,7 @@ def get_new_wrs():
             match = search(old_wrs[i], record)
             if match:
                 #records by the same person on the same map have the same id even if they beat it
-                if record["Time"] != match["Time"]:
+                if record["Time"] != match["Time"] and get(f"user/{record['User']}", {}).json()["Status"] == 1:
                     r = convert_to_record(record)
                     r.diff = round((int(match["Time"]) - int(record["Time"])) / 1000.0, 3)
                     r.previous_record = convert_to_record(match)
@@ -450,7 +450,7 @@ def get_new_wrs():
                 #we can break here because the lists are sorted in the same fashion
                 else:
                     break
-            else:
+            elif get(f"user/{record['User']}", {}).json()["Status"] == 1:
                 r = convert_to_record(record)
                 calculate_wr_diff(r)
                 globals_ls.append(r)
