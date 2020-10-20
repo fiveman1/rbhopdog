@@ -23,7 +23,7 @@ class MainCog(commands.Cog):
             self.commands_text = data
         self.games = ["bhop", "surf"]
         self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
-        files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
+        #files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
         self.global_announcements.start()
         print("maincog loaded")
     
