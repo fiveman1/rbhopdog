@@ -418,7 +418,7 @@ class MainCog(commands.Cog):
         titles = ["Name:", "Members:", "Owner:"]
         msg += f"{titles[0]:30}| {titles[1]}\n"
         for guild in self.bot.guilds:
-            msg += f"Name: {guild.name:30}| {guild.member_count}\n"
+            msg += f"{guild.name:30}| {guild.member_count}\n"
         await ctx.send(self.format_markdown_code(msg))
     
     def get_discord_user_id(self, s):
