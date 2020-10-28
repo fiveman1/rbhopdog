@@ -567,7 +567,7 @@ class MainCog(commands.Cog):
     
     def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style, completions, total_maps):
         ordinal = "th"
-        if placement > 13 or placement < 11:
+        if placement % 100 > 13 or placement % 100 < 11:
             n = placement % 10
             if n == 1:
                 ordinal = "st"
