@@ -567,13 +567,14 @@ class MainCog(commands.Cog):
     
     def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style, completions, total_maps):
         ordinal = "th"
-        n = placement % 10
-        if n == 1:
-            ordinal = "st"
-        elif n == 2:
-            ordinal = "nd"
-        elif n == 3:
-            ordinal = "rd"
+        if placement > 13 or placement < 11:
+            n = placement % 10
+            if n == 1:
+                ordinal = "st"
+            elif n == 2:
+                ordinal = "nd"
+            elif n == 3:
+                ordinal = "rd"
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png")

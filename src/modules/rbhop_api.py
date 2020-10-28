@@ -461,7 +461,7 @@ def get_new_wrs():
         with open(fix_path("files/recent_wrs.json"), "w") as file:
             json.dump(new_wrs, file)
         file.close()
-    return globals_ls
+    return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
 def get_map_times(game, style, map_name, page):
     page_length = 25
