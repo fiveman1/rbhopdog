@@ -252,7 +252,7 @@ def get_user_record(user, game, style, map_name=""):
         "map":map_id
     })
     data = res.json()
-    if len(data) == None:
+    if len(data) == 0:
         return None
     else:
         return convert_to_record(data[0])
