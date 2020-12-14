@@ -115,7 +115,6 @@ def map_name_from_id(map_id, game):
         return bhop_map_lookup[map_id]
     elif game == 2:
         return surf_map_lookup[map_id]
-    return "Map name not found"
 
 def map_id_from_name(map_name, game):
     map_name = map_name.lower()
@@ -127,6 +126,17 @@ def map_id_from_name(map_name, game):
     for m in map_data:
         if m["DisplayName"].lower().startswith(map_name):
             return m["ID"]
+    return "Map id not found"
+
+def map_dict_from_id(map_id, game):
+    game = games[game]
+    if game == 1:
+        map_data = bhop_maps
+    elif game == 2:
+        map_data = surf_maps
+    for m in map_data:
+        if m["ID"] == map_id:
+            return m
     return "Map id not found"
 
 class Record():

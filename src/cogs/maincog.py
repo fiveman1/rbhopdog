@@ -206,6 +206,24 @@ class MainCog(commands.Cog):
                 return
             await ctx.send(self.format_markdown_code(message))
 
+    @commands.command(name="map")
+    async def map_info(self, ctx, game, *, map_name):
+        if not await self.argument_checker(ctx, None, game, None, map_name):
+            return
+        map_id = rbhop.map_id_from_name(map_name, game)
+        map_dict = rbhop.map_dict_from_id(map_id, game)
+        map_name = map_dict["DisplayName"]
+        play_count = map_dict["PlayCount"]
+        map_creator = map_dict["Creator"]
+        embed = discord.Embed(color=0x7c17ff)
+        embed.set_thumbnail(url=f"https://www.roblox.com/asset-thumbnail/image?assetId={map_id}&width=420&height=420&format=png")
+        embed.set_footer(text="Map Info")
+        embed.title = f"\U0001F5FA  {map_name}"
+        embed.add_field(name="Creator", value=map_creator)
+        embed.add_field(name="Map ID", value=map_id)
+        embed.add_field(name="Play Count", value=play_count)
+        await ctx.send(embed=embed)
+
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrcount")
     async def wr_count(self, ctx, user):
@@ -589,6 +607,7 @@ class MainCog(commands.Cog):
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
+        embed.add_field(name="!map game {map_name}", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
         embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
