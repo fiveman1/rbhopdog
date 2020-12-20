@@ -109,12 +109,31 @@ surf_map_lookup = {}
 for map in surf_maps:
     surf_map_lookup[map["ID"]] = map["DisplayName"]
 
+def update_maps():
+    files.write_maps("bhop")
+    bhop_maps = open_json("files/bhop_maps.json")
+    bhop_maps = sorted(bhop_maps, key = lambda i: i["DisplayName"])
+    for map in bhop_maps:
+        bhop_map_lookup[map["ID"]] = map["DisplayName"]
+    files.write_maps("surf")
+    surf_maps = open_json("files/surf_maps.json")
+    surf_maps = sorted(surf_maps, key = lambda i: i["DisplayName"])
+    for map in surf_maps:
+        surf_map_lookup[map["ID"]] = map["DisplayName"]
+
+
 def map_name_from_id(map_id, game):
     game = games[game]
     if game == 1:
-        return bhop_map_lookup[map_id]
+        try:
+            return bhop_map_lookup[map_id]
+        except:
+            return "Missing map"
     elif game == 2:
-        return surf_map_lookup[map_id]
+        try:
+            return surf_map_lookup[map_id]
+        except:
+            return "Missing map"
 
 def map_id_from_name(map_name, game):
     map_name = map_name.lower()

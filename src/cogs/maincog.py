@@ -440,6 +440,12 @@ class MainCog(commands.Cog):
             members = guild.member_count
             msg += f"{name:40}| {members}\n"
         await ctx.send(self.format_markdown_code(msg))
+
+    @commands.command(name="updatemaps")
+    @commands.is_owner()
+    async def update_maps(self, ctx):
+        rbhop.update_maps()
+        await ctx.send(self.format_markdown_code("Maps updated."))
     
     def get_discord_user_id(self, s):
         if s[:3] == "<@!" and s[-1] == ">":
