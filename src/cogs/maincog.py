@@ -17,10 +17,6 @@ class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.remove_command("help")
-        self.commands_text = ""
-        with open(rbhop.fix_path("files/commands.txt")) as file:
-            data = file.read()
-            self.commands_text = data
         self.games = ["bhop", "surf"]
         self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
         files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
@@ -479,10 +475,18 @@ class MainCog(commands.Cog):
         return msg
     
     def add_spaces(self, s, length):
-        s = s[:length]
-        while len(s) < length:
-            s += " "
-        return s
+        if s:
+            s = s[:length]
+            while len(s) < length:
+                s += " "
+            return s
+        else:
+            i = 0
+            s = ""
+            while i < length:
+                s += " "
+                i += 1
+            return s
     
     def page_messages(self, msg):
         ls = []
