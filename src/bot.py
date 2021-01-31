@@ -32,7 +32,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"```Error: Missing argument(s): {error.param}```")
     elif isinstance(error, commands.CommandInvokeError):
-        await ctx.send(f"```Error in argument: {error.original}. Check that your arguments are spelled correctly.```")
+        await ctx.send(f"```Command invokation error: {error.original}.```")
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     else:
         print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)

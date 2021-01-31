@@ -193,18 +193,22 @@ def get(end_of_url, params):
 def get_user_data(user):
     if type(user) == int:
         res = requests.get(f"https://api.roblox.com/users/{user}")
-        data = res.json()
         try:
+            data = res.json()
             return data["Username"], data["Id"]
         except KeyError:
             raise Exception("Invalid user ID")
+        except:
+            raise Exception("Error getting user data")
     else:
         res = requests.get(f"https://api.roblox.com/users/get-by-username?username={user}")
-        data = res.json()
         try:
+            data = res.json()
             return data["Username"], data["Id"]
         except KeyError:
             raise Exception("Invalid username")
+        except:
+            raise Exception("Error getting user data")
 
 #takes time value as input from json in miliseconds
 def format_time(time):
