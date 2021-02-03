@@ -212,10 +212,12 @@ def get_user_data(user):
 
 #takes time value as input from json in miliseconds
 def format_time(time):
-    milis = format_helper(int(time % 1000), 3)
-    seconds = format_helper(int((time / 1000) % 60), 2)
-    minutes = format_helper(int((time / (1000 * 60)) % 60), 2)
-    hours = format_helper(int((time / (1000 * 60 * 60)) % 24), 2)
+    if time > 86400000:
+        return ">1 day"
+    milis = format_helper(time % 1000, 3)
+    seconds = format_helper((time // 1000) % 60, 2)
+    minutes = format_helper((time // (1000 * 60)) % 60, 2)
+    hours = format_helper((time // (1000 * 60 * 60)) % 24, 2)
     if hours == "00":
         return minutes + ":" + seconds + "." + milis
     else:
