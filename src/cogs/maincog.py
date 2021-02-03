@@ -421,6 +421,41 @@ class MainCog(commands.Cog):
         embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
         await ctx.send(embed=embed)
 
+    @commands.command(name="user")
+    async def user_info(self, ctx, user):
+        username = ""
+        if user == "me":
+            username = self.get_roblox_username(ctx.author.id)
+            if not username:
+                await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
+                return
+        else:
+            discord_user_id = self.get_discord_user_id(user)
+            if discord_user_id:
+                username = self.get_roblox_username(discord_user_id)
+                if not user:
+                    await ctx.send(self.format_markdown_code(f"Invalid username. '{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account."))
+                    return
+            else:
+                username = user
+        
+        try:
+            roblox_user = ""
+            roblox_id = ""
+            if username.isnumeric():
+                roblox_user, roblox_id = rbhop.get_user_data(int(username))
+            else:
+                roblox_user, roblox_id = rbhop.get_user_data(username)
+            embed = discord.Embed(color=0xfcba03)
+            embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={roblox_id}&width=420&height=420&format=png")
+            embed.add_field(name="Username", value=roblox_user, inline=True)
+            embed.add_field(name="ID", value=roblox_id, inline=True)
+            embed.set_footer(text="User Info")
+            await ctx.send(embed=embed)
+        except:
+            await ctx.send(self.format_markdown_code("Invalid username (username does not exist on Roblox)."))
+            return
+
     @commands.command(name="help")
     async def help(self, ctx):
         await ctx.send(embed=self.make_help_embed())
@@ -624,6 +659,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
         embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map.", inline=False)
         embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'all', you will get a .txt with every time.", inline=False)
+        embed.add_field(name="!user user", value="Gets the username, user ID, and profile picture of a given user. Can be used with discord accounts that have been verified via the RoVer API.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
         embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.", inline=False)
         embed.add_field(name="!wrmap game style {map_name} page:1", value="Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\"", inline=False)
