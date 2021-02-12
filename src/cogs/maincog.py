@@ -93,7 +93,11 @@ class MainCog(commands.Cog):
         if record == None:
             await ctx.send(self.format_markdown_code(f"No record by {user} found on map: {map_name} [game: {game}, style: {style}]"))
         else:
-            msg = self.message_builder(f"{user}'s record on {record.map_name} [game: {game}, style: {style}]", [("Time:", 10), ("Date:", 11)], [record])
+            placement, total_completions = rbhop.get_record_placement(record)
+            msg = f"{user}'s record on {record.map_name} [game: {game}, style: {style}]\n"
+            titles = ["Time:", "Date:", "Placement:"]
+            msg += f"{titles[0]:10}| {titles[1]:11}| {titles[2]}\n"
+            msg += f"{self.add_spaces(record.time_string, 10)}| {self.add_spaces(record.date_string, 11)}| {placement}{self.get_ordinal(placement)} / {total_completions}\n"
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="wrmap")
@@ -611,6 +615,18 @@ class MainCog(commands.Cog):
     
     def convert_style(self, style):
         return rbhop.style_id_to_string[rbhop.styles[style]]
+
+    def get_ordinal(self, num):
+        ordinal = "th"
+        if num % 100 > 13 or num % 100 < 11:
+            n = num % 10
+            if n == 1:
+                ordinal = "st"
+            elif n == 2:
+                ordinal = "nd"
+            elif n == 3:
+                ordinal = "rd"
+        return ordinal
     
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
@@ -629,15 +645,7 @@ class MainCog(commands.Cog):
         return embed
     
     def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style, completions, total_maps):
-        ordinal = "th"
-        if placement % 100 > 13 or placement % 100 < 11:
-            n = placement % 10
-            if n == 1:
-                ordinal = "st"
-            elif n == 2:
-                ordinal = "nd"
-            elif n == 3:
-                ordinal = "rd"
+        ordinal = self.get_ordinal(placement)
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png")

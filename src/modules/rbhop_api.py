@@ -3,6 +3,7 @@ import datetime
 import json
 import os
 import requests
+import functools
 from dotenv import load_dotenv
 
 import files
@@ -418,23 +419,7 @@ def convert_rank(data):
 
 #records is a list of records from a given map
 def sort_map(records):
-    dups = []
-    i = 0
-    while i < len(records) - 1:
-        if records[i]["Time"] == records[i + 1]["Time"]:
-            dups.append(records[i])
-            dups.append(records[i + 1])
-            j = i + 2
-            while j < len(records) and records[j]["Time"] == records[i]["Time"]:
-                dups.append(records[j])
-                j += 1
-            dups = sorted(dups, key = lambda i: i["Date"])
-            for record in dups:
-                records[i] = record
-                i += 1
-            dups = []
-        else:
-            i += 1
+    records.sort(key=lambda i: (i["Time"], i["Date"]))
 
 #changes a WR's diff and previous_record in place by comparing first and second place
 #times on the given map
@@ -541,3 +526,89 @@ def get_map_times(game, style, map_name, page):
 def get_user(user):
     _, user_id = get_user_data(user)
     return get(f"user/{user_id}", {}).json()
+
+def get_placement(record:Record, page_data, page_num):
+    i = 1
+    for r in page_data:
+        if r["ID"] == record.id:
+            return i + 200 * (page_num - 1)
+        i += 1
+    return -1
+            
+
+def get_record_placement(record:Record):
+    params = {
+        "style":record.style,
+        "page":1
+    }
+    res = get(f"time/map/{record.map_id}", params)
+    first_page = res.json()
+    page_count = int(res.headers["Pagination-Count"])
+
+    if page_count > 1:
+        params["page"] = page_count
+        last_page = get(f"time/map/{record.map_id}", params).json()
+    else:
+        last_page = first_page
+
+    total_times = len(last_page) + 200 * (page_count - 1)
+
+    # handle edge cases separately, could probably integrate this into general case but /shrug
+    if record.time <= first_page[-1]["Time"]:
+        data = first_page
+        if page_count > 1:
+            params["page"] = 2
+            res2 = get(f"time/map/{record.map_id}", params)
+            data += res2.json()
+        sort_map(data)
+        return get_placement(record, data, 1), total_times
+    elif record.time >= last_page[0]["Time"]:
+        params["page"] = page_count - 1
+        res2 = get(f"time/map/{record.map_id}", params)
+        data = res2.json() + last_page
+        sort_map(data)
+        return get_placement(record, data, page_count - 1), total_times
+    
+    checked_pages = {
+        1 : first_page,
+        page_count : last_page
+    }
+    found_page = -1
+    top = 1
+    bottom = page_count
+
+    while found_page == -1:
+        middle = ((bottom + top) // 2)
+
+        if abs(bottom - top) < 2:
+            # this shouldn't ever happen, fail safe to prevent infinite loop
+            return -1, total_times
+
+        params["page"] = middle
+        the_page = get(f"time/map/{record.map_id}", params).json()
+        if record.time >= the_page[0]["Time"] and record.time <= the_page[-1]["Time"]:
+            found_page = middle
+        elif record.time < the_page[0]["Time"]:
+            bottom = middle
+        else:
+            top = middle
+        checked_pages[middle] = the_page
+
+    above_page_idx = found_page - 1
+    below_page_idx = found_page + 1
+
+    if above_page_idx in checked_pages:
+        above_page = checked_pages[above_page_idx]
+    else:
+        params["page"] = above_page_idx
+        above_page = get(f"time/map/{record.map_id}", params).json()
+
+    if below_page_idx in checked_pages:
+        below_page = checked_pages[below_page_idx]
+    else:
+        params["page"] = below_page_idx
+        below_page = get(f"time/map/{record.map_id}", params).json()
+    
+    data = above_page + checked_pages[found_page] + below_page
+    sort_map(data)
+    return get_placement(record, data, found_page - 1), total_times
