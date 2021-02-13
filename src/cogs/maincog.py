@@ -135,7 +135,21 @@ class MainCog(commands.Cog):
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
-    async def wr_list(self, ctx, user, game=None, style=None, sort=""):
+    async def wr_list(self, ctx, user, game=None, style=None, *args):
+        valid_sorts = ["", "date", "time", "name"]
+        sort = ""
+        page = 1
+        args = args[:2] if len(args) >= 2 else args
+        for i in args:
+            if i in valid_sorts:
+                sort = i
+                continue
+            elif i.isnumeric():
+                page = int(i)
+                continue
+            elif i == "txt":
+                page = -1
+                continue
         #loop through all games or all styles if not specified (or if "both" or "all")
         g = []
         s = []
@@ -148,9 +162,6 @@ class MainCog(commands.Cog):
         else:
             s.append(self.convert_style(style.lower()))
         if not await self.argument_checker(ctx, user, g[0], s[0]):
-            return
-        if sort not in ["", "date", "time", "name"]:
-            await ctx.send(self.format_markdown_code(f"'{sort}' is an invalid sort. Try 'name', 'date', or 'time'."))
             return
         if user == "me":
             user = self.get_roblox_username(ctx.author.id)
@@ -197,14 +208,26 @@ class MainCog(commands.Cog):
             cols.append(("Style:", 14))
         if sort == "":
             sort = "default"
-        msg = self.message_builder(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}] (Records: {count})", cols, convert_ls)
-        counter = 0
-        for message in self.page_messages(msg):
-            counter += 1
-            if counter > 5:
-                await ctx.send(self.format_markdown_code("Limiting messages, consider specifying game/style to reduce message count."))
-                return
-            await ctx.send(self.format_markdown_code(message))
+        msg = self.message_builder("", cols, convert_ls)
+        # counter = 0
+        # for message in self.page_messages(msg):
+        #     counter += 1
+        #     if counter > 5:
+        #         await ctx.send(self.format_markdown_code("Limiting messages, consider specifying game/style to reduce message count."))
+        #         return
+        #     await ctx.send(self.format_markdown_code(message))
+        messages = self.page_messages(msg, 1850)
+        if page != -1:
+            total_pages = len(messages)
+            page = total_pages if page > total_pages else page
+            await ctx.send(self.format_markdown_code(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n" + messages[page-1]))
+        else:
+            f = StringIO()
+            f.write(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n" + msg)
+            f.seek(0)
+            await ctx.send(file=discord.File(f, filename=f"wrs_{user}_{game}_{style}.txt"))
+            return
+
 
     @commands.command(name="map")
     async def map_info(self, ctx, game, *, map_name):
@@ -305,8 +328,8 @@ class MainCog(commands.Cog):
         user, user_id = rbhop.get_user_data(user)
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         completions, total_maps = rbhop.get_user_completion(user, game, style)
-        if r == 0:
-            await ctx.send(self.format_markdown_code(f"No data available for user {user} in {style} in {game}."))
+        if r == 0 or placement == 0:
+            await ctx.send(self.format_markdown_code(f"No data available for {user} [game:{game}, style: {style}]"))
             return
         await ctx.send(embed=self.make_user_embed(user, user_id, r, rank, skill, placement, game, style, completions, total_maps))
 
@@ -321,11 +344,12 @@ class MainCog(commands.Cog):
         style = self.convert_style(style)
         ranks, page_count = rbhop.get_ranks(game, style, page)
         if page_count == 0:
-            await ctx.send(self.format_markdown_code(f"No ranks found in {game} {style} (???)."))
+            await ctx.send(self.format_markdown_code(f"No ranks found [game:{game}, style:{style}] (???)."))
             return
         elif page > page_count:
-            await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
-            return
+            page = page_count
+            # await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
+            # return
         msg = f"Ranks [game: {game}, style: {style}, page: {page}/{page_count}]\n"
         titles = ["Placement:", "Username:", "Rank:", "Skill:"]
         msg += f"{titles[0]:11}| {titles[1]:20}| {titles[2]:19}| {titles[3]}\n"
@@ -347,32 +371,43 @@ class MainCog(commands.Cog):
             page = 1
         elif len(args) == 1:
             style = None
-            if args[0].isnumeric() or args[0] == "all":
+            if args[0].isnumeric() or args[0] == "txt":
                 game = None
                 page = args[0]
+            elif args[0] == "all":
+                await ctx.send(self.format_markdown_code("To create a .txt use 'txt' instead of 'all'"))
+                return
             else:
                 game = args[0]
                 page = 1
         elif len(args) == 2:
             game = args[0]
-            if args[1].isnumeric() or args[1] == "all":
+            if args[1].isnumeric() or args[1] == "txt":
                 style = None
                 page = args[1]
+            elif args[1] == "all":
+                await ctx.send(self.format_markdown_code("To create a .txt use 'txt' instead of 'all'"))
+                return
             else:
                 style = args[1]
                 page = 1
         else:
             game = args[0]
             style = args[1]
-            if args[2].isnumeric() or args[2] == "all":
+            if args[2].isnumeric() or args[2] == "txt":
                 page = args[2]
+            elif args[2] == "all":
+                await ctx.send(self.format_markdown_code("To create a .txt use 'txt' instead of 'all'"))
+                return
             else:
                 page = 1
-        if page != "all":
+        if page != "txt":
             page = int(page)
             if page < 1:
                 await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
                 return
+        else:
+            page = -1
         if game in ["all", "both"]:
             game = None
         if style == "all":
@@ -388,17 +423,16 @@ class MainCog(commands.Cog):
         if style:
             style = self.convert_style(style)
         user, _ = rbhop.get_user_data(user)
-        if page == "all":
-            page = -1
         record_list, page_count = rbhop.get_user_times(user, game, style, page)
         if page_count == 0:
             if not style:
                 style = "all"
-            await ctx.send(self.format_markdown_code(f"No times found for {user} in game '{game}' style '{style}'."))
+            await ctx.send(self.format_markdown_code(f"No times found for {user} [game:{game}, style:{style}]"))
             return
         elif page > page_count:
-            await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
-            return
+            page = page_count
+            # await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
+            # return
         cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
         if game == None:
             game = "both"
@@ -492,7 +526,7 @@ class MainCog(commands.Cog):
     
     #title: first line, cols: list of tuples: (column_name, length of string), record_ls: a list of Records
     def message_builder(self, title, cols, record_ls, i=1):
-        msg = f"{title}\n"
+        msg = f"{title}\n" if title != "" else ""
         for col_title in cols[:-1]:
             msg += self.add_spaces(col_title[0], col_title[1]) + "| "
         last_title = cols[-1]
@@ -527,17 +561,17 @@ class MainCog(commands.Cog):
                 i += 1
             return s
     
-    def page_messages(self, msg):
+    def page_messages(self, msg, max_length=2000):
         ls = []
         lines = msg.split("\n")
         items = len(lines)
         length = 0
         page = ""
         i = 0
-        #add each line together until the total length exceeds 1900
+        #add each line together until the total length exceeds max_length
         #then create a new string (message)
         while i < items:
-            while i < items and length + len(lines[i]) + 2 < 2000:
+            while i < items and length + len(lines[i]) + 2 < max_length:
                 page += lines[i] + "\n"
                 length += len(lines[i]) + 2
                 i += 1
@@ -589,7 +623,7 @@ class MainCog(commands.Cog):
         if map_name:
             m = rbhop.map_id_from_name(map_name, game)
             if m == "Map id not found":
-                await ctx.send(self.format_markdown_code(f"'{map_name}' is not a valid {game} map."))
+                await ctx.send(self.format_markdown_code(f"\"{map_name}\" is not a valid {game} map."))
                 return False
         return True
     
@@ -665,11 +699,11 @@ class MainCog(commands.Cog):
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
-        embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map.", inline=False)
-        embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'all', you will get a .txt with every time.", inline=False)
+        embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map and their placement (ex. 31st / 5690).", inline=False)
+        embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'txt', you will get a .txt with every time.", inline=False)
         embed.add_field(name="!user user", value="Gets the username, user ID, and profile picture of a given user. Can be used with discord accounts that have been verified via the RoVer API.", inline=False)
         embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
-        embed.add_field(name="!wrlist username game:both style:all sort:default", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.", inline=False)
+        embed.add_field(name="!wrlist username game:both style:all sort:default page:1", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist bhop auto M1nerss txt", inline=False)
         embed.add_field(name="!wrmap game style {map_name} page:1", value="Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\"", inline=False)
         return embed
 

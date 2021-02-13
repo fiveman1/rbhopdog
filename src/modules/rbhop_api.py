@@ -3,7 +3,6 @@ import datetime
 import json
 import os
 import requests
-import functools
 from dotenv import load_dotenv
 
 import files
@@ -447,7 +446,8 @@ def get_new_wrs():
             if not (game == 2 and style == 2): #skip surf/scroll
                 wrs = get("time/recent/wr", {
                         "game":game,
-                        "style":style
+                        "style":style,
+                        "whitelist":True
                     })
                 new_wrs.append(wrs.json())
     old_wrs = []
@@ -473,8 +473,8 @@ def get_new_wrs():
             else:
                 r = convert_to_record(record)
                 calculate_wr_diff(r)
-                if r.diff != -1.0 or get(f"user/{r.user_id}", {}).json()["State"] == 1:
-                    globals_ls.append(r)
+                # if r.diff != -1.0 or get(f"user/{r.user_id}", {}).json()["State"] == 1:
+                globals_ls.append(r)
 
     #overwrite recent_wrs.json with new wrs if they exist
     if len(globals_ls) > 0:
