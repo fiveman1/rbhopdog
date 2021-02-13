@@ -135,21 +135,32 @@ class MainCog(commands.Cog):
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
-    async def wr_list(self, ctx, user, game=None, style=None, *args):
+    async def wr_list(self, ctx, user, *args):
         valid_sorts = ["", "date", "time", "name"]
         sort = ""
         page = 1
-        args = args[:2] if len(args) >= 2 else args
+        game = None
+        style = None
+        args = args[:4] if len(args) >= 4 else args
         for i in args:
             if i in valid_sorts:
                 sort = i
-                continue
             elif i.isnumeric():
                 page = int(i)
-                continue
             elif i == "txt":
                 page = -1
-                continue
+            elif i == "both":
+                game = "both"
+            elif i == "all":
+                if game:
+                    style = "all"
+                else:
+                    game = "all"
+            elif i in self.games and not game:
+                game = i
+            elif i in self.styles and not style:
+                style = i
+
         #loop through all games or all styles if not specified (or if "both" or "all")
         g = []
         s = []
