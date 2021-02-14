@@ -156,9 +156,9 @@ class MainCog(commands.Cog):
                     style = "all"
                 else:
                     game = "all"
-            elif i in self.games and not game:
+            elif i in rbhop.games and not game:
                 game = i
-            elif i in self.styles and not style:
+            elif i in rbhop.styles and not style:
                 style = i
 
         #loop through all games or all styles if not specified (or if "both" or "all")
@@ -220,13 +220,6 @@ class MainCog(commands.Cog):
         if sort == "":
             sort = "default"
         msg = self.message_builder("", cols, convert_ls)
-        # counter = 0
-        # for message in self.page_messages(msg):
-        #     counter += 1
-        #     if counter > 5:
-        #         await ctx.send(self.format_markdown_code("Limiting messages, consider specifying game/style to reduce message count."))
-        #         return
-        #     await ctx.send(self.format_markdown_code(message))
         messages = self.page_messages(msg, 1850)
         if page != -1:
             total_pages = len(messages)
