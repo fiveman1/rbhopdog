@@ -333,7 +333,7 @@ class MainCog(commands.Cog):
         r, rank, skill, placement = rbhop.get_user_rank(user, game, style)
         completions, total_maps = rbhop.get_user_completion(user, game, style)
         if r == 0 or placement == 0:
-            await ctx.send(self.format_markdown_code(f"No data available for {user} [game:{game}, style: {style}]"))
+            await ctx.send(self.format_markdown_code(f"No data available for {user} [game: {game}, style: {style}]"))
             return
         await ctx.send(embed=self.make_user_embed(user, user_id, r, rank, skill, placement, game, style, completions, total_maps))
 
@@ -348,7 +348,7 @@ class MainCog(commands.Cog):
         style = self.convert_style(style)
         ranks, page_count = rbhop.get_ranks(game, style, page)
         if page_count == 0:
-            await ctx.send(self.format_markdown_code(f"No ranks found [game:{game}, style:{style}] (???)."))
+            await ctx.send(self.format_markdown_code(f"No ranks found [game: {game}, style: {style}] (???)."))
             return
         elif page > page_count:
             page = page_count
@@ -431,7 +431,7 @@ class MainCog(commands.Cog):
         if page_count == 0:
             if not style:
                 style = "all"
-            await ctx.send(self.format_markdown_code(f"No times found for {user} [game:{game}, style:{style}]"))
+            await ctx.send(self.format_markdown_code(f"No times found for {user} [game: {game}, style: {style}]"))
             return
         elif page > page_count:
             page = page_count

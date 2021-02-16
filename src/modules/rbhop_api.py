@@ -397,6 +397,10 @@ def get_user_times(user, game, style, page):
         else:
             page_count = int(first_page_res.headers["Pagination-Count"])
             converted_page_count = find_max_pages(f"time/user/{userid}", params, page_count, 200, page_length)
+            page_num, start = divmod((int(converted_page_count) - 1) * page_length, 200)
+            end = start + 25
+            params["page"] = page_count
+            data = get(f"time/user/{userid}", params).json()
     return make_record_list(data[start:end], user), converted_page_count
 
 def get_user_completion(user, game, style):
