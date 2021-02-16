@@ -540,4 +540,17 @@ def get_placement(record:Record, page_data, page_num):
     return -1
 
 def get_record_placement(record:Record):
-    return get(f"record/{record.id}/rank", {}).json()["Rank"]
+    params = {
+        "style":record.style,
+        "page":1
+    }
+    first_page_res = get(f"time/map/{record.map_id}", params)
+    page_count = int(first_page_res.headers["Pagination-Count"])
+    completions = 0
+    if page_count == 1:
+        completions = len(first_page_res.json())
+    else:
+        params["page"] = page_count
+        last_page_res = get(f"time/map/{record.map_id}", params)
+        completions = len(last_page_res.json()) + (page_count - 1) * 200
+    return get(f"time/{record.id}/rank", {}).json()["Rank"], completions
