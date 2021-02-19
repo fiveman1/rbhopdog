@@ -6,6 +6,7 @@ import requests
 from dotenv import load_dotenv
 
 import files
+from tree import MapTree
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -76,7 +77,7 @@ game_id_to_string = {
     2 : "surf"
 }
 
-ranks = ["New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God"]
+ranks = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
 
 def open_json(path):
     with open(fix_path(path)) as file:
@@ -89,7 +90,6 @@ try:
 except FileNotFoundError:
     files.write_maps("bhop")
     bhop_maps = open_json("files/bhop_maps.json")
-bhop_maps = sorted(bhop_maps, key = lambda i: i["DisplayName"])
 
 surf_maps = {}
 try:
@@ -97,55 +97,50 @@ try:
 except FileNotFoundError:
     files.write_maps("surf")
     surf_maps = open_json("files/surf_maps.json")
-surf_maps = sorted(surf_maps, key = lambda i: i["DisplayName"])
 
-#since dicts are sorta glorified hash tables we can optimize id -> displayname lookup
-#by storing this data in a dict; now the operation should be O(1) instead of O(n)
-bhop_map_lookup = {}
+# hash table for id -> displayname because each id is unique
+map_lookup = {}
 for map in bhop_maps:
-    bhop_map_lookup[map["ID"]] = map["DisplayName"]
-
-surf_map_lookup = {}
+    map_lookup[map["ID"]] = map["DisplayName"]
 for map in surf_maps:
-    surf_map_lookup[map["ID"]] = map["DisplayName"]
+    map_lookup[map["ID"]] = map["DisplayName"]
 
 def update_maps():
     files.write_maps("bhop")
     bhop_maps = open_json("files/bhop_maps.json")
-    bhop_maps = sorted(bhop_maps, key = lambda i: i["DisplayName"])
     for map in bhop_maps:
-        bhop_map_lookup[map["ID"]] = map["DisplayName"]
+        map_lookup[map["ID"]] = map["DisplayName"]
     files.write_maps("surf")
     surf_maps = open_json("files/surf_maps.json")
-    surf_maps = sorted(surf_maps, key = lambda i: i["DisplayName"])
     for map in surf_maps:
-        surf_map_lookup[map["ID"]] = map["DisplayName"]
-
+        map_lookup[map["ID"]] = map["DisplayName"]
 
 def map_name_from_id(map_id, game):
-    game = games[game]
-    if game == 1:
-        try:
-            return bhop_map_lookup[map_id]
-        except:
-            return "Missing map"
-    elif game == 2:
-        try:
-            return surf_map_lookup[map_id]
-        except:
-            return "Missing map"
+    try:
+        return map_lookup[map_id]
+    except:
+        return "Missing map"
+
+# bst for displayname -> id so that users can enter partial names (i.e. "adven" -> "Adventure v2" -> id)
+# MapTree is designed for such operations
+# was this necessary over just iterating a list? ...probably not. But it's cool, right?
+bhop_map_to_id = MapTree()
+for map in bhop_maps:
+    bhop_map_to_id.add(map["DisplayName"], map["ID"])
+
+bhop_map_to_id.print()
+
+surf_map_to_id = MapTree()
+for map in surf_maps:
+    surf_map_to_id.add(map["DisplayName"], map["ID"])
 
 def map_id_from_name(map_name, game):
-    map_name = map_name.lower()
     game = games[game]
     if game == 1:
-        map_data = bhop_maps
+        return bhop_map_to_id.get(map_name)
     elif game == 2:
-        map_data = surf_maps
-    for m in map_data:
-        if m["DisplayName"].lower().startswith(map_name):
-            return m["ID"]
-    return "Map id not found"
+        return surf_map_to_id.get(map_name)
+    return -1
 
 def map_dict_from_id(map_id, game):
     game = games[game]
@@ -530,14 +525,6 @@ def get_map_times(game, style, map_name, page):
 def get_user(user):
     _, user_id = get_user_data(user)
     return get(f"user/{user_id}", {}).json()
-
-def get_placement(record:Record, page_data, page_num):
-    i = 1
-    for r in page_data:
-        if r["ID"] == record.id:
-            return i + 200 * (page_num - 1)
-        i += 1
-    return -1
 
 def get_record_placement(record:Record):
     params = {
