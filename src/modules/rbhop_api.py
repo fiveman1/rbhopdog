@@ -115,33 +115,42 @@ def setup_maps():
 setup_maps()
 
 # ls should be sorted
-# uses binary search
+# performs an iterative binary search
+# returns the first index where the item was found according to the compare function
+def find_item(ls, compare):
+    left = 0
+    right = len(ls) - 1
+    while left <= right:
+        middle = (left + right) // 2
+        res = compare(ls[middle])
+        if res == 0:
+            return middle
+        elif res < 0:
+            left = middle + 1
+        else:
+            right = middle - 1
+    return -1
+
+def compare_maps(name, map_name):
+    if map_name.startswith(name):
+        return 0
+    elif map_name < name:
+        return -1
+    else:
+        return 1
+
 def id_from_name(name, ls):
     name = name.lower()
-    top = len(ls) - 1
-    bottom = 0
-    middle = (top - bottom) // 2
-    id = -1
-    while middle != bottom and middle != top:
-        map = ls[middle]
-        map_name = map[0]
-        if map_name.startswith(name):
-            id = map[1]
-            break
-        elif name > map_name:
-            bottom = middle
-        else:
-            top = middle
-        middle = (top + bottom) // 2
-    while middle > 0:
-        middle -= 1
-        map = ls[middle]
-        map_name = map[0]
-        if map_name.startswith(name):
-            id = map[1]
-        else:
-            break
-    return id
+    idx = find_item(ls, lambda m : compare_maps(name, m[0]))
+    if idx != -1:
+        while idx > 0:
+            if ls[idx-1][0].startswith(name):
+                idx -= 1
+            else:
+                break
+        return ls[idx][1]
+    else:
+        return -1
 
 def map_id_from_name(map_name, game):
     game = games[game]
