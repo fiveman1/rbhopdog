@@ -6,7 +6,6 @@ import requests
 from dotenv import load_dotenv
 
 import files
-from tree import MapTree
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -84,74 +83,79 @@ def open_json(path):
         data = file.read()
         return json.loads(data)
 
-bhop_maps = {}
-try:
-    bhop_maps = open_json("files/bhop_maps.json")
-except FileNotFoundError:
-    files.write_maps("bhop")
-    bhop_maps = open_json("files/bhop_maps.json")
-
-surf_maps = {}
-try:
-    surf_maps = open_json("files/surf_maps.json")
-except FileNotFoundError:
-    files.write_maps("surf")
-    surf_maps = open_json("files/surf_maps.json")
-
+bhop_map_pairs = []
+surf_map_pairs = []
 # hash table for id -> displayname because each id is unique
 map_lookup = {}
-for map in bhop_maps:
-    map_lookup[map["ID"]] = map["DisplayName"]
-for map in surf_maps:
-    map_lookup[map["ID"]] = map["DisplayName"]
 
-def update_maps():
+def setup_maps():
     files.write_maps("bhop")
-    bhop_maps = open_json("files/bhop_maps.json")
-    for map in bhop_maps:
-        map_lookup[map["ID"]] = map["DisplayName"]
     files.write_maps("surf")
+    bhop_maps = open_json("files/bhop_maps.json")
     surf_maps = open_json("files/surf_maps.json")
-    for map in surf_maps:
-        map_lookup[map["ID"]] = map["DisplayName"]
+    for map in bhop_maps:
+        bhop_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
+    bhop_map_pairs.sort(key=lambda i: i[0])
 
-def map_name_from_id(map_id, game):
+    for map in surf_maps:
+        surf_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
+    surf_map_pairs.sort(key=lambda i: i[0])
+
+    for map in bhop_maps:
+        map_lookup[map["ID"]] = map
+
+    for map in surf_maps:
+        map_lookup[map["ID"]] = map
+
+setup_maps()
+
+#ls should be sorted
+def id_from_name(name, ls):
+    name = name.lower()
+    top = len(ls) - 1
+    bottom = 0
+    middle = (top - bottom) // 2
+    id = -1
+    while middle != bottom and middle != top:
+        map = ls[middle]
+        map_name = map[0]
+        if map_name.startswith(name):
+            id = map[1]
+            break
+        elif name > map_name:
+            bottom = middle
+        else:
+            top = middle
+        middle = (top + bottom) // 2
+    while middle > 0:
+        middle -= 1
+        map = ls[middle]
+        map_name = map[0]
+        if map_name.startswith(name):
+            id = map[1]
+        else:
+            break
+    return id
+
+def map_id_from_name(map_name, game):
+    game = games[game]
+    if game == 1:
+        return id_from_name(map_name, bhop_map_pairs)
+    elif game == 2:
+        return id_from_name(map_name, surf_map_pairs)
+    return -1
+
+def map_dict_from_id(map_id, game):
     try:
         return map_lookup[map_id]
     except:
         return "Missing map"
 
-# bst for displayname -> id so that users can enter partial names (i.e. "adven" -> "Adventure v2" -> id)
-# MapTree is designed for such operations
-# was this necessary over just iterating a list? ...probably not. But it's cool, right?
-bhop_map_to_id = MapTree()
-for map in bhop_maps:
-    bhop_map_to_id.add(map["DisplayName"], map["ID"])
-
-bhop_map_to_id.print()
-
-surf_map_to_id = MapTree()
-for map in surf_maps:
-    surf_map_to_id.add(map["DisplayName"], map["ID"])
-
-def map_id_from_name(map_name, game):
-    game = games[game]
-    if game == 1:
-        return bhop_map_to_id.get(map_name)
-    elif game == 2:
-        return surf_map_to_id.get(map_name)
-    return -1
-
-def map_dict_from_id(map_id, game):
-    game = games[game]
-    if game == 1:
-        map_data = bhop_maps
-    elif game == 2:
-        map_data = surf_maps
-    for m in map_data:
-        if m["ID"] == map_id:
-            return m
-    return "Map id not found"
+def map_name_from_id(map_id, game):
+    try:
+        return map_lookup[map_id]["DisplayName"]
+    except:
+        return "Missing map"
 
 class Record():
     def __init__(self, id, time, user_id, map_id, date, style, mode, game, user=None):
@@ -402,9 +406,9 @@ def get_user_completion(user, game, style):
     records, _ = get_user_times(user, game, style, -1)
     completions = len(records)
     if game == "bhop":
-        return completions, len(bhop_maps)
+        return completions, len(bhop_map_pairs)
     else:
-        return completions, len(surf_maps)
+        return completions, len(surf_map_pairs)
 
 def convert_rank(data):
     if data == None:

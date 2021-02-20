@@ -517,7 +517,7 @@ class MainCog(commands.Cog):
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps(self, ctx):
-        rbhop.update_maps()
+        rbhop.setup_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
     
     def get_discord_user_id(self, s):
