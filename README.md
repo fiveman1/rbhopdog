@@ -8,6 +8,10 @@ Commands:
 
     Determines if a player is eligible for faste in a given game and style.
 
+**!map game {map_name}**
+
+    Gives info about the given map such as the creator, total play count, and the map's asset ID.
+
 **!mapcount**
 
     Gives the total map count for bhop and surf.
@@ -26,11 +30,15 @@ Commands:
 
 **!record user game style {map_name}**
 
-    Get a user's time on a given map.
+    Get a user's time on a given map and their placement (ex. 31st / 5690).
 
 **!times user game:both style:all page:1**
 
-    Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'all', you will get a .txt with every time.
+    Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'txt', you will get a .txt with every time.
+
+**!user user**
+
+    Gets the username, user ID, and profile picture of a given user. Can be used with discord accounts that have been verified via the RoVer API.
 
 **!wrcount username**
 
@@ -38,7 +46,7 @@ Commands:
 
 **!wrlist username game:both style:all sort:default**
 
-    Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'.
+    Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist bhop auto M1nerss txt
 
 **!wrmap game style {map_name} page:1**
 

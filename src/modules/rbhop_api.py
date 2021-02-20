@@ -2,10 +2,11 @@
 import datetime
 import json
 import os
+from discord.errors import InvalidData
 import requests
 from dotenv import load_dotenv
 
-import files
+from modules import files
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -160,13 +161,13 @@ def map_id_from_name(map_name, game):
         return id_from_name(map_name, surf_map_pairs)
     return -1
 
-def map_dict_from_id(map_id, game):
+def map_dict_from_id(map_id):
     try:
         return map_lookup[map_id]
     except:
         return "Missing map"
 
-def map_name_from_id(map_id, game):
+def map_name_from_id(map_id):
     try:
         return map_lookup[map_id]["DisplayName"]
     except:
@@ -182,7 +183,7 @@ class Record():
         self.style = style
         self.mode = mode
         self.game = game
-        self.map_name = map_name_from_id(self.map_id, self.game)
+        self.map_name = map_name_from_id(self.map_id)
         self.date_string = convert_date(self.date)
         self.time_string = format_time(self.time)
         self.style_string = style_id_to_string[self.style]
@@ -211,18 +212,18 @@ def get_user_data(user):
             data = res.json()
             return data["Username"], data["Id"]
         except KeyError:
-            raise Exception("Invalid user ID")
+            raise InvalidData("Invalid user ID")
         except:
-            raise Exception("Error getting user data")
+            raise TimeoutError("Error getting user data")
     else:
         res = requests.get(f"https://api.roblox.com/users/get-by-username?username={user}")
         try:
             data = res.json()
             return data["Username"], data["Id"]
         except KeyError:
-            raise Exception("Invalid username")
+            raise InvalidData("Invalid username")
         except:
-            raise Exception("Error getting user data")
+            raise TimeoutError("Error getting user data")
 
 #takes time value as input from json in miliseconds
 def format_time(time):
@@ -293,7 +294,10 @@ def get_user_wrs(user, game, style):
 def get_user_record(user, game, style, map_name=""):
     if map_name == "":
         return get_user_wrs(user, game, style)
-    _, user_id = get_user_data(user)
+    if type(user) == int:
+        user_id = user
+    else:
+        _, user_id = get_user_data(user)
     map_id = map_id_from_name(map_name, game)
     res = get(f"time/user/{user_id}", {
         "game":games[game],
@@ -307,7 +311,10 @@ def get_user_record(user, game, style, map_name=""):
         return convert_to_record(data[0])
 
 def total_wrs(user, game, style):
-    _, user_id = get_user_data(user)
+    if type(user) == int:
+        user_id = user
+    else:
+        _, user_id = get_user_data(user)
     res = get(f"time/user/{user_id}/wr", {
         "game":games[game],
         "style":styles[style]
@@ -319,7 +326,10 @@ def total_wrs(user, game, style):
         return len(data)
 
 def get_user_rank(user, game, style):
-    _, user_id = get_user_data(user)
+    if type(user) == int:
+        user_id = user
+    else:
+        _, user_id = get_user_data(user)
     res = get(f"rank/{user_id}", {
         "game":games[game],
         "style":styles[style]
@@ -370,6 +380,10 @@ def get_ranks(game, style, page):
     return ls, converted_page_count
 
 def get_user_times(user, game, style, page):
+    if type(user) == int:
+        userid = user
+    else:
+        _, userid = get_user_data(user)
     if page == -1:
         i = 1
         params = {"page":i}
@@ -377,7 +391,6 @@ def get_user_times(user, game, style, page):
             params["game"] = games[game]
         if style != None:
             params["style"] = styles[style]
-        _, userid = get_user_data(user)
         times_ls = []
         while True:
             params["page"] = i
@@ -397,7 +410,6 @@ def get_user_times(user, game, style, page):
         params["game"] = games[game]
     if style != None:
         params["style"] = styles[style]
-    _, userid = get_user_data(user)
     res = get(f"time/user/{userid}", params) 
     data = res.json()
     if len(data) > 0:
@@ -491,7 +503,6 @@ def get_new_wrs():
             else:
                 r = convert_to_record(record)
                 calculate_wr_diff(r)
-                # if r.diff != -1.0 or get(f"user/{r.user_id}", {}).json()["State"] == 1:
                 globals_ls.append(r)
 
     #overwrite recent_wrs.json with new wrs if they exist
@@ -541,8 +552,7 @@ def get_map_times(game, style, map_name, page):
     end = start + page_length
     return make_record_list(data[start:end]), converted_page_count
 
-def get_user(user):
-    _, user_id = get_user_data(user)
+def get_user_state(user_id):
     return get(f"user/{user_id}", {}).json()
 
 def get_record_placement(record:Record):

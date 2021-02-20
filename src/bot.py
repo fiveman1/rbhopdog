@@ -4,10 +4,9 @@ import os
 import traceback
 import sys
 from dotenv import load_dotenv
-
-sys.path.insert(1, os.path.join(sys.path[0], 'modules')) #for some reason I can't load modules in cogs without this
-
 from discord.ext import commands
+
+from modules import messages
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -23,20 +22,31 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    #if isinstance(error, commands.CommandNotFound):
-        #await ctx.send("```Invalid command```")
     if isinstance(error, commands.BadArgument):
         await ctx.send("```Error: Bad argument```")
     elif isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(f'This command is on cooldown. Please wait {error.retry_after:.2f}s.')
+        await ctx.send(f'```This command is on cooldown. Please wait {error.retry_after:.2f}s.```')
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"```Error: Missing argument(s): {error.param}```")
     elif isinstance(error, commands.CommandInvokeError):
         await ctx.send(f"```Command invokation error: {error.original}.```")
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+        await send_traceback(ctx, error)
     else:
         print('Ignoring exception in command {}:'.format(ctx.command), file=sys.stderr)
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+
+#formatting taken from https://github.com/drumman22/Bhop-Bot/blob/bhop-bot-v3/cogs/error_handler.py
+async def send_traceback(ctx, error):
+    tb_channel = bot.get_channel(812768023920115742)
+    tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    await tb_channel.send(
+            f"An error occured while executing `{''.join(ctx.prefix)}{ctx.command}` command by "
+            f"{ctx.author.name}#{ctx.author.discriminator}@{ctx.guild.name} in {ctx.channel.mention}."
+            f"\n> {ctx.message.jump_url}\n"
+        )
+    for msg in messages.page_messages(f"{type(error).__name__}: {error}\n" + tb):
+        await tb_channel.send(f"```\n{msg}\n```")
 
 #shamelessly adapted from here
 #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot
