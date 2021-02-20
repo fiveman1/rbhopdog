@@ -93,6 +93,10 @@ def setup_maps():
     files.write_maps("surf")
     bhop_maps = open_json("files/bhop_maps.json")
     surf_maps = open_json("files/surf_maps.json")
+
+    bhop_map_pairs.clear()
+    surf_map_pairs.clear()
+
     for map in bhop_maps:
         bhop_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
     bhop_map_pairs.sort(key=lambda i: i[0])
@@ -101,6 +105,7 @@ def setup_maps():
         surf_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
     surf_map_pairs.sort(key=lambda i: i[0])
 
+    map_lookup.clear()
     for map in bhop_maps:
         map_lookup[map["ID"]] = map
 
@@ -109,7 +114,8 @@ def setup_maps():
 
 setup_maps()
 
-#ls should be sorted
+# ls should be sorted
+# uses binary search
 def id_from_name(name, ls):
     name = name.lower()
     top = len(ls) - 1
