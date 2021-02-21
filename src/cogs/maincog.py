@@ -546,7 +546,7 @@ class MainCog(commands.Cog):
                 return arguments
         if style:
             arguments.style = self.convert_style(style.lower())
-            if arguments.style not in rbhop.styles:
+            if not arguments.style or arguments.style not in rbhop.styles:
                 await ctx.send(self.format_markdown_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
                 return arguments
         if arguments.game == "surf" and arguments.style == "scroll":
@@ -614,7 +614,10 @@ class MainCog(commands.Cog):
         return f"```\n{s}```"
     
     def convert_style(self, style):
-        return rbhop.style_id_to_string[rbhop.styles[style]]
+        if style in rbhop.styles:
+            return rbhop.style_id_to_string[rbhop.styles[style]]
+        else:
+            return None
 
     def get_ordinal(self, num):
         ordinal = "th"
