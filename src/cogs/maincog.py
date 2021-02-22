@@ -1,6 +1,8 @@
 # maincog.py
 import discord
 from discord.errors import InvalidData
+from discord.ext import commands, tasks
+import random
 import requests
 import sys
 import traceback
@@ -9,8 +11,6 @@ from io import StringIO
 from modules import rbhop_api as rbhop
 from modules import files
 from modules import messages
-
-from discord.ext import commands, tasks
 
 class ArgumentChecker:
     def __init__(self):
@@ -634,7 +634,7 @@ class MainCog(commands.Cog):
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png")
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}")
         embed.add_field(name="Player", value=record.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
@@ -651,7 +651,7 @@ class MainCog(commands.Cog):
         ordinal = self.get_ordinal(placement)
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png")
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}")
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")

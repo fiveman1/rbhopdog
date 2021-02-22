@@ -1,10 +1,10 @@
 # bot.py
 import discord
+from discord.ext import commands
+from dotenv import load_dotenv
 import os
 import traceback
 import sys
-from dotenv import load_dotenv
-from discord.ext import commands
 
 from modules import messages
 

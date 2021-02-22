@@ -1,10 +1,10 @@
 # rbhop_api.py
 import datetime
+from discord.errors import InvalidData
+from dotenv import load_dotenv
 import json
 import os
-from discord.errors import InvalidData
 import requests
-from dotenv import load_dotenv
 
 from modules import files
 
@@ -173,7 +173,7 @@ def map_name_from_id(map_id):
     except:
         return "Missing map"
 
-class Record():
+class Record:
     def __init__(self, id, time, user_id, map_id, date, style, mode, game, user=None):
         self.id = id
         self.time = time
