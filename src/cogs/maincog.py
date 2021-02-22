@@ -260,7 +260,7 @@ class MainCog(commands.Cog):
                         ls[i].append((style, wrs))
                         count += wrs
         embed = discord.Embed(color=0xff94b8)
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={arguments.user_id}&width=420&height=420&format=png")
+        embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_id))
         embed.set_footer(text="WR Count")
         embed.title = f"\U0001F4C4  {arguments.username}"
         if count > 0:
@@ -451,7 +451,7 @@ class MainCog(commands.Cog):
             else:
                 roblox_user, roblox_id = rbhop.get_user_data(username)
             embed = discord.Embed(color=0xfcba03)
-            embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={roblox_id}&width=420&height=420&format=png")
+            embed.set_thumbnail(url=self.get_user_headshot_url(roblox_id))
             embed.add_field(name="Username", value=roblox_user, inline=True)
             embed.add_field(name="ID", value=roblox_id, inline=True)
             embed.set_footer(text="User Info")
@@ -630,11 +630,14 @@ class MainCog(commands.Cog):
             elif n == 3:
                 ordinal = "rd"
         return ordinal
+
+    def get_user_headshot_url(self, user_id):
+        return f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}"
     
     def make_global_embed(self, record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={record.user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}")
+        embed.set_thumbnail(url=self.get_user_headshot_url(record.user_id))
         embed.add_field(name="Player", value=record.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
@@ -651,7 +654,7 @@ class MainCog(commands.Cog):
         ordinal = self.get_ordinal(placement)
         wrs = rbhop.total_wrs(user, game, style)
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
-        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}")
+        embed.set_thumbnail(url=self.get_user_headshot_url(user_id))
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")
