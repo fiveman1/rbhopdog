@@ -48,42 +48,6 @@ def write_maps(game):
         json.dump(map_data, file)
     file.close()
 
-
-#     bhop_maps = get("map", {
-#         "game":"1",
-#         "page":"1"
-#     })
-#     total_pages = int(bhop_maps.headers["Pagination-Count"])
-#     bhop_map_data = bhop_maps.json()
-#     for i in range(2, total_pages + 1):
-#         m = get("map", {
-#             "game":"1",
-#             "page":str(i)
-#         })
-#         bhop_map_data = bhop_map_data + m.json()
-
-#     with open(fix_path("files/bhop_maps.json"), "w") as file:
-#         json.dump(bhop_map_data, file)
-#     file.close()
-
-# def write_surf_maps():
-#     surf_maps = get("map", {
-#         "game":"2",
-#         "page":"1"
-#     })
-#     total_pages = int(surf_maps.headers["Pagination-Count"])
-#     surf_map_data = surf_maps.json()
-#     for i in range(2, total_pages + 1):
-#         m = get("map", {
-#             "game":"2",
-#             "page":str(i)
-#         })
-#         surf_map_data = surf_map_data + m.json()
-
-#     with open(fix_path("files/surf_maps.json"), "w") as file:
-#         json.dump(surf_map_data, file)
-#     file.close()
-
 def write_wrs():
     wrs_data = []
     for game in range(1,3):

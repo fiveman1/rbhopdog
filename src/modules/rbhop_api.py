@@ -5,14 +5,12 @@ from dotenv import load_dotenv
 import json
 import os
 import requests
+from typing import Dict, List, Optional, Tuple, Union
 
 from modules import files
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
-
-def fix_path(path):
-    return os.path.abspath(os.path.expanduser(path))
 
 URL = "https://api.strafes.net/v1/"
 
@@ -20,6 +18,7 @@ headers = {
     "api-key":API_KEY,
 }
 
+# TODO: turn these into enums or something
 styles = {
     "autohop" : 1,
     "auto" : 1,
@@ -78,6 +77,9 @@ game_id_to_string = {
 }
 
 ranks = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
+
+def fix_path(path):
+    return os.path.abspath(os.path.expanduser(path))
 
 def open_json(path):
     with open(fix_path(path)) as file:
@@ -174,10 +176,11 @@ def map_name_from_id(map_id):
         return "Missing map"
 
 class Record:
-    def __init__(self, id, time, user_id, map_id, date, style, mode, game, user=None):
+    def __init__(self, id, time, user_id, username, map_id, date, style, mode, game):
         self.id = id
         self.time = time
         self.user_id = user_id
+        self.username = username
         self.map_id = map_id
         self.date = date
         self.style = style
@@ -190,11 +193,48 @@ class Record:
         self.game_string = game_id_to_string[self.game]
         self.diff = -1.0
         self.previous_record = None
-        if user == None:
-            username, _ = get_user_data(user_id)
-            self.username = username
+    @staticmethod
+    def from_dict(d, username:Optional[str]=None) -> "Record":
+        if not username:
+            username = get_user_data(d["User"]).username
+        return Record(
+            d["ID"],
+            d["Time"],
+            d["User"],
+            username,
+            d["Map"],
+            d["Date"],
+            d["Style"],
+            d["Mode"],
+            d["Game"]
+        )
+    @staticmethod
+    def make_record_list(records, username=None) -> List["Record"]:
+        ls = []
+        if username:
+            for record in records:
+                ls.append(Record.from_dict(record, username))
         else:
-            self.username = user
+            user_ids = []
+            for record in records:
+                user_ids.append(record["User"])
+            user_lookup = get_user_data_from_list(user_ids)
+            for record in records:
+                ls.append(Record.from_dict(record, user_lookup[record["User"]].username))
+        return ls
+
+class User:
+    def __init__(self):
+        self.id = -1
+        self.username = ""
+        self.displayname = ""
+    @staticmethod
+    def from_dict(d) -> "User":
+        user = User()
+        user.id = d["id"]
+        user.username = d["name"]
+        user.displayname = d["displayName"]
+        return user
 
 def get(end_of_url, params):
     res = requests.get(URL + end_of_url, headers=headers, params=params)
@@ -205,25 +245,37 @@ def get(end_of_url, params):
     else:
         return res
 
-def get_user_data(user):
+def get_user_data(user : Union[str, int]) -> User:
     if type(user) == int:
-        res = requests.get(f"https://api.roblox.com/users/{user}")
+        res = requests.get(f"https://users.roblox.com/v1/users/{user}")
+        if res.status_code == 404:
+            raise InvalidData("Invalid user ID")
         try:
             data = res.json()
-            return data["Username"], data["Id"]
-        except KeyError:
-            raise InvalidData("Invalid user ID")
+            return User.from_dict(data)
         except:
             raise TimeoutError("Error getting user data")
     else:
-        res = requests.get(f"https://api.roblox.com/users/get-by-username?username={user}")
+        res = requests.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]})
         try:
-            data = res.json()
-            return data["Username"], data["Id"]
-        except KeyError:
-            raise InvalidData("Invalid username")
+            data = res.json()["data"]
+            if len(data) > 0:
+                return User.from_dict(data[0])
+            else:
+                raise InvalidData("Invalid user ID")
         except:
             raise TimeoutError("Error getting user data")
+
+def get_user_data_from_list(users) -> Dict[int, User]:
+    res = requests.post("https://users.roblox.com/v1/users", data={"userIds":users})
+    if res:
+        user_lookup = {}
+        for user_dict in res.json()["data"]:
+            user = User.from_dict(user_dict)
+            user_lookup[user_dict["id"]] = user
+        return user_lookup
+    else:
+        raise TimeoutError("Error getting user data")
 
 #takes time value as input from json in miliseconds
 def format_time(time):
@@ -247,27 +299,7 @@ def format_helper(time, digits):
 def convert_date(date):
     return datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
 
-#records is a list of dicts made from json output from rbhop api
-def make_record_list(records, username=None):
-    ls = []
-    for record in records:
-        ls.append(convert_to_record(record, username))
-    return ls
-
-def convert_to_record(record, username=None):
-    return Record(
-        record["ID"],
-        record["Time"],
-        record["User"],
-        record["Map"],
-        record["Date"],
-        record["Style"],
-        record["Mode"],
-        record["Game"],
-        username
-    )
-
-def get_recent_wrs(game, style):
+def get_recent_wrs(game, style) -> List[Record]:
     game = games[game]
     style = styles[style]
     res = get("time/recent/wr", {
@@ -275,31 +307,25 @@ def get_recent_wrs(game, style):
         "style":style
     })
     data = res.json()
-    return make_record_list(data)
+    return Record.make_record_list(data)
 
-#can input userID as int or username as string
-def get_user_wrs(user, game, style):
-    username, user_id = get_user_data(user)
-    res = get(f"time/user/{user_id}/wr", {
+def get_user_wrs(user_data:User, game, style) -> List[Record]:
+    res = get(f"time/user/{user_data.id}/wr", {
         "game":games[game],
         "style":styles[style]
     })
     data = res.json()
     if data:
-        return make_record_list(data, username)
+        return Record.make_record_list(data, user_data.username)
     else:
         return []
 
 #returns a record object of a user's time on a given map
-def get_user_record(user, game, style, map_name=""):
+def get_user_record(user_data:User, game, style, map_name="") -> Optional[Record]:
     if map_name == "":
-        return get_user_wrs(user, game, style)
-    if type(user) == int:
-        user_id = user
-    else:
-        _, user_id = get_user_data(user)
+        return get_user_wrs(user_data, game, style)
     map_id = map_id_from_name(map_name, game)
-    res = get(f"time/user/{user_id}", {
+    res = get(f"time/user/{user_data.id}", {
         "game":games[game],
         "style":styles[style],
         "map":map_id
@@ -308,14 +334,10 @@ def get_user_record(user, game, style, map_name=""):
     if len(data) == 0:
         return None
     else:
-        return convert_to_record(data[0])
+        return Record.from_dict(data[0], user_data.username)
 
-def total_wrs(user, game, style):
-    if type(user) == int:
-        user_id = user
-    else:
-        _, user_id = get_user_data(user)
-    res = get(f"time/user/{user_id}/wr", {
+def total_wrs(user_data:User, game, style) -> int:
+    res = get(f"time/user/{user_data.id}/wr", {
         "game":games[game],
         "style":styles[style]
     })
@@ -325,19 +347,15 @@ def total_wrs(user, game, style):
     else:
         return len(data)
 
-def get_user_rank(user, game, style):
-    if type(user) == int:
-        user_id = user
-    else:
-        _, user_id = get_user_data(user)
-    res = get(f"rank/{user_id}", {
+def get_user_rank(user_data:User, game, style) -> Tuple:
+    res = get(f"rank/{user_data.id}", {
         "game":games[game],
         "style":styles[style]
     })
     data = res.json()
     return convert_rank(data)
 
-def find_max_pages(url, params, page_count, page_length, custom_page_length):
+def find_max_pages(url, params, page_count, page_length, custom_page_length) -> int:
     params["page"] = page_count
     res = get(url, params)
     data = res.json()
@@ -348,7 +366,8 @@ def find_max_pages(url, params, page_count, page_length, custom_page_length):
         return 0
 
 #returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
-def get_ranks(game, style, page):
+# TODO: make a Rank object
+def get_ranks(game, style, page) -> Tuple[List, int]:
     params = {
         "game":games[game],
         "style":styles[style],
@@ -373,17 +392,16 @@ def get_ranks(game, style, page):
         data = data[:25]
     elif page % 2 == 0:
         data = data[25:]
+    users = []
     for i in data:
-        user, _ = get_user_data(i["User"])
+        users.append(i["User"])
+    user_lookup = get_user_data_from_list(users)
+    for i in data:
         r, rank, skill, placement, = convert_rank(i)
-        ls.append({"Username": user, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
+        ls.append({"Username": user_lookup[i["User"]].username, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
     return ls, converted_page_count
 
-def get_user_times(user, game, style, page):
-    if type(user) == int:
-        userid = user
-    else:
-        _, userid = get_user_data(user)
+def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int]:
     if page == -1:
         i = 1
         params = {"page":i}
@@ -394,14 +412,14 @@ def get_user_times(user, game, style, page):
         times_ls = []
         while True:
             params["page"] = i
-            res = get(f"time/user/{userid}", params)
+            res = get(f"time/user/{user_data.id}", params)
             data = res.json()
             if len(data) == 0:
                 break
             else:
                 times_ls += data
                 i += 1
-        return make_record_list(times_ls, user), i - 1
+        return Record.make_record_list(times_ls, user_data.username), i - 1
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     end = start + 25
@@ -410,34 +428,34 @@ def get_user_times(user, game, style, page):
         params["game"] = games[game]
     if style != None:
         params["style"] = styles[style]
-    res = get(f"time/user/{userid}", params) 
+    res = get(f"time/user/{user_data.id}", params) 
     data = res.json()
     if len(data) > 0:
         page_count = int(res.headers["Pagination-Count"])
-        converted_page_count = find_max_pages(f"time/user/{userid}", params, page_count, 200, page_length)
+        converted_page_count = find_max_pages(f"time/user/{user_data.id}", params, page_count, 200, page_length)
     else:
         params["page"] = 1
-        first_page_res = get(f"time/user/{userid}", params)
+        first_page_res = get(f"time/user/{user_data.id}", params)
         if len(first_page_res.json()) == 0:
             return [], 0
         else:
             page_count = int(first_page_res.headers["Pagination-Count"])
-            converted_page_count = find_max_pages(f"time/user/{userid}", params, page_count, 200, page_length)
+            converted_page_count = find_max_pages(f"time/user/{user_data.id}", params, page_count, 200, page_length)
             page_num, start = divmod((int(converted_page_count) - 1) * page_length, 200)
             end = start + 25
             params["page"] = page_count
-            data = get(f"time/user/{userid}", params).json()
-    return make_record_list(data[start:end], user), converted_page_count
+            data = get(f"time/user/{user_data.id}", params).json()
+    return Record.make_record_list(data[start:end], user_data.username), converted_page_count
 
-def get_user_completion(user, game, style):
-    records, _ = get_user_times(user, game, style, -1)
+def get_user_completion(user_data:User, game, style) -> Tuple[int, int]:
+    records, _ = get_user_times(user_data, game, style, -1)
     completions = len(records)
     if game == "bhop":
         return completions, len(bhop_map_pairs)
     else:
         return completions, len(surf_map_pairs)
 
-def convert_rank(data):
+def convert_rank(data) -> Tuple[int, int, int, int]:
     if data == None:
         return 0,0,0,0
     else:
@@ -459,7 +477,7 @@ def calculate_wr_diff(record):
     data = res.json()
     sort_map(data)
     if len(data) > 1:
-        second = convert_to_record(data[1])
+        second = Record.from_dict(data[1])
         record.diff = round((int(second.time) - int(record.time)) / 1000.0, 3)
         record.previous_record = second
 
@@ -469,7 +487,7 @@ def search(ls, record):
             return i
     return None
 
-def get_new_wrs():
+def get_new_wrs() -> List[Record]:
     new_wrs = []
     for game in range(1,3):
         for style in range(1,8):
@@ -493,15 +511,15 @@ def get_new_wrs():
             if match:
                 #records by the same person on the same map have the same id even if they beat it
                 if record["Time"] != match["Time"]:
-                    r = convert_to_record(record)
+                    r = Record.from_dict(record)
                     r.diff = round((int(match["Time"]) - int(record["Time"])) / 1000.0, 3)
-                    r.previous_record = convert_to_record(match)
+                    r.previous_record = Record.from_dict(match)
                     globals_ls.append(r)
                 #we can break here because the lists are sorted in the same fashion
                 else:
                     break
             else:
-                r = convert_to_record(record)
+                r = Record.from_dict(record)
                 calculate_wr_diff(r)
                 globals_ls.append(r)
 
@@ -512,7 +530,7 @@ def get_new_wrs():
         file.close()
     return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
-def get_map_times(game, style, map_name, page):
+def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     map_id = map_id_from_name(map_name, game)
@@ -550,12 +568,12 @@ def get_map_times(game, style, map_name, page):
     sort_map(data)
     start += len(res2data)
     end = start + page_length
-    return make_record_list(data[start:end]), converted_page_count
+    return Record.make_record_list(data[start:end]), converted_page_count
 
-def get_user_state(user_id):
-    return get(f"user/{user_id}", {}).json()
+def get_user_state(user_data:User):
+    return get(f"user/{user_data.id}", {}).json()
 
-def get_record_placement(record:Record):
+def get_record_placement(record:Record) -> Tuple[int, int]:
     params = {
         "style":record.style,
         "page":1

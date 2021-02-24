@@ -1,4 +1,5 @@
 # maincog.py
+from typing import List
 import discord
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
@@ -16,8 +17,7 @@ class ArgumentChecker:
     def __init__(self):
         self.game = None
         self.style = None
-        self.username = None
-        self.user_id = None
+        self.user_data = None
         self.map_name = None
         self.valid = False
     def __bool__(self):
@@ -87,12 +87,12 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user, game, style, map_name)
         if not arguments:
             return
-        record = rbhop.get_user_record(arguments.user_id, arguments.game, arguments.style, arguments.map_name)
+        record = rbhop.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map_name)
         if record == None:
-            await ctx.send(self.format_markdown_code(f"No record by {arguments.username} found on map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}]"))
+            await ctx.send(self.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}]"))
         else:
             placement, total_completions = rbhop.get_record_placement(record)
-            msg = f"{arguments.username}'s record on {record.map_name} [game: {arguments.game}, style: {arguments.style}]\n"
+            msg = f"{arguments.user_data.username}'s record on {record.map_name} [game: {arguments.game}, style: {arguments.style}]\n"
             titles = ["Time:", "Date:", "Placement:"]
             msg += f"{titles[0]:10}| {titles[1]:11}| {titles[2]}\n"
             msg += f"{self.add_spaces(record.time_string, 10)}| {self.add_spaces(record.date_string, 11)}| {placement}{self.get_ordinal(placement)} / {total_completions}\n"
@@ -174,12 +174,12 @@ class MainCog(commands.Cog):
         for game in g:
             for style in s:
                 if not(game == "surf" and style == "scroll"):
-                    record_list = rbhop.get_user_wrs(arguments.user_id, game, style)
+                    record_list = rbhop.get_user_wrs(arguments.user_data, game, style)
                     if record_list != None:
                         count += len(record_list)
                         wrs.append(record_list)
         if count == 0:
-            await ctx.send(self.format_markdown_code(f"{arguments.username} has no WRs in the specified game and style."))
+            await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
             return
         #default sort: sort by style, then within each style sort alphabetically
         convert_ls = []
@@ -216,12 +216,12 @@ class MainCog(commands.Cog):
         if page != -1:
             total_pages = len(msg_ls)
             page = total_pages if page > total_pages else page
-            await ctx.send(self.format_markdown_code(f"WR list for {arguments.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n" + msg_ls[page-1]))
+            await ctx.send(self.format_markdown_code(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n" + msg_ls[page-1]))
         else:
             f = StringIO()
             f.write(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n" + msg)
             f.seek(0)
-            await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.username}_{game}_{style}.txt"))
+            await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
             return
 
 
@@ -255,14 +255,14 @@ class MainCog(commands.Cog):
             game = self.games[i]
             for style in self.styles:
                 if not(game == "surf" and style == "scroll"):
-                    wrs = rbhop.total_wrs(arguments.user_id, game, style)
+                    wrs = rbhop.total_wrs(arguments.user_data, game, style)
                     if wrs > 0:
                         ls[i].append((style, wrs))
                         count += wrs
         embed = discord.Embed(color=0xff94b8)
-        embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_id))
+        embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_data.id))
         embed.set_footer(text="WR Count")
-        embed.title = f"\U0001F4C4  {arguments.username}"
+        embed.title = f"\U0001F4C4  {arguments.user_data.username}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
             if len(ls[0]) > 0:
@@ -289,23 +289,23 @@ class MainCog(commands.Cog):
         if arguments.style == "scroll":
             await ctx.send(self.format_markdown_code("Scroll is not eligible for faste"))
             return
-        wrs = rbhop.total_wrs(arguments.username, arguments.game, arguments.style)
+        wrs = rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
         if (arguments.style in ["autohop", "auto"] and wrs >= 10) or wrs >= 50:
-            await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
+            await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
         else:
-            await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
+            await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
 
     @commands.command(name="profile")
     async def user_rank(self, ctx, user, game, style):
         arguments = await self.argument_checker(ctx, user, game, style)
         if not arguments:
             return
-        r, rank, skill, placement = rbhop.get_user_rank(arguments.user_id, arguments.game, arguments.style)
-        completions, total_maps = rbhop.get_user_completion(arguments.user_id, arguments.game, arguments.style)
+        r, rank, skill, placement = rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style)
+        completions, total_maps = rbhop.get_user_completion(arguments.user_data, arguments.game, arguments.style)
         if r == 0 or placement == 0:
-            await ctx.send(self.format_markdown_code(f"No data available for {arguments.username} [game: {arguments.game}, style: {arguments.style}]"))
+            await ctx.send(self.format_markdown_code(f"No data available for {arguments.user_data.username} [game: {arguments.game}, style: {arguments.style}]"))
             return
-        await ctx.send(embed=self.make_user_embed(arguments.username, arguments.user_id, r, rank, skill, placement, arguments.game, arguments.style, completions, total_maps))
+        await ctx.send(embed=self.make_user_embed(arguments.user_data, r, rank, skill, placement, arguments.game, arguments.style, completions, total_maps))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
@@ -391,11 +391,11 @@ class MainCog(commands.Cog):
             style = arguments.style
         if game:
             game = arguments.game
-        record_list, page_count = rbhop.get_user_times(arguments.user_id, game, style, page)
+        record_list, page_count = rbhop.get_user_times(arguments.user_data, game, style, page)
         if page_count == 0:
             if not style:
                 style = "all"
-            await ctx.send(self.format_markdown_code(f"No times found for {arguments.username} [game: {game}, style: {style}]"))
+            await ctx.send(self.format_markdown_code(f"No times found for {arguments.user_data.username} [game: {game}, style: {style}]"))
             return
         elif page > page_count:
             page = page_count
@@ -407,13 +407,13 @@ class MainCog(commands.Cog):
             style = "all"
             cols.append(("Style:", 14))
         if page == -1:
-            msg = self.message_builder(f"Recent times for {arguments.username} [game: {game}, style: {style}] (total: {len(record_list)})", cols, record_list)
+            msg = self.message_builder(f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}] (total: {len(record_list)})", cols, record_list)
             f = StringIO()
             f.write(msg)
             f.seek(0)
-            await ctx.send(file=discord.File(f, filename=f"times_{arguments.username}_{game}_{style}.txt"))
+            await ctx.send(file=discord.File(f, filename=f"times_{arguments.user_data.username}_{game}_{style}.txt"))
             return
-        msg = self.message_builder(f"Recent times for {arguments.username} [game: {game}, style: {style}, page: {page}/{page_count}]", cols, record_list)
+        msg = self.message_builder(f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}, page: {page}/{page_count}]", cols, record_list)
         for message in messages.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
     
@@ -429,14 +429,14 @@ class MainCog(commands.Cog):
     async def user_info(self, ctx, user):
         username = ""
         if user == "me":
-            username = self.get_roblox_username(ctx.author.id)
+            username = self.get_roblox_user(ctx.author.id)["robloxUsername"]
             if not username:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return
         else:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
-                username = self.get_roblox_username(discord_user_id)
+                username = self.get_roblox_user(discord_user_id)["robloxUsername"]
                 if not user:
                     await ctx.send(self.format_markdown_code(f"Invalid username. '{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account."))
                     return
@@ -444,16 +444,14 @@ class MainCog(commands.Cog):
                 username = user
         
         try:
-            roblox_user = ""
-            roblox_id = ""
             if username.isnumeric():
-                roblox_user, roblox_id = rbhop.get_user_data(int(username))
+                user_data = rbhop.get_user_data(int(username))
             else:
-                roblox_user, roblox_id = rbhop.get_user_data(username)
+                user_data = rbhop.get_user_data(username)
             embed = discord.Embed(color=0xfcba03)
-            embed.set_thumbnail(url=self.get_user_headshot_url(roblox_id))
-            embed.add_field(name="Username", value=roblox_user, inline=True)
-            embed.add_field(name="ID", value=roblox_id, inline=True)
+            embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
+            embed.add_field(name="Username", value=user_data.username, inline=True)
+            embed.add_field(name="ID", value=user_data.id, inline=True)
             embed.set_footer(text="User Info")
             await ctx.send(embed=embed)
         except InvalidData:
@@ -497,7 +495,7 @@ class MainCog(commands.Cog):
             return None
     
     #title: first line, cols: list of tuples: (column_name, length of string), record_ls: a list of Records
-    def message_builder(self, title, cols, record_ls, i=1):
+    def message_builder(self, title, cols, record_ls:List[rbhop.Record], i=1):
         msg = f"{title}\n" if title != "" else ""
         for col_title in cols[:-1]:
             msg += self.add_spaces(col_title[0], col_title[1]) + "| "
@@ -520,24 +518,13 @@ class MainCog(commands.Cog):
         return msg
     
     def add_spaces(self, s, length):
-        if s:
-            s = s[:length]
-            while len(s) < length:
-                s += " "
-            return s
-        else:
-            i = 0
-            s = ""
-            while i < length:
-                s += " "
-                i += 1
-            return s
+        return f"{s:<{length}}"[:length]
     
     #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
     #returns an ArgumentChecker object with the properly converted arguments
     #is falsy if the check failed, truthy if it passed
-    async def argument_checker(self, ctx, user, game, style, map_name=None):
+    async def argument_checker(self, ctx, user, game, style, map_name=None) -> ArgumentChecker:
         arguments = ArgumentChecker()
         if game:
             arguments.game = game.lower()
@@ -553,23 +540,25 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code("Surf and scroll cannot be combined."))
             return arguments
         if user == "me":
-            arguments.username = self.get_roblox_username(ctx.author.id)
-            if not arguments.username:
+            user_id = self.get_roblox_user(ctx.author.id)["robloxId"]
+            if not user_id:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return arguments
             else:
-                arguments.username, arguments.user_id = rbhop.get_user_data(arguments.username)
+                arguments.user_data = rbhop.get_user_data(user_id)
                 if not await self.check_user_status(ctx, arguments):
                     return arguments
         elif user:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
-                user = self.get_roblox_username(discord_user_id)
+                user = self.get_roblox_user(discord_user_id)
                 if not user:
                     await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
                     return arguments
+                else:
+                    user = user["robloxId"]
             try:
-                arguments.username, arguments.user_id = rbhop.get_user_data(user)
+                arguments.user_data = rbhop.get_user_data(user)
             except InvalidData:
                 await ctx.send(self.format_markdown_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
                 return arguments
@@ -580,7 +569,7 @@ class MainCog(commands.Cog):
                 if not await self.check_user_status(ctx, arguments):
                     return arguments
             except:
-                await ctx.send(self.format_markdown_code(f"'{arguments.username}' has not played bhop/surf."))
+                await ctx.send(self.format_markdown_code(f"'{arguments.user_data.username}' has not played bhop/surf."))
                 return arguments
         if map_name:
             m = rbhop.map_id_from_name(map_name, arguments.game)
@@ -593,20 +582,20 @@ class MainCog(commands.Cog):
         return arguments
     
     #set the user_id and username of the argument_checker before passing it to this
-    async def check_user_status(self, ctx, argument_checker:ArgumentChecker):
-        user_data = rbhop.get_user_state(argument_checker.user_id)
+    async def check_user_status(self, ctx, arguments:ArgumentChecker):
+        user_data = rbhop.get_user_state(arguments.user_data)
         if user_data["State"] == 2:
-            await ctx.send(self.format_markdown_code(f"{argument_checker.username} is blacklisted."))
+            await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} is blacklisted."))
             return False
         elif user_data["State"] == 3:
-            await ctx.send(self.format_markdown_code(f"{argument_checker.username} is pending moderation."))
+            await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} is pending moderation."))
             return False
         return True
 
-    def get_roblox_username(self, user_id):
+    def get_roblox_user(self, user_id):
         res = requests.get(f"https://verify.eryn.io/api/user/{user_id}")
         if res:
-            return res.json()["robloxUsername"]
+            return res.json()
         else:
             return None
 
@@ -634,7 +623,7 @@ class MainCog(commands.Cog):
     def get_user_headshot_url(self, user_id):
         return f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}"
     
-    def make_global_embed(self, record):
+    def make_global_embed(self, record:rbhop.Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         embed.set_thumbnail(url=self.get_user_headshot_url(record.user_id))
@@ -650,11 +639,11 @@ class MainCog(commands.Cog):
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user, user_id, r, rank, skill, placement, game, style, completions, total_maps):
+    def make_user_embed(self, user:rbhop.User, r, rank, skill, placement, game, style, completions, total_maps):
         ordinal = self.get_ordinal(placement)
         wrs = rbhop.total_wrs(user, game, style)
-        embed = discord.Embed(title=f"\N{NEWSPAPER}  {user}", color=0x1dbde0)
-        embed.set_thumbnail(url=self.get_user_headshot_url(user_id))
+        embed = discord.Embed(title=f"\N{NEWSPAPER}  {user.username}", color=0x1dbde0)
+        embed.set_thumbnail(url=self.get_user_headshot_url(user.id))
         embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
         embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{placement}{ordinal}")
