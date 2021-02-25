@@ -235,7 +235,8 @@ class MainCog(commands.Cog):
         play_count = map_dict["PlayCount"]
         map_creator = map_dict["Creator"]
         embed = discord.Embed(color=0x7c17ff)
-        embed.set_thumbnail(url=f"https://www.roblox.com/asset-thumbnail/image?assetId={map_id}&width=420&height=420&format=png")
+        res = requests.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={map_id}&size=250x250&format=Png&isCircular=false")
+        embed.set_thumbnail(url=res.json()["data"][0]["imageUrl"])
         embed.set_footer(text="Map Info")
         embed.title = f"\U0001F5FA  {arguments.map_name}"
         embed.add_field(name="Creator", value=map_creator)
@@ -625,7 +626,9 @@ class MainCog(commands.Cog):
         return ordinal
 
     def get_user_headshot_url(self, user_id):
-        return f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}"
+        res = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false")
+        return f"{res.json()['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
+        #return f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}"
     
     def make_global_embed(self, record:rbhop.Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
