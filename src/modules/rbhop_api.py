@@ -433,7 +433,7 @@ def get_ranks(game, style, page) -> Tuple[List[Tuple[str, Rank]], int]:
         users.append(i["User"])
     user_lookup = get_user_data_from_list(users)
     for i in data:
-        ls.append(user_lookup[i["User"]].username, Rank.from_dict(i))
+        ls.append((user_lookup[i["User"]].username, Rank.from_dict(i)))
     return ls, converted_page_count
 
 def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int]:
