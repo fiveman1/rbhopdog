@@ -270,8 +270,8 @@ class User:
 class UserState(Enum):
     DEFAULT = 0
     WHITELISTED = 1
-    PENDING = 2
-    BLACKLISTED = 3
+    BLACKLISTED = 2
+    PENDING = 3
     def __str__(self):
         return self.name.lower()
 
