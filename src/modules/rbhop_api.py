@@ -436,6 +436,7 @@ def get_ranks(game, style, page) -> Tuple[List[Tuple[str, Rank]], int]:
         ls.append((user_lookup[i["User"]].username, Rank.from_dict(i)))
     return ls, converted_page_count
 
+# TODO: optimize this pls
 def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int]:
     if page == -1:
         i = 1
@@ -464,7 +465,7 @@ def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int
     if style != None:
         params["style"] = styles[style]
     res = get(f"time/user/{user_data.id}", params) 
-    data = res.json()
+    data = res.json()[start:end]
     if len(data) > 0:
         page_count = int(res.headers["Pagination-Count"])
         converted_page_count = find_max_pages(f"time/user/{user_data.id}", params, page_count, 200, page_length)
@@ -479,8 +480,9 @@ def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int
             page_num, start = divmod((int(converted_page_count) - 1) * page_length, 200)
             end = start + 25
             params["page"] = page_count
-            data = get(f"time/user/{user_data.id}", params).json()
-    return Record.make_record_list(data[start:end], user_data.username), converted_page_count
+            data = get(f"time/user/{user_data.id}", params).json()[start:end]
+            print(data)
+    return Record.make_record_list(data, user_data.username), converted_page_count
 
 def get_user_completion(user_data:User, game, style) -> Tuple[int, int]:
     records, _ = get_user_times(user_data, game, style, -1)
