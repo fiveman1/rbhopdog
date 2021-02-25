@@ -558,6 +558,7 @@ def get_new_wrs() -> List[Record]:
         file.close()
     return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
+# TODO: optimize this to reduce unnecessary api calls
 def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
@@ -581,7 +582,8 @@ def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
             page_count = int(first_page_res.headers["Pagination-Count"])
             params["page"] = page_count
             converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
-            return [], converted_page_count
+            data = get(f"time/map/{map_id}", params).json()
+            #return [], converted_page_count
     #add the previous and next page so that we can sort the times across pages properly
     res2data = []
     if page_num > 0:
@@ -594,6 +596,8 @@ def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
         res3 = get(f"time/map/{map_id}", params)
         data += res3.json()
     sort_map(data)
+    if page > converted_page_count:
+        start = ((int(converted_page_count) - 1) * page_length) % 200
     start += len(res2data)
     end = start + page_length
     return Record.make_record_list(data[start:end]), converted_page_count

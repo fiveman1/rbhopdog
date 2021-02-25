@@ -120,10 +120,12 @@ class MainCog(commands.Cog):
         if page_count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.map_name} has not yet been completed in {arguments.style}."))
             return
-        elif page > page_count:
-            await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
-            return
+        # elif page > page_count:
+        #     await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
+        #     return
         else:
+            if page > page_count:
+                page = page_count
             msg = self.message_builder(f"Record list for map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
             await ctx.send(self.format_markdown_code(msg))
 
