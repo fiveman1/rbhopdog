@@ -275,14 +275,8 @@ class UserState(Enum):
     def __str__(self):
         return self.name.lower()
 
-def get(end_of_url, params):
-    res = requests.get(URL + end_of_url, headers=headers, params=params)
-    if not res:
-        print(res)
-        print(res.text)
-        raise Exception("Request failed")
-    else:
-        return res
+def get(end_of_url, params) -> Response:
+    return requests.get(URL + end_of_url, headers=headers, params=params)
 
 def get_user_data(user : Union[str, int]) -> User:
     if type(user) == int:
