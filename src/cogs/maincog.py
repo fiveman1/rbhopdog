@@ -653,7 +653,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="Rank", value=f"{rank_data.rank_string} ({rank_data.rank})", inline=True)
         embed.add_field(name="Skill", value=f"{rank_data.skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}")
-        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Status:** {user.state}")
+        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Moderation status:** {user.state}")
         embed.set_footer(text="User Profile")
         return embed
     
