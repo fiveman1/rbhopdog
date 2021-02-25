@@ -10,14 +10,15 @@ import traceback
 from io import StringIO
 
 from modules import rbhop_api as rbhop
+from modules.rbhop_api import Game, Style
 from modules import files
 from modules import messages
 
 class ArgumentChecker:
     def __init__(self):
-        self.game = None
-        self.style = None
-        self.user_data = None
+        self.game:Game = None
+        self.style:Style = None
+        self.user_data:rbhop.User = None
         self.map_name = None
         self.valid = False
     def __bool__(self):
@@ -27,8 +28,6 @@ class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.remove_command("help")
-        self.games = ["bhop", "surf"]
-        self.styles = ["a-only", "autohop", "backwards", "half-sideways", "scroll", "sideways", "w-only"]
         files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
         self.global_announcements.start()
         print("maincog loaded")
@@ -51,13 +50,13 @@ class MainCog(commands.Cog):
                         if isinstance(ch, discord.TextChannel):
                             if ch.name == "globals":
                                 await self.post_global(ch, record)
-                            if ch.name == "bhop-auto-globals" and record.game == 1 and record.style == 1:
+                            if ch.name == "bhop-auto-globals" and record.game == Game.BHOP and record.style == Style.AUTOHOP:
                                 await self.post_global(ch, record)
-                            elif ch.name == "bhop-styles-globals" and record.game == 1 and record.style != 1:
+                            elif ch.name == "bhop-styles-globals" and record.game == Game.BHOP and record.style != Style.AUTOHOP:
                                 await self.post_global(ch, record)
-                            elif ch.name == "surf-auto-globals" and record.game == 2 and record.style == 1:
+                            elif ch.name == "surf-auto-globals" and record.game == Game.SURF and record.style == Style.AUTOHOP:
                                 await self.post_global(ch, record)
-                            elif ch.name == "surf-styles-globals" and record.game == 2 and record.style != 1:
+                            elif ch.name == "surf-styles-globals" and record.game == Game.SURF and record.style != Style.AUTOHOP:
                                 await self.post_global(ch, record)
     
     async def post_global(self, ch, record):
@@ -120,13 +119,10 @@ class MainCog(commands.Cog):
         if page_count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.map_name} has not yet been completed in {arguments.style}."))
             return
-        # elif page > page_count:
-        #     await ctx.send(self.format_markdown_code(f"Page number ({page}) too large (total pages: {page_count})"))
-        #     return
         else:
             if page > page_count:
                 page = page_count
-            msg = self.message_builder(f"Record list for map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", [("Rank:", 6), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
+            msg = self.message_builder(f"Record list for map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", [("Rank:", 7), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -139,6 +135,7 @@ class MainCog(commands.Cog):
         style = None
         args = args[:4] if len(args) >= 4 else args
         for i in args:
+            i = i.lower()
             if i in valid_sorts:
                 sort = i
             elif i.isnumeric():
@@ -152,34 +149,33 @@ class MainCog(commands.Cog):
                     style = "all"
                 else:
                     game = "all"
-            elif i.lower() in rbhop.games and not game:
-                game = i.lower()
-            elif i.lower() in rbhop.styles and not style:
-                style = i.lower()
+            elif Game.contains(i) and not game:
+                game = i
+            elif Style.contains(i) and not style:
+                style = i
 
         #loop through all games or all styles if not specified (or if "both" or "all")
-        g = []
-        s = []
-        if game in [None, "both", "all"]:
-            g = self.games
-        else:
-            g.append(game.lower())
-        if style in [None, "all"]:
-            s = self.styles
-        else:
-            s.append(self.convert_style(style.lower()))
-        arguments = await self.argument_checker(ctx, user, g[0], s[0])
+        arguments = await self.argument_checker(ctx, user, None if game in [None, "both", "all"] else game, None if style in [None, "all"] else style)
         if not arguments:
             return
         wrs = []
         count = 0
-        for game in g:
-            for style in s:
-                if not(game == "surf" and style == "scroll"):
-                    record_list = rbhop.get_user_wrs(arguments.user_data, game, style)
-                    if record_list != None:
-                        count += len(record_list)
-                        wrs.append(record_list)
+        if game in [None, "both", "all"]:
+            g = Game
+        else:
+            g = [arguments.game]
+        if style in [None, "all"]:
+            s = Style
+        else:
+            s = [arguments.style]
+        for _game in g:
+            if _game != Game.MAPTEST:
+                for _style in s:
+                    if not (_game == Game.SURF and _style == Style.SCROLL) and _style != Style.FASTE:
+                        record_list = rbhop.get_user_wrs(arguments.user_data, _game, _style)
+                        if record_list != None:
+                            count += len(record_list)
+                            wrs.append(record_list)
         if count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
             return
@@ -201,12 +197,12 @@ class MainCog(commands.Cog):
             elif sort == "time":
                 convert_ls = sorted(convert_ls, key = lambda i: i.time) #sort by time
         cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
-        if len(g) > 1:
+        if g == Game:
             game = "both"
             cols.append(("Game:", 6))
         else:
             game = arguments.game
-        if len(s) > 1:
+        if s == Style:
             style = "all"
             cols.append(("Style:", 14))
         else:
@@ -225,7 +221,6 @@ class MainCog(commands.Cog):
             f.seek(0)
             await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
             return
-
 
     @commands.command(name="map")
     async def map_info(self, ctx, game, *, map_name):
@@ -253,15 +248,18 @@ class MainCog(commands.Cog):
         if not arguments:
             return
         count = 0
-        ls = [[],[]]
-        for i in range(len(self.games)):
-            game = self.games[i]
-            for style in self.styles:
-                if not(game == "surf" and style == "scroll"):
-                    wrs = rbhop.total_wrs(arguments.user_data, game, style)
-                    if wrs > 0:
-                        ls[i].append((style, wrs))
-                        count += wrs
+        dict = {
+            Game.BHOP: [],
+            Game.SURF: []
+        }
+        for game in Game:
+            if game != Game.MAPTEST:
+                for style in Style:
+                    if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
+                        wrs = rbhop.total_wrs(arguments.user_data, game, style)
+                        if wrs > 0:
+                            dict[game].append((style, wrs))
+                            count += wrs
         embed = discord.Embed(color=0xff94b8)
         embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_data.id))
         embed.set_footer(text="WR Count")
@@ -272,15 +270,15 @@ class MainCog(commands.Cog):
         embed.title = f"\U0001F4C4  {name}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
-            if len(ls[0]) > 0:
+            if len(dict[Game.BHOP]) > 0:
                 body = ""
-                for c in ls[0]:
+                for c in dict[Game.BHOP]:
                     if c[1] > 0:
                         body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
-            if len(ls[1]) > 0:
+            if len(dict[Game.SURF]) > 0:
                 body = ""
-                for c in ls[1]:
+                for c in dict[Game.SURF]:
                     if c[1] > 0:
                         body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
@@ -293,11 +291,11 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user, game, style)
         if not arguments:
             return
-        if arguments.style == "scroll":
-            await ctx.send(self.format_markdown_code("Scroll is not eligible for faste"))
+        if arguments.style == Style.SCROLL:
+            await ctx.send(self.format_markdown_code("Scroll is not eligible for faste."))
             return
         wrs = rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
-        if (arguments.style in ["autohop", "auto"] and wrs >= 10) or wrs >= 50:
+        if (arguments.style == Style.AUTOHOP and wrs >= 10) or wrs >= 50:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
         else:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
@@ -400,6 +398,8 @@ class MainCog(commands.Cog):
         if page_count == 0:
             if not style:
                 style = "all"
+            if not game:
+                game = "both"
             await ctx.send(self.format_markdown_code(f"No times found for {arguments.user_data.username} [game: {game}, style: {style}]"))
             return
         elif page > page_count:
@@ -514,8 +514,8 @@ class MainCog(commands.Cog):
                     "Map name:":record.map_name,
                     "Time:":record.time_string,
                     "Date:":record.date_string,
-                    "Style:":record.style_string,
-                    "Game:":record.game_string
+                    "Style:":record.style.name,
+                    "Game:":record.game.name
                 }
             for col_title in cols[:-1]:
                 msg += self.add_spaces(d[col_title[0]], col_title[1]) + "| "
@@ -530,19 +530,21 @@ class MainCog(commands.Cog):
     #passing None as argument to any of these fields will pass the check for that field
     #returns an ArgumentChecker object with the properly converted arguments
     #is falsy if the check failed, truthy if it passed
-    async def argument_checker(self, ctx, user, game, style, map_name=None) -> ArgumentChecker:
+    async def argument_checker(self, ctx, user:str, game:str, style:str, map_name:str=None) -> ArgumentChecker:
         arguments = ArgumentChecker()
         if game:
-            arguments.game = game.lower()
-            if arguments.game not in rbhop.games:
+            try:
+                arguments.game = Game(game.lower())
+            except KeyError:
                 await ctx.send(self.format_markdown_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
                 return arguments
         if style:
-            arguments.style = self.convert_style(style.lower())
-            if not arguments.style or arguments.style not in rbhop.styles:
+            try:
+                arguments.style = Style(style.lower())
+            except KeyError:
                 await ctx.send(self.format_markdown_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
                 return arguments
-        if arguments.game == "surf" and arguments.style == "scroll":
+        if arguments.game == Game.SURF and arguments.style == Style.SCROLL:
             await ctx.send(self.format_markdown_code("Surf and scroll cannot be combined."))
             return arguments
         if user == "me":
@@ -608,12 +610,6 @@ class MainCog(commands.Cog):
 
     def format_markdown_code(self, s):
         return f"```\n{s}```"
-    
-    def convert_style(self, style):
-        if style in rbhop.styles:
-            return rbhop.style_id_to_string[rbhop.styles[style]]
-        else:
-            return None
 
     def get_ordinal(self, num):
         ordinal = "th"
@@ -639,14 +635,14 @@ class MainCog(commands.Cog):
         embed.add_field(name="Player", value=record.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=False)
+            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=False)
         else:
             embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=False)
+            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=False)
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user:rbhop.User, rank_data:rbhop.Rank, game, style, completions, total_maps):
+    def make_user_embed(self, user:rbhop.User, rank_data:rbhop.Rank, game:Game, style:Style, completions, total_maps):
         ordinal = self.get_ordinal(rank_data.placement)
         wrs = rbhop.total_wrs(user, game, style)
         if user.username != user.displayname:

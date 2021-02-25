@@ -20,64 +20,6 @@ headers = {
     "api-key":API_KEY,
 }
 
-# TODO: turn these into enums or something
-styles = {
-    "autohop" : 1,
-    "auto" : 1,
-    "a" : 1,
-    "scroll" : 2,
-    "s" : 2,
-    "sideways" : 3,
-    "sw" : 3,
-    "half-sideways" : 4,
-    "hsw" : 4,
-    "half" : 4,
-    "w-only" : 5,
-    "wonly" : 5,
-    "wo" : 5,
-    "w" : 5,
-    "a-only" : 6,
-    "aonly" : 6,
-    "ao" : 6,
-    "backwards" : 7,
-    "bw" : 7,
-    "faste" : 8,
-    1 : 1,
-    2 : 2,
-    3 : 3,
-    4 : 4,
-    5 : 5,
-    6 : 6,
-    7 : 7,
-    8 : 8
-}
-
-style_id_to_string = {
-    1 : "autohop",
-    2 : "scroll",
-    3 : "sideways",
-    4 : "half-sideways",
-    5 : "w-only",
-    6 : "a-only",
-    7 : "backwards",
-    8 : "faste"
-}
-
-games = {
-    "maptest" : 0,
-    "bhop" : 1,
-    "surf" : 2,
-    0 : 0,
-    1 : 1,
-    2 : 2
-}
-
-game_id_to_string = {
-    0 : "maptest",
-    1 : "bhop",
-    2 : "surf"
-}
-
 def fix_path(path):
     return os.path.abspath(os.path.expanduser(path))
 
@@ -85,6 +27,68 @@ def open_json(path):
     with open(fix_path(path)) as file:
         data = file.read()
         return json.loads(data)
+
+def create_str_to_val(dict):
+    str_to_val = {}
+    for key, values in dict.items():
+        for value in values:
+            str_to_val[value] = key
+    return str_to_val
+
+_GAMES = {
+    0: ["maptest"],
+    1: ["bhop"],
+    2: ["surf"]
+}
+_STR_TO_GAME = create_str_to_val(_GAMES)
+
+class Game(Enum):
+    MAPTEST = 0
+    BHOP = 1
+    SURF = 2
+    @property
+    def name(self):
+        return _GAMES[self.value][0]
+    def __str__(self):
+        return self.name
+    @staticmethod
+    def contains(obj):
+        return obj in Game._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_GAME
+
+# !!! Hacky workaround warning !!!
+setattr(Game, "__new__", lambda cls, value: super(Game, cls).__new__(cls, _STR_TO_GAME[value] if isinstance(value, str) else value))
+
+_STYLES = {
+    1: ["autohop", "auto", "a"],
+    2: ["scroll", "s"],
+    3: ["sideways", "sw"],
+    4: ["half-sideways", "hsw", "half"],
+    5: ["w-only", "wonly", "wo", "w"],
+    6: ["a-only", "aonly", "ao"],
+    7: ["backwards", "bw"],
+    8: ["faste"]
+}
+_STR_TO_STYLE = create_str_to_val(_STYLES)
+
+class Style(Enum):
+    AUTOHOP = 1
+    SCROLL = 2
+    SIDEWAYS = 3
+    HSW = 4
+    WONLY = 5
+    AONLY = 6
+    BACKWARDS = 7
+    FASTE = 8
+    @property
+    def name(self):
+        return _STYLES[self.value][0]
+    def __str__(self):
+        return self.name
+    @staticmethod
+    def contains(obj):
+        return obj in Style._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_STYLE
+
+setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR_TO_STYLE[value] if isinstance(value, str) else value))
 
 # TODO: convert stuff that uses map_name and map_id to Map objects and also implement that :)
 class Map:
@@ -165,11 +169,10 @@ class Map:
             return -1
 
     @staticmethod
-    def map_id_from_name(map_name, game):
-        game = games[game]
-        if game == 1:
+    def map_id_from_name(map_name, game:Game):
+        if game == Game.BHOP:
             return Map.id_from_name(map_name, Map.bhop_map_pairs)
-        elif game == 2:
+        elif game == Game.SURF:
             return Map.id_from_name(map_name, Map.surf_map_pairs)
         return -1
 
@@ -205,24 +208,23 @@ class Rank:
             data["Placement"]
         )
 
+# TODO: convert this to use a user object and a map object once that is implemented
 class Record:
-    def __init__(self, id, time, user_id, username, map_id, date, style, mode, game):
+    def __init__(self, id, time, user_id, username, map_id, date, style:Style, mode, game:Game):
         self.id = id
         self.time = time
         self.user_id = user_id
         self.username = username
         self.map_id = map_id
         self.date = date
-        self.style = style
+        self.style:Style = style
         self.mode = mode
-        self.game = game
+        self.game:Game = game
         self.map_name = Map.map_name_from_id(self.map_id)
         self.date_string = convert_date(self.date)
         self.time_string = format_time(self.time)
-        self.style_string = style_id_to_string[self.style]
-        self.game_string = game_id_to_string[self.game]
         self.diff = -1.0
-        self.previous_record = None
+        self.previous_record : Record = None
     @staticmethod
     def from_dict(d, username:Optional[str]=None) -> "Record":
         if not username:
@@ -234,9 +236,9 @@ class Record:
             username,
             d["Map"],
             d["Date"],
-            d["Style"],
+            Style(d["Style"]),
             d["Mode"],
-            d["Game"]
+            Game(d["Game"])
         )
     @staticmethod
     def make_record_list(records, username=None) -> List["Record"]:
@@ -312,6 +314,7 @@ def get_user_data_from_list(users) -> Dict[int, User]:
         raise TimeoutError("Error getting user data")
 
 #takes time value as input from json in miliseconds
+#TODO: time object
 def format_time(time):
     if time > 86400000:
         return ">1 day"
@@ -330,23 +333,22 @@ def format_helper(time, digits):
         time = "0" + time
     return time
 
+#TODO: date object
 def convert_date(date):
     return datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
 
-def get_recent_wrs(game, style) -> List[Record]:
-    game = games[game]
-    style = styles[style]
+def get_recent_wrs(game:Game, style:Style) -> List[Record]:
     res = get("time/recent/wr", {
-        "game":game,
-        "style":style
+        "game":game.value,
+        "style":style.value
     })
     data = res.json()
     return Record.make_record_list(data)
 
-def get_user_wrs(user_data:User, game, style) -> List[Record]:
+def get_user_wrs(user_data:User, game:Game, style:Style) -> List[Record]:
     res = get(f"time/user/{user_data.id}/wr", {
-        "game":games[game],
-        "style":styles[style]
+        "game":game.value,
+        "style":style.value
     })
     data = res.json()
     if data:
@@ -355,13 +357,13 @@ def get_user_wrs(user_data:User, game, style) -> List[Record]:
         return []
 
 #returns a record object of a user's time on a given map
-def get_user_record(user_data:User, game, style, map_name="") -> Optional[Record]:
+def get_user_record(user_data:User, game:Game, style:Style, map_name="") -> Optional[Record]:
     if map_name == "":
         return get_user_wrs(user_data, game, style)
     map_id = Map.map_id_from_name(map_name, game)
     res = get(f"time/user/{user_data.id}", {
-        "game":games[game],
-        "style":styles[style],
+        "game":game.value,
+        "style":style.value,
         "map":map_id
     })
     data = res.json()
@@ -370,10 +372,10 @@ def get_user_record(user_data:User, game, style, map_name="") -> Optional[Record
     else:
         return Record.from_dict(data[0], user_data.username)
 
-def total_wrs(user_data:User, game, style) -> int:
+def total_wrs(user_data:User, game:Game, style:Style) -> int:
     res = get(f"time/user/{user_data.id}/wr", {
-        "game":games[game],
-        "style":styles[style]
+        "game":game.value,
+        "style":style.value
     })
     data = res.json()
     if data == None:
@@ -381,10 +383,10 @@ def total_wrs(user_data:User, game, style) -> int:
     else:
         return len(data)
 
-def get_user_rank(user_data:User, game, style) -> Optional[Rank]:
+def get_user_rank(user_data:User, game:Game, style:Style) -> Optional[Rank]:
     res = get(f"rank/{user_data.id}", {
-        "game":games[game],
-        "style":styles[style]
+        "game":game.value,
+        "style":style.value
     })
     data = res.json()
     if data == None:
@@ -403,10 +405,10 @@ def find_max_pages(url, params, page_count, page_length, custom_page_length) -> 
         return 0
 
 #returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
-def get_ranks(game, style, page) -> Tuple[List[Tuple[str, Rank]], int]:
+def get_ranks(game:Game, style:Style, page) -> Tuple[List[Tuple[str, Rank]], int]:
     params = {
-        "game":games[game],
-        "style":styles[style],
+        "game":game.value,
+        "style":style.value,
         "page":(int((page - 1) / 2)) + 1
     }
     page_length = 25
@@ -437,14 +439,14 @@ def get_ranks(game, style, page) -> Tuple[List[Tuple[str, Rank]], int]:
     return ls, converted_page_count
 
 # TODO: optimize this pls
-def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int]:
+def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[Record], int]:
     if page == -1:
         i = 1
         params = {"page":i}
         if game != None:
-            params["game"] = games[game]
+            params["game"] = game.value
         if style != None:
-            params["style"] = styles[style]
+            params["style"] = style.value
         times_ls = []
         while True:
             params["page"] = i
@@ -461,9 +463,9 @@ def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int
     end = start + 25
     params = {"page":page_num + 1}
     if game != None:
-        params["game"] = games[game]
+        params["game"] = game.value
     if style != None:
-        params["style"] = styles[style]
+        params["style"] = style.value
     res = get(f"time/user/{user_data.id}", params) 
     data = res.json()[start:end]
     if len(data) > 0:
@@ -484,7 +486,7 @@ def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int
             print(data)
     return Record.make_record_list(data, user_data.username), converted_page_count
 
-def get_user_completion(user_data:User, game, style) -> Tuple[int, int]:
+def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, int]:
     records, _ = get_user_times(user_data, game, style, -1)
     completions = len(records)
     if game == "bhop":
@@ -500,7 +502,7 @@ def sort_map(records):
 #times on the given map
 def calculate_wr_diff(record):
     res = get(f"time/map/{record.map_id}", {
-        "style":record.style,
+        "style":record.style.value,
     })
     data = res.json()
     sort_map(data)
@@ -517,15 +519,16 @@ def search(ls, record):
 
 def get_new_wrs() -> List[Record]:
     new_wrs = []
-    for game in range(1,3):
-        for style in range(1,8):
-            if not (game == 2 and style == 2): #skip surf/scroll
-                wrs = get("time/recent/wr", {
-                        "game":game,
-                        "style":style,
-                        "whitelist":True
-                    })
-                new_wrs.append(wrs.json())
+    for game in Game:
+        if not game == Game.MAPTEST:
+            for style in Style:
+                if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
+                    wrs = get("time/recent/wr", {
+                            "game":game.value,
+                            "style":style.value,
+                            "whitelist":True
+                        })
+                    new_wrs.append(wrs.json())
     old_wrs = []
     try:
         old_wrs = open_json("files/recent_wrs.json")
@@ -559,12 +562,12 @@ def get_new_wrs() -> List[Record]:
     return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
 # TODO: optimize this to reduce unnecessary api calls
-def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
+def get_map_times(game:Game, style:Style, map_name, page) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     map_id = Map.map_id_from_name(map_name, game)
     params = {
-        "style":styles[style],
+        "style":style.value,
         "page":page_num + 1
     }
     res = get(f"time/map/{map_id}", params)
@@ -607,7 +610,7 @@ def get_user_state(user_data:User) -> Response:
 
 def get_record_placement(record:Record) -> Tuple[int, int]:
     params = {
-        "style":record.style,
+        "style":record.style.value,
         "page":1
     }
     first_page_res = get(f"time/map/{record.map_id}", params)
