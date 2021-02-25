@@ -2,9 +2,11 @@
 import datetime
 from discord.errors import InvalidData
 from dotenv import load_dotenv
+from enum import Enum
 import json
 import os
 import requests
+from requests.models import Response
 from typing import Dict, List, Optional, Tuple, Union
 
 from modules import files
@@ -76,8 +78,6 @@ game_id_to_string = {
     2 : "surf"
 }
 
-ranks = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
-
 def fix_path(path):
     return os.path.abspath(os.path.expanduser(path))
 
@@ -86,94 +86,124 @@ def open_json(path):
         data = file.read()
         return json.loads(data)
 
-bhop_map_pairs = []
-surf_map_pairs = []
-# hash table for id -> displayname because each id is unique
-map_lookup = {}
+# TODO: convert stuff that uses map_name and map_id to Map objects and also implement that :)
+class Map:
+    bhop_map_pairs = []
+    surf_map_pairs = []
+    bhop_map_count = 0
+    surf_map_count = 0
+    # hash table for id -> displayname because each id is unique
+    map_lookup = {}
 
-def setup_maps():
-    files.write_maps("bhop")
-    files.write_maps("surf")
-    bhop_maps = open_json("files/bhop_maps.json")
-    surf_maps = open_json("files/surf_maps.json")
+    @staticmethod
+    def setup_maps():
+        files.write_maps("bhop")
+        files.write_maps("surf")
+        bhop_maps = open_json("files/bhop_maps.json")
+        surf_maps = open_json("files/surf_maps.json")
 
-    bhop_map_pairs.clear()
-    surf_map_pairs.clear()
+        Map.bhop_map_count = len(bhop_maps)
+        Map.surf_map_count = len(surf_maps)
 
-    for map in bhop_maps:
-        bhop_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
-    bhop_map_pairs.sort(key=lambda i: i[0])
+        Map.bhop_map_pairs.clear()
+        Map.surf_map_pairs.clear()
 
-    for map in surf_maps:
-        surf_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
-    surf_map_pairs.sort(key=lambda i: i[0])
+        for map in bhop_maps:
+            Map.bhop_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
+        Map.bhop_map_pairs.sort(key=lambda i: i[0])
 
-    map_lookup.clear()
-    for map in bhop_maps:
-        map_lookup[map["ID"]] = map
+        for map in surf_maps:
+            Map.surf_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
+        Map.surf_map_pairs.sort(key=lambda i: i[0])
 
-    for map in surf_maps:
-        map_lookup[map["ID"]] = map
+        Map.map_lookup.clear()
+        for map in bhop_maps:
+            Map.map_lookup[map["ID"]] = map
 
-setup_maps()
+        for map in surf_maps:
+            Map.map_lookup[map["ID"]] = map
 
-# ls should be sorted
-# performs an iterative binary search
-# returns the first index where the item was found according to the compare function
-def find_item(ls, compare):
-    left = 0
-    right = len(ls) - 1
-    while left <= right:
-        middle = (left + right) // 2
-        res = compare(ls[middle])
-        if res == 0:
-            return middle
-        elif res < 0:
-            left = middle + 1
-        else:
-            right = middle - 1
-    return -1
-
-def compare_maps(name, map_name):
-    if map_name.startswith(name):
-        return 0
-    elif map_name < name:
-        return -1
-    else:
-        return 1
-
-def id_from_name(name, ls):
-    name = name.lower()
-    idx = find_item(ls, lambda m : compare_maps(name, m[0]))
-    if idx != -1:
-        while idx > 0:
-            if ls[idx-1][0].startswith(name):
-                idx -= 1
+    # ls should be sorted
+    # performs an iterative binary search
+    # returns the first index where the item was found according to the compare function
+    @staticmethod
+    def find_item(ls, compare):
+        left = 0
+        right = len(ls) - 1
+        while left <= right:
+            middle = (left + right) // 2
+            res = compare(ls[middle])
+            if res == 0:
+                return middle
+            elif res < 0:
+                left = middle + 1
             else:
-                break
-        return ls[idx][1]
-    else:
+                right = middle - 1
         return -1
 
-def map_id_from_name(map_name, game):
-    game = games[game]
-    if game == 1:
-        return id_from_name(map_name, bhop_map_pairs)
-    elif game == 2:
-        return id_from_name(map_name, surf_map_pairs)
-    return -1
+    @staticmethod
+    def compare_maps(name, map_name):
+        if map_name.startswith(name):
+            return 0
+        elif map_name < name:
+            return -1
+        else:
+            return 1
 
-def map_dict_from_id(map_id):
-    try:
-        return map_lookup[map_id]
-    except:
-        return "Missing map"
+    @staticmethod
+    def id_from_name(name, ls):
+        name = name.lower()
+        idx = Map.find_item(ls, lambda m : Map.compare_maps(name, m[0]))
+        if idx != -1:
+            while idx > 0:
+                if ls[idx-1][0].startswith(name):
+                    idx -= 1
+                else:
+                    break
+            return ls[idx][1]
+        else:
+            return -1
 
-def map_name_from_id(map_id):
-    try:
-        return map_lookup[map_id]["DisplayName"]
-    except:
-        return "Missing map"
+    @staticmethod
+    def map_id_from_name(map_name, game):
+        game = games[game]
+        if game == 1:
+            return Map.id_from_name(map_name, Map.bhop_map_pairs)
+        elif game == 2:
+            return Map.id_from_name(map_name, Map.surf_map_pairs)
+        return -1
+
+    @staticmethod
+    def map_dict_from_id(map_id):
+        try:
+            return Map.map_lookup[map_id]
+        except:
+            return "Missing map"
+
+    @staticmethod
+    def map_name_from_id(map_id):
+        try:
+            return Map.map_lookup[map_id]["DisplayName"]
+        except:
+            return "Missing map"
+
+Map.setup_maps()
+
+class Rank:
+    __ranks__ = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
+
+    def __init__(self, rank, skill, placement):
+        self.rank = rank
+        self.rank_string = Rank.__ranks__[self.rank - 1]
+        self.skill = skill
+        self.placement = placement
+    @staticmethod
+    def from_dict(data):
+        return Rank(
+            1 + int(float(data["Rank"]) * 19),
+            round(float(data["Skill"]) * 100.0, 3),
+            data["Placement"]
+        )
 
 class Record:
     def __init__(self, id, time, user_id, username, map_id, date, style, mode, game):
@@ -186,7 +216,7 @@ class Record:
         self.style = style
         self.mode = mode
         self.game = game
-        self.map_name = map_name_from_id(self.map_id)
+        self.map_name = Map.map_name_from_id(self.map_id)
         self.date_string = convert_date(self.date)
         self.time_string = format_time(self.time)
         self.style_string = style_id_to_string[self.style]
@@ -228,6 +258,7 @@ class User:
         self.id = -1
         self.username = ""
         self.displayname = ""
+        self.state = UserState.DEFAULT
     @staticmethod
     def from_dict(d) -> "User":
         user = User()
@@ -235,6 +266,14 @@ class User:
         user.username = d["name"]
         user.displayname = d["displayName"]
         return user
+
+class UserState(Enum):
+    DEFAULT = 0
+    WHITELISTED = 1
+    PENDING = 2
+    BLACKLISTED = 3
+    def __str__(self):
+        return self.name.lower()
 
 def get(end_of_url, params):
     res = requests.get(URL + end_of_url, headers=headers, params=params)
@@ -257,14 +296,15 @@ def get_user_data(user : Union[str, int]) -> User:
             raise TimeoutError("Error getting user data")
     else:
         res = requests.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]})
-        try:
-            data = res.json()["data"]
+        d = res.json()
+        if not d:
+            raise TimeoutError("Error getting user data")
+        else:
+            data = d["data"]
             if len(data) > 0:
                 return User.from_dict(data[0])
             else:
-                raise InvalidData("Invalid user ID")
-        except:
-            raise TimeoutError("Error getting user data")
+                raise InvalidData("Invalid username")
 
 def get_user_data_from_list(users) -> Dict[int, User]:
     res = requests.post("https://users.roblox.com/v1/users", data={"userIds":users})
@@ -324,7 +364,7 @@ def get_user_wrs(user_data:User, game, style) -> List[Record]:
 def get_user_record(user_data:User, game, style, map_name="") -> Optional[Record]:
     if map_name == "":
         return get_user_wrs(user_data, game, style)
-    map_id = map_id_from_name(map_name, game)
+    map_id = Map.map_id_from_name(map_name, game)
     res = get(f"time/user/{user_data.id}", {
         "game":games[game],
         "style":styles[style],
@@ -347,13 +387,16 @@ def total_wrs(user_data:User, game, style) -> int:
     else:
         return len(data)
 
-def get_user_rank(user_data:User, game, style) -> Tuple:
+def get_user_rank(user_data:User, game, style) -> Optional[Rank]:
     res = get(f"rank/{user_data.id}", {
         "game":games[game],
         "style":styles[style]
     })
     data = res.json()
-    return convert_rank(data)
+    if data == None:
+        return None
+    else:
+        return Rank.from_dict(data)
 
 def find_max_pages(url, params, page_count, page_length, custom_page_length) -> int:
     params["page"] = page_count
@@ -366,8 +409,7 @@ def find_max_pages(url, params, page_count, page_length, custom_page_length) -> 
         return 0
 
 #returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
-# TODO: make a Rank object
-def get_ranks(game, style, page) -> Tuple[List, int]:
+def get_ranks(game, style, page) -> Tuple[List[Tuple[str, Rank]], int]:
     params = {
         "game":games[game],
         "style":styles[style],
@@ -397,8 +439,7 @@ def get_ranks(game, style, page) -> Tuple[List, int]:
         users.append(i["User"])
     user_lookup = get_user_data_from_list(users)
     for i in data:
-        r, rank, skill, placement, = convert_rank(i)
-        ls.append({"Username": user_lookup[i["User"]].username, "R": r, "Rank": rank, "Skill": skill, "Placement": placement})
+        ls.append(user_lookup[i["User"]].username, Rank.from_dict(i))
     return ls, converted_page_count
 
 def get_user_times(user_data:User, game, style, page) -> Tuple[List[Record], int]:
@@ -451,18 +492,9 @@ def get_user_completion(user_data:User, game, style) -> Tuple[int, int]:
     records, _ = get_user_times(user_data, game, style, -1)
     completions = len(records)
     if game == "bhop":
-        return completions, len(bhop_map_pairs)
+        return completions, Map.bhop_map_count
     else:
-        return completions, len(surf_map_pairs)
-
-def convert_rank(data) -> Tuple[int, int, int, int]:
-    if data == None:
-        return 0,0,0,0
-    else:
-        r = 1 + int(float(data["Rank"]) * 19)
-        rank = ranks[r - 1]
-        skill = round(float(data["Skill"]) * 100.0, 3)
-        return r, rank, skill, data["Placement"]
+        return completions, Map.surf_map_count
 
 #records is a list of records from a given map
 def sort_map(records):
@@ -533,7 +565,7 @@ def get_new_wrs() -> List[Record]:
 def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
-    map_id = map_id_from_name(map_name, game)
+    map_id = Map.map_id_from_name(map_name, game)
     params = {
         "style":styles[style],
         "page":page_num + 1
@@ -570,8 +602,8 @@ def get_map_times(game, style, map_name, page) -> Tuple[List[Record], int]:
     end = start + page_length
     return Record.make_record_list(data[start:end]), converted_page_count
 
-def get_user_state(user_data:User):
-    return get(f"user/{user_data.id}", {}).json()
+def get_user_state(user_data:User) -> Response:
+    return get(f"user/{user_data.id}", {})
 
 def get_record_placement(record:Record) -> Tuple[int, int]:
     params = {

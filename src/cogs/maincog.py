@@ -230,8 +230,8 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, None, game, None, map_name)
         if not arguments:
             return
-        map_id = rbhop.map_id_from_name(arguments.map_name, arguments.game)
-        map_dict = rbhop.map_dict_from_id(map_id)
+        map_id = rbhop.Map.map_id_from_name(arguments.map_name, arguments.game)
+        map_dict = rbhop.Map.map_dict_from_id(map_id)
         play_count = map_dict["PlayCount"]
         map_creator = map_dict["Creator"]
         embed = discord.Embed(color=0x7c17ff)
@@ -262,7 +262,11 @@ class MainCog(commands.Cog):
         embed = discord.Embed(color=0xff94b8)
         embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_data.id))
         embed.set_footer(text="WR Count")
-        embed.title = f"\U0001F4C4  {arguments.user_data.username}"
+        if arguments.user_data.username != arguments.user_data.displayname:
+            name = f"{arguments.user_data.displayname} ({arguments.user_data.username})"
+        else:
+            name = arguments.user_data.username
+        embed.title = f"\U0001F4C4  {name}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
             if len(ls[0]) > 0:
@@ -300,12 +304,13 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user, game, style)
         if not arguments:
             return
-        r, rank, skill, placement = rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style)
-        completions, total_maps = rbhop.get_user_completion(arguments.user_data, arguments.game, arguments.style)
-        if r == 0 or placement == 0:
+        rank_data = rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style)
+        if not rank_data:
             await ctx.send(self.format_markdown_code(f"No data available for {arguments.user_data.username} [game: {arguments.game}, style: {arguments.style}]"))
             return
-        await ctx.send(embed=self.make_user_embed(arguments.user_data, r, rank, skill, placement, arguments.game, arguments.style, completions, total_maps))
+        else:
+            completions, total_maps = rbhop.get_user_completion(arguments.user_data, arguments.game, arguments.style)
+            await ctx.send(embed=self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
@@ -326,13 +331,10 @@ class MainCog(commands.Cog):
         titles = ["Placement:", "Username:", "Rank:", "Skill:"]
         msg += f"{titles[0]:11}| {titles[1]:20}| {titles[2]:19}| {titles[3]}\n"
         for rank in ranks:
-            r = rank["R"]
-            rank_string = rank["Rank"]
-            skill = rank["Skill"]
-            placement = rank["Placement"]
-            username = rank["Username"]
-            formatted = f"{rank_string} ({r})"
-            msg += f"{placement:10} | {username:20}| {formatted:19}| {skill:.3f}%\n"
+            username = rank[0]
+            rank_data = rank[1]
+            formatted = f"{rank_data.rank_string} ({rank_data.rank})"
+            msg += f"{rank_data.placement:10} | {username:20}| {formatted:19}| {rank_data.skill:.3f}%\n"
         await ctx.send(self.format_markdown_code(msg))
     
     @commands.command(name="times")
@@ -420,8 +422,8 @@ class MainCog(commands.Cog):
     @commands.command(name="mapcount")
     async def map_count(self, ctx):
         embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
-        embed.add_field(name="Bhop Maps", value=str(len(rbhop.bhop_map_pairs)))
-        embed.add_field(name="Surf Maps", value=str(len(rbhop.surf_map_pairs)))
+        embed.add_field(name="Bhop Maps", value=str(rbhop.Map.bhop_map_count))
+        embed.add_field(name="Surf Maps", value=str(rbhop.Map.surf_map_count))
         embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
         await ctx.send(embed=embed)
 
@@ -452,6 +454,7 @@ class MainCog(commands.Cog):
             embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
             embed.add_field(name="ID", value=user_data.id, inline=True)
+            embed.add_field(name="Display name", value=user_data.displayname, inline=True)
             embed.set_footer(text="User Info")
             await ctx.send(embed=embed)
         except InvalidData:
@@ -483,7 +486,7 @@ class MainCog(commands.Cog):
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps(self, ctx):
-        rbhop.setup_maps()
+        rbhop.Map.setup_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
     
     def get_discord_user_id(self, s):
@@ -546,7 +549,7 @@ class MainCog(commands.Cog):
                 return arguments
             else:
                 arguments.user_data = rbhop.get_user_data(user_id)
-                if not await self.check_user_status(ctx, arguments):
+                if not await self.check_user_status(ctx, arguments.user_data):
                     return arguments
         elif user:
             discord_user_id = self.get_discord_user_id(user)
@@ -565,31 +568,32 @@ class MainCog(commands.Cog):
             except TimeoutError:
                 await ctx.send(self.format_markdown_code(f"Error: User data request timed out."))
                 return arguments
-            try:
-                if not await self.check_user_status(ctx, arguments):
-                    return arguments
-            except:
-                await ctx.send(self.format_markdown_code(f"'{arguments.user_data.username}' has not played bhop/surf."))
+            if not await self.check_user_status(ctx, arguments.user_data):
                 return arguments
         if map_name:
-            m = rbhop.map_id_from_name(map_name, arguments.game)
+            m = rbhop.Map.map_id_from_name(map_name, arguments.game)
             if m == -1:
                 await ctx.send(self.format_markdown_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
                 return arguments
             else:
-                arguments.map_name = rbhop.map_name_from_id(m)
+                arguments.map_name = rbhop.Map.map_name_from_id(m)
         arguments.valid = True
         return arguments
     
     #set the user_id and username of the argument_checker before passing it to this
-    async def check_user_status(self, ctx, arguments:ArgumentChecker):
-        user_data = rbhop.get_user_state(arguments.user_data)
-        if user_data["State"] == 2:
-            await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} is blacklisted."))
+    async def check_user_status(self, ctx, user_data:rbhop.User):
+        res = rbhop.get_user_state(user_data)
+        if res.status_code == 404:
+            await ctx.send(self.format_markdown_code(f"'{user_data.username}' has not played bhop/surf."))
             return False
-        elif user_data["State"] == 3:
-            await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} is pending moderation."))
-            return False
+        else:
+            user_data.state = rbhop.UserState(res.json()["State"])
+            if user_data.state == rbhop.UserState.BLACKLISTED:
+                await ctx.send(self.format_markdown_code(f"{user_data.username} is blacklisted."))
+                return False
+            elif user_data.state == rbhop.UserState.PENDING:
+                await ctx.send(self.format_markdown_code(f"{user_data.username} is pending moderation."))
+                return False
         return True
 
     def get_roblox_user(self, user_id):
@@ -630,24 +634,26 @@ class MainCog(commands.Cog):
         embed.add_field(name="Player", value=record.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
-            embed.add_field(name="\u200B", value="\u200B", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=True)
+            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=False)
         else:
             embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
-            embed.add_field(name="\u200B", value="\u200B", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=True)
+            embed.add_field(name="Info", value=f"**Game:** {record.game_string}\n**Style:** {record.style_string}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=False)
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user:rbhop.User, r, rank, skill, placement, game, style, completions, total_maps):
-        ordinal = self.get_ordinal(placement)
+    def make_user_embed(self, user:rbhop.User, rank_data:rbhop.Rank, game, style, completions, total_maps):
+        ordinal = self.get_ordinal(rank_data.placement)
         wrs = rbhop.total_wrs(user, game, style)
-        embed = discord.Embed(title=f"\N{NEWSPAPER}  {user.username}", color=0x1dbde0)
+        if user.username != user.displayname:
+            name = f"{user.displayname} ({user.username})"
+        else:
+            name = user.username
+        embed = discord.Embed(title=f"\N{NEWSPAPER}  {name}", color=0x1dbde0)
         embed.set_thumbnail(url=self.get_user_headshot_url(user.id))
-        embed.add_field(name="Rank", value=f"{rank} ({r})", inline=True)
-        embed.add_field(name="Skill", value=f"{skill:.3f}%", inline=True)
-        embed.add_field(name="Placement", value=f"{placement}{ordinal}")
-        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})")
+        embed.add_field(name="Rank", value=f"{rank_data.rank_string} ({rank_data.rank})", inline=True)
+        embed.add_field(name="Skill", value=f"{rank_data.skill:.3f}%", inline=True)
+        embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}")
+        embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Status:** {user.state}")
         embed.set_footer(text="User Profile")
         return embed
     
