@@ -1,7 +1,7 @@
 # maincog.py
 from typing import List
 import discord
-from discord.errors import InvalidData
+from discord.errors import InvalidData, NotFound
 from discord.ext import commands, tasks
 import random
 import requests
@@ -26,7 +26,7 @@ class ArgumentChecker:
 
 class MainCog(commands.Cog):
     def __init__(self, bot):
-        self.bot = bot
+        self.bot:commands.Bot = bot
         self.bot.remove_command("help")
         files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
         self.global_announcements.start()
@@ -432,27 +432,27 @@ class MainCog(commands.Cog):
 
     @commands.command(name="user")
     async def user_info(self, ctx, user):
-        username = ""
         if user == "me":
-            username = self.get_roblox_user(ctx.author.id)["robloxUsername"]
-            if not username:
+            roblox_user = self.get_roblox_user(ctx.author.id)
+            if not roblox_user:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return
+            else:
+                user = roblox_user["robloxId"]
         else:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
-                username = self.get_roblox_user(discord_user_id)["robloxUsername"]
-                if not user:
-                    await ctx.send(self.format_markdown_code(f"Invalid username. '{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account."))
+                roblox_user = self.get_roblox_user(discord_user_id)
+                if not roblox_user:
+                    await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
                     return
-            else:
-                username = user
-        
+                else:
+                    user = roblox_user["robloxId"]
         try:
-            if username.isnumeric():
-                user_data = rbhop.get_user_data(int(username))
+            if user.isnumeric():
+                user_data = rbhop.get_user_data(int(user))
             else:
-                user_data = rbhop.get_user_data(username)
+                user_data = rbhop.get_user_data(user)
             embed = discord.Embed(color=0xfcba03)
             embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
@@ -461,8 +461,12 @@ class MainCog(commands.Cog):
             embed.set_footer(text="User Info")
             await ctx.send(embed=embed)
         except InvalidData:
-            await ctx.send(self.format_markdown_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
-            return
+            if user.isnumeric():
+                await ctx.send(self.format_markdown_code(f"Invalid user ID (user ID '{user}' does not exist on Roblox)."))
+                return
+            else:
+                await ctx.send(self.format_markdown_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
+                return
         except TimeoutError:
             await ctx.send(self.format_markdown_code(f"Error: User data request timed out."))
             return
@@ -547,24 +551,27 @@ class MainCog(commands.Cog):
         if arguments.game == Game.SURF and arguments.style == Style.SCROLL:
             await ctx.send(self.format_markdown_code("Surf and scroll cannot be combined."))
             return arguments
-        if user == "me":
-            user_id = self.get_roblox_user(ctx.author.id)["robloxId"]
-            if not user_id:
-                await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
-                return arguments
-            else:
-                arguments.user_data = rbhop.get_user_data(user_id)
-                if not await self.check_user_status(ctx, arguments.user_data):
-                    return arguments
-        elif user:
-            discord_user_id = self.get_discord_user_id(user)
-            if discord_user_id:
-                user = self.get_roblox_user(discord_user_id)
-                if not user:
-                    await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
+        if user:
+            if user == "me":
+                roblox_user = self.get_roblox_user(ctx.author.id)
+                if not roblox_user:
+                    await ctx.send(self.format_markdown_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
                     return arguments
                 else:
-                    user = user["robloxId"]
+                    user = roblox_user["robloxId"]
+            else:
+                discord_user_id = self.get_discord_user_id(user)
+                if discord_user_id:
+                    roblox_user = self.get_roblox_user(discord_user_id)
+                    if not roblox_user:
+                        try:
+                            discord_user = await self.bot.fetch_user(int(discord_user_id))
+                            await ctx.send(self.format_markdown_code(f"Invalid username ('{discord_user.name}' does not have a Roblox account associated with their Discord account.)"))
+                        except:
+                            await ctx.send(self.format_markdown_code(f"Invalid discord user ID."))
+                        return arguments
+                    else:
+                        user = roblox_user["robloxId"]
             try:
                 arguments.user_data = rbhop.get_user_data(user)
             except InvalidData:
@@ -653,7 +660,7 @@ class MainCog(commands.Cog):
         embed.set_thumbnail(url=self.get_user_headshot_url(user.id))
         embed.add_field(name="Rank", value=f"{rank_data.rank_string} ({rank_data.rank})", inline=True)
         embed.add_field(name="Skill", value=f"{rank_data.skill:.3f}%", inline=True)
-        embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}")
+        embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}") if rank_data.placement > 0 else embed.add_field(name="Placement", value="n/a")
         embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Moderation status:** {user.state}")
         embed.set_footer(text="User Profile")
         return embed

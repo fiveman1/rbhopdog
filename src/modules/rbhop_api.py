@@ -88,6 +88,7 @@ class Style(Enum):
     def contains(obj):
         return obj in Style._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_STYLE
 
+# !!! Hacky workaround warning 2 !!!
 setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR_TO_STYLE[value] if isinstance(value, str) else value))
 
 # TODO: convert stuff that uses map_name and map_id to Map objects and also implement that :)
@@ -489,10 +490,12 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
 def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, int]:
     records, _ = get_user_times(user_data, game, style, -1)
     completions = len(records)
-    if game == "bhop":
+    if game == Game.BHOP:
         return completions, Map.bhop_map_count
-    else:
+    elif game == Game.SURF:
         return completions, Map.surf_map_count
+    else:
+        return completions, 1
 
 #records is a list of records from a given map
 def sort_map(records):
