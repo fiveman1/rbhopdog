@@ -22,6 +22,9 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
+    ignored = (discord.Forbidden, commands.CommandNotFound)
+    if isinstance(error, ignored):
+        return
     if isinstance(error, commands.BadArgument):
         await ctx.send("```Error: Bad argument```")
     elif isinstance(error, commands.CommandOnCooldown):

@@ -1,5 +1,5 @@
 # maincog.py
-from typing import List
+from typing import List, Tuple
 import discord
 from discord.errors import InvalidData, NotFound
 from discord.ext import commands, tasks
@@ -43,29 +43,36 @@ class MainCog(commands.Cog):
         except:
             return
         if len(records) > 0:
+            bhop_auto = []
+            bhop_style = []
+            surf_auto = []
+            surf_style = []
             for record in records:
-                print(f"New WR: {record.map_name}, {record.username}, {record.time_string}")
-                for guild in self.bot.guilds:
-                    for ch in guild.channels:
-                        if isinstance(ch, discord.TextChannel):
-                            if ch.name == "globals":
-                                await self.post_global(ch, record)
-                            if ch.name == "bhop-auto-globals" and record.game == Game.BHOP and record.style == Style.AUTOHOP:
-                                await self.post_global(ch, record)
-                            elif ch.name == "bhop-styles-globals" and record.game == Game.BHOP and record.style != Style.AUTOHOP:
-                                await self.post_global(ch, record)
-                            elif ch.name == "surf-auto-globals" and record.game == Game.SURF and record.style == Style.AUTOHOP:
-                                await self.post_global(ch, record)
-                            elif ch.name == "surf-styles-globals" and record.game == Game.SURF and record.style != Style.AUTOHOP:
-                                await self.post_global(ch, record)
-    
-    async def post_global(self, ch, record):
-        try:
-            await ch.send(embed=self.make_global_embed(record))
-        except Exception as error:
-            if not isinstance(error, discord.errors.Forbidden):
-                print("Couldn't post global")
-                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+                if record.game == Game.BHOP and record.style == Style.AUTOHOP:
+                    bhop_auto.append(record)
+                elif record.game == Game.BHOP and record.style != Style.AUTOHOP:
+                    bhop_style.append(record)
+                elif record.game == Game.SURF and record.style == Style.AUTOHOP:
+                    surf_auto.append(record)
+                elif record.game == Game.SURF and record.style != Style.AUTOHOP:
+                    surf_style.append(record)
+            for ch in self.bot.get_all_channels():
+                if isinstance(ch, discord.TextChannel):
+                    if ch.name == "globals":
+                        for record in records:
+                            await ch.send(embed=self.make_global_embed(record))
+                    elif ch.name == "bhop-auto-globals":
+                        for record in bhop_auto:
+                            await ch.send(embed=self.make_global_embed(record))
+                    elif ch.name == "bhop-styles-globals":
+                        for record in bhop_style:
+                            await ch.send(embed=self.make_global_embed(record))
+                    elif ch.name == "surf-auto-globals":
+                        for record in surf_auto:
+                            await ch.send(embed=self.make_global_embed(record))
+                    elif ch.name == "surf-styles-globals":
+                        for record in surf_style:
+                            await ch.send(embed=self.make_global_embed(record))
     
     @global_announcements.before_loop
     async def before_global_announcements(self):
@@ -75,7 +82,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="recentwrs")
     async def get_recent_wrs(self, ctx, game, style="autohop"):
-        arguments = await self.argument_checker(ctx, None, game, style)
+        arguments = await self.argument_checker(ctx, game=game, style=style)
         if not arguments:
             return
         msg = self.message_builder(f"10 Recent WRs [game: {arguments.game}, style: {arguments.style}]", [("Username:", 20), ("Map name:", 30), ("Time:", 10), ("Date:", 11)], rbhop.get_recent_wrs(arguments.game, arguments.style))
@@ -83,7 +90,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="record")
     async def get_user_record(self, ctx, user, game, style, *, map_name):
-        arguments = await self.argument_checker(ctx, user, game, style, map_name)
+        arguments = await self.argument_checker(ctx, user=user, game=game, style=style, map_name=map_name)
         if not arguments:
             return
         record = rbhop.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map_name)
@@ -112,7 +119,7 @@ class MainCog(commands.Cog):
         if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
             return
-        arguments = await self.argument_checker(ctx, None, game, style, map_name)
+        arguments = await self.argument_checker(ctx, game=game, style=style, map_name=map_name)
         if not arguments:
             return
         records, page_count = rbhop.get_map_times(arguments.game, arguments.style, arguments.map_name, page)
@@ -155,7 +162,7 @@ class MainCog(commands.Cog):
                 style = i
 
         #loop through all games or all styles if not specified (or if "both" or "all")
-        arguments = await self.argument_checker(ctx, user, None if game in [None, "both", "all"] else game, None if style in [None, "all"] else style)
+        arguments = await self.argument_checker(ctx, user=user, game=None if game in [None, "both", "all"] else game, style=None if style in [None, "all"] else style)
         if not arguments:
             return
         wrs = []
@@ -224,7 +231,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="map")
     async def map_info(self, ctx, game, *, map_name):
-        arguments = await self.argument_checker(ctx, None, game, None, map_name)
+        arguments = await self.argument_checker(ctx, game=game, map_name=map_name)
         if not arguments:
             return
         map_id = rbhop.Map.map_id_from_name(arguments.map_name, arguments.game)
@@ -244,7 +251,7 @@ class MainCog(commands.Cog):
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrcount")
     async def wr_count(self, ctx, user):
-        arguments = await self.argument_checker(ctx, user, None, None)
+        arguments = await self.argument_checker(ctx, user=user)
         if not arguments:
             return
         count = 0
@@ -288,7 +295,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="fastecheck")
     async def faste_check(self, ctx, user, game, style):
-        arguments = await self.argument_checker(ctx, user, game, style)
+        arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
         if not arguments:
             return
         if arguments.style == Style.SCROLL:
@@ -302,7 +309,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="profile")
     async def user_rank(self, ctx, user, game, style):
-        arguments = await self.argument_checker(ctx, user, game, style)
+        arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
         if not arguments:
             return
         rank_data = rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style)
@@ -319,7 +326,7 @@ class MainCog(commands.Cog):
         if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
             return
-        arguments = await self.argument_checker(ctx, None, game, style)
+        arguments = await self.argument_checker(ctx,game=game, style=style)
         if not arguments:
             return
         ranks, page_count = rbhop.get_ranks(arguments.game, arguments.style, page)
@@ -387,7 +394,7 @@ class MainCog(commands.Cog):
             game = None
         if style == "all":
             style = None
-        arguments = await self.argument_checker(ctx, user, game, style)
+        arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
         if not arguments:
             return
         if style:
@@ -504,17 +511,17 @@ class MainCog(commands.Cog):
         else:
             return None
     
-    #title: first line, cols: list of tuples: (column_name, length of string), record_ls: a list of Records
-    def message_builder(self, title, cols, record_ls:List[rbhop.Record], i=1):
+    #title: first line, cols: list of tuples: (column_name, length of string), records: a list of Records
+    def message_builder(self, title:str, cols:Tuple[str, int], records:List[rbhop.Record], i=1):
         msg = f"{title}\n" if title != "" else ""
         for col_title in cols[:-1]:
             msg += self.add_spaces(col_title[0], col_title[1]) + "| "
         last_title = cols[-1]
         msg += f"{last_title[0]}\n"
-        for record in record_ls:
+        for record in records:
             d = {
                     "Rank:":str(i),
-                    "Username:":record.username,
+                    "Username:":record.user.username,
                     "Map name:":record.map_name,
                     "Time:":record.time_string,
                     "Date:":record.date_string,
@@ -527,14 +534,14 @@ class MainCog(commands.Cog):
             i += 1
         return msg
     
-    def add_spaces(self, s, length):
+    def add_spaces(self, s:str, length:int):
         return f"{s:<{length}}"[:length]
     
     #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
     #returns an ArgumentChecker object with the properly converted arguments
     #is falsy if the check failed, truthy if it passed
-    async def argument_checker(self, ctx, user:str, game:str, style:str, map_name:str=None) -> ArgumentChecker:
+    async def argument_checker(self, ctx, user:str=None, game:str=None, style:str=None, map_name:str=None) -> ArgumentChecker:
         arguments = ArgumentChecker()
         if game:
             try:
@@ -618,7 +625,7 @@ class MainCog(commands.Cog):
     def format_markdown_code(self, s):
         return f"```\n{s}```"
 
-    def get_ordinal(self, num):
+    def get_ordinal(self, num:int) -> str:
         ordinal = "th"
         if num % 100 > 13 or num % 100 < 11:
             n = num % 10
@@ -633,19 +640,18 @@ class MainCog(commands.Cog):
     def get_user_headshot_url(self, user_id):
         res = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false")
         return f"{res.json()['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
-        #return f"https://www.roblox.com/headshot-thumbnail/image?userId={user_id}&width=420&height=420&format=png?{random.randint(0, 100000)}"
     
     def make_global_embed(self, record:rbhop.Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        embed.set_thumbnail(url=self.get_user_headshot_url(record.user_id))
-        embed.add_field(name="Player", value=record.username, inline=True)
+        embed.set_thumbnail(url=self.get_user_headshot_url(record.user.id))
+        embed.add_field(name="Player", value=record.user.username, inline=True)
         if record.diff == -1:
             embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
             embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=False)
         else:
             embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.username})", inline=False)
+            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.user.username})", inline=False)
         embed.set_footer(text="World Record")
         return embed
     

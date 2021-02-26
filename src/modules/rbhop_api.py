@@ -46,11 +46,14 @@ class Game(Enum):
     MAPTEST = 0
     BHOP = 1
     SURF = 2
+
     @property
     def name(self):
         return _GAMES[self.value][0]
+
     def __str__(self):
         return self.name
+
     @staticmethod
     def contains(obj):
         return obj in Game._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_GAME
@@ -79,11 +82,14 @@ class Style(Enum):
     AONLY = 6
     BACKWARDS = 7
     FASTE = 8
+
     @property
     def name(self):
         return _STYLES[self.value][0]
+        
     def __str__(self):
         return self.name
+
     @staticmethod
     def contains(obj):
         return obj in Style._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_STYLE
@@ -201,6 +207,7 @@ class Rank:
         self.rank_string = Rank.__ranks__[self.rank - 1]
         self.skill = skill
         self.placement = placement
+
     @staticmethod
     def from_dict(data):
         return Rank(
@@ -209,13 +216,12 @@ class Rank:
             data["Placement"]
         )
 
-# TODO: convert this to use a user object and a map object once that is implemented
+# TODO: convert this to use a map object once that is implemented
 class Record:
-    def __init__(self, id, time, user_id, username, map_id, date, style:Style, mode, game:Game):
+    def __init__(self, id, time, user, map_id, date, style:Style, mode, game:Game):
         self.id = id
         self.time = time
-        self.user_id = user_id
-        self.username = username
+        self.user:User = user
         self.map_id = map_id
         self.date = date
         self.style:Style = style
@@ -225,35 +231,33 @@ class Record:
         self.date_string = convert_date(self.date)
         self.time_string = format_time(self.time)
         self.diff = -1.0
-        self.previous_record : Record = None
+        self.previous_record:Record = None
+
     @staticmethod
-    def from_dict(d, username:Optional[str]=None) -> "Record":
-        if not username:
-            username = get_user_data(d["User"]).username
+    def from_dict(d, id_to_user:Dict[int, "User"]=None) -> "Record":
+        if not id_to_user:
+            id_to_user = {d["User"]:get_user_data(d["User"])}
         return Record(
             d["ID"],
             d["Time"],
-            d["User"],
-            username,
+            id_to_user[d["User"]],
             d["Map"],
             d["Date"],
             Style(d["Style"]),
             d["Mode"],
             Game(d["Game"])
         )
+
     @staticmethod
-    def make_record_list(records, username=None) -> List["Record"]:
+    def make_record_list(records, id_to_user:Dict[int, "User"]=None) -> List["Record"]:
         ls = []
-        if username:
+        if not id_to_user:
+            user_ids = set()
             for record in records:
-                ls.append(Record.from_dict(record, username))
-        else:
-            user_ids = []
-            for record in records:
-                user_ids.append(record["User"])
-            user_lookup = get_user_data_from_list(user_ids)
-            for record in records:
-                ls.append(Record.from_dict(record, user_lookup[record["User"]].username))
+                user_ids.add(record["User"])
+            id_to_user = get_user_data_from_list(list(user_ids))
+        for record in records:
+            ls.append(Record.from_dict(record, id_to_user))
         return ls
 
 class User:
@@ -262,6 +266,7 @@ class User:
         self.username = ""
         self.displayname = ""
         self.state = UserState.DEFAULT
+
     @staticmethod
     def from_dict(d) -> "User":
         user = User()
@@ -275,8 +280,13 @@ class UserState(Enum):
     WHITELISTED = 1
     BLACKLISTED = 2
     PENDING = 3
+
+    @property
+    def name(self):
+        return super().name.lower()
+        
     def __str__(self):
-        return self.name.lower()
+        return self.name
 
 def get(end_of_url, params) -> Response:
     return requests.get(URL + end_of_url, headers=headers, params=params)
@@ -353,7 +363,7 @@ def get_user_wrs(user_data:User, game:Game, style:Style) -> List[Record]:
     })
     data = res.json()
     if data:
-        return Record.make_record_list(data, user_data.username)
+        return Record.make_record_list(data, {user_data.id:user_data})
     else:
         return []
 
@@ -371,7 +381,7 @@ def get_user_record(user_data:User, game:Game, style:Style, map_name="") -> Opti
     if len(data) == 0:
         return None
     else:
-        return Record.from_dict(data[0], user_data.username)
+        return Record.from_dict(data[0], {user_data.id:user_data})
 
 def total_wrs(user_data:User, game:Game, style:Style) -> int:
     res = get(f"time/user/{user_data.id}/wr", {
@@ -458,7 +468,7 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
             else:
                 times_ls += data
                 i += 1
-        return Record.make_record_list(times_ls, user_data.username), i - 1
+        return Record.make_record_list(times_ls, {user_data.id:user_data}), i - 1
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     end = start + 25
@@ -485,7 +495,7 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
             params["page"] = page_count
             data = get(f"time/user/{user_data.id}", params).json()[start:end]
             print(data)
-    return Record.make_record_list(data, user_data.username), converted_page_count
+    return Record.make_record_list(data, {user_data.id:user_data}), converted_page_count
 
 def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, int]:
     records, _ = get_user_times(user_data, game, style, -1)
@@ -503,16 +513,15 @@ def sort_map(records):
 
 #changes a WR's diff and previous_record in place by comparing first and second place
 #times on the given map
-def calculate_wr_diff(record):
+def calculate_wr_diff(record:Record):
     res = get(f"time/map/{record.map_id}", {
         "style":record.style.value,
     })
     data = res.json()
     sort_map(data)
     if len(data) > 1:
-        second = Record.from_dict(data[1])
-        record.diff = round((int(second.time) - int(record.time)) / 1000.0, 3)
-        record.previous_record = second
+        record.previous_record = Record.from_dict(data[1])
+        record.diff = round((int(record.previous_record.time) - int(record.time)) / 1000.0, 3)
 
 def search(ls, record):
     for i in ls:
