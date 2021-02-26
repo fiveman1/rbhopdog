@@ -46,6 +46,7 @@ class MainCog(commands.Cog):
             surf_auto = []
             surf_style = []
             for record in records:
+                print(f"New global: {record.time_string}, {record.map}, {record.user.username}, {record.game}, {record.style}")
                 if record.game == Game.BHOP and record.style == Style.AUTOHOP:
                     bhop_auto.append(record)
                 elif record.game == Game.BHOP and record.style != Style.AUTOHOP:
@@ -56,21 +57,24 @@ class MainCog(commands.Cog):
                     surf_style.append(record)
             for guild in self.bot.guilds:
                 for ch in guild.text_channels:
-                    if ch.name == "globals":
-                        for record in records:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "bhop-auto-globals":
-                        for record in bhop_auto:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "bhop-styles-globals":
-                        for record in bhop_style:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "surf-auto-globals":
-                        for record in surf_auto:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "surf-styles-globals":
-                        for record in surf_style:
-                            await ch.send(embed=self.make_global_embed(record))
+                    try:
+                        if ch.name == "globals":
+                            for record in records:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "bhop-auto-globals":
+                            for record in bhop_auto:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "bhop-styles-globals":
+                            for record in bhop_style:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "surf-auto-globals":
+                            for record in surf_auto:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "surf-styles-globals":
+                            for record in surf_style:
+                                await ch.send(embed=self.make_global_embed(record))
+                    except discord.Forbidden:
+                        pass
             
     @global_announcements.before_loop
     async def before_global_announcements(self):
