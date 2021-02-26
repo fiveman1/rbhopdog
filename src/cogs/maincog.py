@@ -5,8 +5,6 @@ from discord.errors import InvalidData, NotFound
 from discord.ext import commands, tasks
 import random
 import requests
-import sys
-import traceback
 from io import StringIO
 
 from modules import rbhop_api as rbhop
@@ -19,7 +17,7 @@ class ArgumentChecker:
         self.game:Game = None
         self.style:Style = None
         self.user_data:rbhop.User = None
-        self.map_name = None
+        self.map:rbhop.Map = None
         self.valid = False
     def __bool__(self):
         return self.valid
@@ -93,12 +91,12 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user=user, game=game, style=style, map_name=map_name)
         if not arguments:
             return
-        record = rbhop.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map_name)
+        record = rbhop.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map)
         if record == None:
-            await ctx.send(self.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}]"))
+            await ctx.send(self.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}]"))
         else:
             placement, total_completions = rbhop.get_record_placement(record)
-            msg = f"{arguments.user_data.username}'s record on {record.map_name} [game: {arguments.game}, style: {arguments.style}]\n"
+            msg = f"{arguments.user_data.username}'s record on {record.map.displayname} [game: {arguments.game}, style: {arguments.style}]\n"
             titles = ["Time:", "Date:", "Placement:"]
             msg += f"{titles[0]:10}| {titles[1]:11}| {titles[2]}\n"
             msg += f"{self.add_spaces(record.time_string, 10)}| {self.add_spaces(record.date_string, 11)}| {placement}{self.get_ordinal(placement)} / {total_completions}\n"
@@ -122,14 +120,14 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, game=game, style=style, map_name=map_name)
         if not arguments:
             return
-        records, page_count = rbhop.get_map_times(arguments.game, arguments.style, arguments.map_name, page)
+        records, page_count = rbhop.get_map_times(arguments.style, arguments.map, page)
         if page_count == 0:
-            await ctx.send(self.format_markdown_code(f"{arguments.map_name} has not yet been completed in {arguments.style}."))
+            await ctx.send(self.format_markdown_code(f"{arguments.map.displayname} has not yet been completed in {arguments.style}."))
             return
         else:
             if page > page_count:
                 page = page_count
-            msg = self.message_builder(f"Record list for map: {arguments.map_name} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", [("Rank:", 7), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
+            msg = self.message_builder(f"Record list for map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", [("Rank:", 7), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -190,7 +188,7 @@ class MainCog(commands.Cog):
         convert_ls = []
         if sort == "":
             for record_ls in wrs:
-                record_ls_sort = sorted(record_ls, key = lambda i: i.map_name)
+                record_ls_sort = sorted(record_ls, key = lambda i: i.map.displayname)
                 for record in record_ls_sort:
                     convert_ls.append(record)
         else:
@@ -198,7 +196,7 @@ class MainCog(commands.Cog):
                 for record in record_ls:
                     convert_ls.append(record)
             if sort == "name":
-                convert_ls = sorted(convert_ls, key = lambda i: i.map_name) #sort by map name
+                convert_ls = sorted(convert_ls, key = lambda i: i.map.displayname) #sort by map name
             elif sort == "date":
                 convert_ls = sorted(convert_ls, key = lambda i: i.date, reverse=True) #sort by date (most recent)
             elif sort == "time":
@@ -234,18 +232,14 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, game=game, map_name=map_name)
         if not arguments:
             return
-        map_id = rbhop.Map.map_id_from_name(arguments.map_name, arguments.game)
-        map_dict = rbhop.Map.map_dict_from_id(map_id)
-        play_count = map_dict["PlayCount"]
-        map_creator = map_dict["Creator"]
         embed = discord.Embed(color=0x7c17ff)
-        res = requests.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={map_id}&size=250x250&format=Png&isCircular=false")
+        res = requests.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={arguments.map.id}&size=250x250&format=Png&isCircular=false")
         embed.set_thumbnail(url=res.json()["data"][0]["imageUrl"])
         embed.set_footer(text="Map Info")
-        embed.title = f"\U0001F5FA  {arguments.map_name}"
-        embed.add_field(name="Creator", value=map_creator)
-        embed.add_field(name="Map ID", value=map_id)
-        embed.add_field(name="Play Count", value=play_count)
+        embed.title = f"\U0001F5FA  {arguments.map.displayname}"
+        embed.add_field(name="Creator", value=arguments.map.creator)
+        embed.add_field(name="Map ID", value=arguments.map.id)
+        embed.add_field(name="Play Count", value=arguments.map.playcount)
         await ctx.send(embed=embed)
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -522,7 +516,7 @@ class MainCog(commands.Cog):
             d = {
                     "Rank:":str(i),
                     "Username:":record.user.username,
-                    "Map name:":record.map_name,
+                    "Map name:":record.map.displayname,
                     "Time:":record.time_string,
                     "Date:":record.date_string,
                     "Style:":record.style.name,
@@ -590,12 +584,10 @@ class MainCog(commands.Cog):
             if not await self.check_user_status(ctx, arguments.user_data):
                 return arguments
         if map_name:
-            m = rbhop.Map.map_id_from_name(map_name, arguments.game)
-            if m == -1:
+            arguments.map = rbhop.Map.from_name(map_name, arguments.game)
+            if not arguments.map:
                 await ctx.send(self.format_markdown_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
                 return arguments
-            else:
-                arguments.map_name = rbhop.Map.map_name_from_id(m)
         arguments.valid = True
         return arguments
     
@@ -642,7 +634,7 @@ class MainCog(commands.Cog):
         return f"{res.json()['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
     
     def make_global_embed(self, record:rbhop.Record):
-        embed = discord.Embed(title=f"\N{CROWN}  {record.map_name}", color=0x80ff80)
+        embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         embed.set_thumbnail(url=self.get_user_headshot_url(record.user.id))
         embed.add_field(name="Player", value=record.user.username, inline=True)

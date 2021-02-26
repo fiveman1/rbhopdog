@@ -99,12 +99,31 @@ setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR
 
 # TODO: convert stuff that uses map_name and map_id to Map objects and also implement that :)
 class Map:
-    bhop_map_pairs = []
-    surf_map_pairs = []
-    bhop_map_count = 0
-    surf_map_count = 0
+    bhop_map_pairs:List[Tuple[str, "Map"]] = []
+    surf_map_pairs:List[Tuple[str, "Map"]] = []
+    bhop_map_count:int = 0
+    surf_map_count:int = 0
     # hash table for id -> displayname because each id is unique
-    map_lookup = {}
+    map_lookup:Dict[int, "Map"] = {}
+
+    def __init__(self, id, displayname, creator, game, date, playcount):
+        self.id:int = id
+        self.displayname:str = displayname
+        self.creator:str = creator
+        self.game:Game = game
+        self.date:int = date
+        self.playcount:int = playcount
+
+    @staticmethod
+    def from_dict(d) -> "Map":
+        return Map(
+            d["ID"],
+            d["DisplayName"],
+            d["Creator"],
+            Game(d["Game"]),
+            d["Date"],
+            d["PlayCount"]
+        )
 
     @staticmethod
     def setup_maps():
@@ -120,25 +139,25 @@ class Map:
         Map.surf_map_pairs.clear()
 
         for map in bhop_maps:
-            Map.bhop_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
+            Map.bhop_map_pairs.append((map["DisplayName"].lower(), Map.from_dict(map)))
         Map.bhop_map_pairs.sort(key=lambda i: i[0])
 
         for map in surf_maps:
-            Map.surf_map_pairs.append((map["DisplayName"].lower(), map["ID"]))
+            Map.surf_map_pairs.append((map["DisplayName"].lower(), Map.from_dict(map)))
         Map.surf_map_pairs.sort(key=lambda i: i[0])
 
         Map.map_lookup.clear()
         for map in bhop_maps:
-            Map.map_lookup[map["ID"]] = map
+            Map.map_lookup[map["ID"]] = Map.from_dict(map)
 
         for map in surf_maps:
-            Map.map_lookup[map["ID"]] = map
+            Map.map_lookup[map["ID"]] = Map.from_dict(map)
 
     # ls should be sorted
     # performs an iterative binary search
     # returns the first index where the item was found according to the compare function
     @staticmethod
-    def find_item(ls, compare):
+    def _find_item(ls, compare):
         left = 0
         right = len(ls) - 1
         while left <= right:
@@ -153,7 +172,7 @@ class Map:
         return -1
 
     @staticmethod
-    def compare_maps(name, map_name):
+    def _compare_maps(name, map_name):
         if map_name.startswith(name):
             return 0
         elif map_name < name:
@@ -162,9 +181,9 @@ class Map:
             return 1
 
     @staticmethod
-    def id_from_name(name, ls):
+    def _from_name(name, ls):
         name = name.lower()
-        idx = Map.find_item(ls, lambda m : Map.compare_maps(name, m[0]))
+        idx = Map._find_item(ls, lambda m : Map._compare_maps(name, m[0]))
         if idx != -1:
             while idx > 0:
                 if ls[idx-1][0].startswith(name):
@@ -173,29 +192,22 @@ class Map:
                     break
             return ls[idx][1]
         else:
-            return -1
+            return None
 
     @staticmethod
-    def map_id_from_name(map_name, game:Game):
+    def from_name(map_name:str, game:Game) -> Optional["Map"]:
         if game == Game.BHOP:
-            return Map.id_from_name(map_name, Map.bhop_map_pairs)
+            return Map._from_name(map_name, Map.bhop_map_pairs)
         elif game == Game.SURF:
-            return Map.id_from_name(map_name, Map.surf_map_pairs)
-        return -1
+            return Map._from_name(map_name, Map.surf_map_pairs)
+        return None
 
     @staticmethod
-    def map_dict_from_id(map_id):
+    def from_id(map_id:int) -> "Map":
         try:
             return Map.map_lookup[map_id]
-        except:
-            return "Missing map"
-
-    @staticmethod
-    def map_name_from_id(map_id):
-        try:
-            return Map.map_lookup[map_id]["DisplayName"]
-        except:
-            return "Missing map"
+        except KeyError:
+            return Map(-1, "Missing map", "", Game.BHOP, -1, -1)
 
 Map.setup_maps()
 
@@ -216,48 +228,53 @@ class Rank:
             data["Placement"]
         )
 
-# TODO: convert this to use a map object once that is implemented
 class Record:
-    def __init__(self, id, time, user, map_id, date, style:Style, mode, game:Game):
-        self.id = id
-        self.time = time
+    def __init__(self, id, time, user, map, date, style, mode, game):
+        self.id:int = id
+        self.time:int = time
         self.user:User = user
-        self.map_id = map_id
-        self.date = date
+        self.map:Map = map
+        self.date:int = date
         self.style:Style = style
-        self.mode = mode
+        self.mode:int = mode
         self.game:Game = game
-        self.map_name = Map.map_name_from_id(self.map_id)
-        self.date_string = convert_date(self.date)
-        self.time_string = format_time(self.time)
-        self.diff = -1.0
+        self.date_string:str = convert_date(self.date)
+        self.time_string:str = format_time(self.time)
+        self.diff:float = -1.0
         self.previous_record:Record = None
 
+    #include user or map if they are known already
     @staticmethod
-    def from_dict(d, id_to_user:Dict[int, "User"]=None) -> "Record":
-        if not id_to_user:
-            id_to_user = {d["User"]:get_user_data(d["User"])}
+    def from_dict(d, user:"User"=None, map:Map=None) -> "Record":
+        if not user:
+            user = get_user_data(d["User"])
+        if not map:
+            map = Map.from_id(d["Map"])
         return Record(
             d["ID"],
             d["Time"],
-            id_to_user[d["User"]],
-            d["Map"],
+            user,
+            map,
             d["Date"],
             Style(d["Style"]),
             d["Mode"],
             Game(d["Game"])
         )
 
+    #include user or map if they are known already
     @staticmethod
-    def make_record_list(records, id_to_user:Dict[int, "User"]=None) -> List["Record"]:
+    def make_record_list(records, user:"User"=None, map:Map=None) -> List["Record"]:
         ls = []
-        if not id_to_user:
+        if not user:
             user_ids = set()
             for record in records:
                 user_ids.add(record["User"])
             id_to_user = get_user_data_from_list(list(user_ids))
         for record in records:
-            ls.append(Record.from_dict(record, id_to_user))
+            if not user:
+                ls.append(Record.from_dict(record, id_to_user[record["User"]], map))
+            else:
+                ls.append(Record.from_dict(record, user, map))
         return ls
 
 class User:
@@ -363,25 +380,22 @@ def get_user_wrs(user_data:User, game:Game, style:Style) -> List[Record]:
     })
     data = res.json()
     if data:
-        return Record.make_record_list(data, {user_data.id:user_data})
+        return Record.make_record_list(data, user=user_data)
     else:
         return []
 
 #returns a record object of a user's time on a given map
-def get_user_record(user_data:User, game:Game, style:Style, map_name="") -> Optional[Record]:
-    if map_name == "":
-        return get_user_wrs(user_data, game, style)
-    map_id = Map.map_id_from_name(map_name, game)
+def get_user_record(user_data:User, game:Game, style:Style, map:Map) -> Optional[Record]:
     res = get(f"time/user/{user_data.id}", {
         "game":game.value,
         "style":style.value,
-        "map":map_id
+        "map":map.id
     })
     data = res.json()
     if len(data) == 0:
         return None
     else:
-        return Record.from_dict(data[0], {user_data.id:user_data})
+        return Record.from_dict(data[0], user=user_data)
 
 def total_wrs(user_data:User, game:Game, style:Style) -> int:
     res = get(f"time/user/{user_data.id}/wr", {
@@ -468,7 +482,7 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
             else:
                 times_ls += data
                 i += 1
-        return Record.make_record_list(times_ls, {user_data.id:user_data}), i - 1
+        return Record.make_record_list(times_ls, user=user_data), i - 1
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     end = start + 25
@@ -495,7 +509,7 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
             params["page"] = page_count
             data = get(f"time/user/{user_data.id}", params).json()[start:end]
             print(data)
-    return Record.make_record_list(data, {user_data.id:user_data}), converted_page_count
+    return Record.make_record_list(data, user=user_data), converted_page_count
 
 def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, int]:
     records, _ = get_user_times(user_data, game, style, -1)
@@ -514,7 +528,7 @@ def sort_map(records):
 #changes a WR's diff and previous_record in place by comparing first and second place
 #times on the given map
 def calculate_wr_diff(record:Record):
-    res = get(f"time/map/{record.map_id}", {
+    res = get(f"time/map/{record.map.id}", {
         "style":record.style.value,
     })
     data = res.json()
@@ -574,48 +588,47 @@ def get_new_wrs() -> List[Record]:
     return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
 # TODO: optimize this to reduce unnecessary api calls
-def get_map_times(game:Game, style:Style, map_name, page) -> Tuple[List[Record], int]:
+def get_map_times(style:Style, map:Map, page) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
-    map_id = Map.map_id_from_name(map_name, game)
     params = {
         "style":style.value,
         "page":page_num + 1
     }
-    res = get(f"time/map/{map_id}", params)
+    res = get(f"time/map/{map.id}", params)
     data = res.json()
     if len(data) > 0:
         page_count = int(res.headers["Pagination-Count"])
         params["page"] = page_count
-        converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
+        converted_page_count = find_max_pages(f"time/map/{map.id}", params, page_count, 200, page_length)
     else:
         params["page"] = 1
-        first_page_res = get(f"time/map/{map_id}", params)
+        first_page_res = get(f"time/map/{map.id}", params)
         if len(first_page_res.json()) == 0:
             return [], 0
         else:
             page_count = int(first_page_res.headers["Pagination-Count"])
             params["page"] = page_count
-            converted_page_count = find_max_pages(f"time/map/{map_id}", params, page_count, 200, page_length)
-            data = get(f"time/map/{map_id}", params).json()
+            converted_page_count = find_max_pages(f"time/map/{map.id}", params, page_count, 200, page_length)
+            data = get(f"time/map/{map.id}", params).json()
             #return [], converted_page_count
     #add the previous and next page so that we can sort the times across pages properly
     res2data = []
     if page_num > 0:
         params["page"] = page_num
-        res2 = get(f"time/map/{map_id}", params)
+        res2 = get(f"time/map/{map.id}", params)
         res2data = res2.json()
         data = res2data + data
     if page_num + 2 <= converted_page_count:
         params["page"] = page_num + 2
-        res3 = get(f"time/map/{map_id}", params)
+        res3 = get(f"time/map/{map.id}", params)
         data += res3.json()
     sort_map(data)
     if page > converted_page_count:
         start = ((int(converted_page_count) - 1) * page_length) % 200
     start += len(res2data)
     end = start + page_length
-    return Record.make_record_list(data[start:end]), converted_page_count
+    return Record.make_record_list(data[start:end], map=map), converted_page_count
 
 def get_user_state(user_data:User) -> Response:
     return get(f"user/{user_data.id}", {})
@@ -625,13 +638,13 @@ def get_record_placement(record:Record) -> Tuple[int, int]:
         "style":record.style.value,
         "page":1
     }
-    first_page_res = get(f"time/map/{record.map_id}", params)
+    first_page_res = get(f"time/map/{record.map.id}", params)
     page_count = int(first_page_res.headers["Pagination-Count"])
     completions = 0
     if page_count == 1:
         completions = len(first_page_res.json())
     else:
         params["page"] = page_count
-        last_page_res = get(f"time/map/{record.map_id}", params)
+        last_page_res = get(f"time/map/{record.map.id}", params)
         completions = len(last_page_res.json()) + (page_count - 1) * 200
     return get(f"time/{record.id}/rank", {}).json()["Rank"], completions
