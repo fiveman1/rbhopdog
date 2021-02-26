@@ -114,6 +114,9 @@ class Map:
         self.date:int = date
         self.playcount:int = playcount
 
+    def __str__(self):
+        return self.displayname
+
     @staticmethod
     def from_dict(d) -> "Map":
         return Map(
@@ -284,6 +287,9 @@ class User:
         self.username = ""
         self.displayname = ""
         self.state = UserState.DEFAULT
+
+    def __str__(self):
+        return self.username
 
     @staticmethod
     def from_dict(d) -> "User":
