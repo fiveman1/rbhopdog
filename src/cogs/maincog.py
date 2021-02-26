@@ -46,7 +46,7 @@ class MainCog(commands.Cog):
             surf_auto = []
             surf_style = []
             for record in records:
-                print(f"New global: {record.time_string}, {record.map}, {record.user.username}, {record.game}, {record.style}")
+                print(f"New global:\n{record}")
                 if record.game == Game.BHOP and record.style == Style.AUTOHOP:
                     bhop_auto.append(record)
                 elif record.game == Game.BHOP and record.style != Style.AUTOHOP:

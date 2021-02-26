@@ -247,6 +247,9 @@ class Record:
         self.diff:float = -1.0
         self.previous_record:Record = None
 
+    def __str__(self):
+        return f"Time: {self.time_string}\nMap: {self.map}\nUser: {self.user}\nGame: {self.game}, style: {self.style}"
+
     #include user or map if they are known already
     @staticmethod
     def from_dict(d, user:"User"=None, map:Map=None) -> "Record":
