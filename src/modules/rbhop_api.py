@@ -137,21 +137,19 @@ class Map:
 
         Map.bhop_map_pairs.clear()
         Map.surf_map_pairs.clear()
+        Map.map_lookup.clear()
 
-        for map in bhop_maps:
-            Map.bhop_map_pairs.append((map["DisplayName"].lower(), Map.from_dict(map)))
+        for m in bhop_maps:
+            map = Map.from_dict(m)
+            Map.bhop_map_pairs.append((map.displayname.lower(), map))
+            Map.map_lookup[map.id] = map
         Map.bhop_map_pairs.sort(key=lambda i: i[0])
 
-        for map in surf_maps:
-            Map.surf_map_pairs.append((map["DisplayName"].lower(), Map.from_dict(map)))
+        for m in surf_maps:
+            map = Map.from_dict(m)
+            Map.surf_map_pairs.append((map.displayname.lower(), map))
+            Map.map_lookup[map.id] = map
         Map.surf_map_pairs.sort(key=lambda i: i[0])
-
-        Map.map_lookup.clear()
-        for map in bhop_maps:
-            Map.map_lookup[map["ID"]] = Map.from_dict(map)
-
-        for map in surf_maps:
-            Map.map_lookup[map["ID"]] = Map.from_dict(map)
 
     # ls should be sorted
     # performs an iterative binary search
@@ -216,9 +214,12 @@ class Rank:
 
     def __init__(self, rank, skill, placement):
         self.rank = rank
-        self.rank_string = Rank.__ranks__[self.rank - 1]
         self.skill = skill
         self.placement = placement
+        self._rank_string = Rank.__ranks__[self.rank - 1]
+
+    def __str__(self):
+        return self._rank_string
 
     @staticmethod
     def from_dict(data):
@@ -272,9 +273,9 @@ class Record:
             id_to_user = get_user_data_from_list(list(user_ids))
         for record in records:
             if not user:
-                ls.append(Record.from_dict(record, id_to_user[record["User"]], map))
+                ls.append(Record.from_dict(record, user=id_to_user[record["User"]], map=map))
             else:
-                ls.append(Record.from_dict(record, user, map))
+                ls.append(Record.from_dict(record, user=user, map=map))
         return ls
 
 class User:

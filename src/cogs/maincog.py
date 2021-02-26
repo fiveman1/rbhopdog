@@ -54,24 +54,25 @@ class MainCog(commands.Cog):
                     surf_auto.append(record)
                 elif record.game == Game.SURF and record.style != Style.AUTOHOP:
                     surf_style.append(record)
-            for ch in self.bot.get_all_channels():
-                if isinstance(ch, discord.TextChannel):
-                    if ch.name == "globals":
-                        for record in records:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "bhop-auto-globals":
-                        for record in bhop_auto:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "bhop-styles-globals":
-                        for record in bhop_style:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "surf-auto-globals":
-                        for record in surf_auto:
-                            await ch.send(embed=self.make_global_embed(record))
-                    elif ch.name == "surf-styles-globals":
-                        for record in surf_style:
-                            await ch.send(embed=self.make_global_embed(record))
-    
+            for guild in self.bot.guilds:
+                for ch in guild.channels:
+                    if isinstance(ch, discord.TextChannel):
+                        if ch.name == "globals":
+                            for record in records:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "bhop-auto-globals":
+                            for record in bhop_auto:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "bhop-styles-globals":
+                            for record in bhop_style:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "surf-auto-globals":
+                            for record in surf_auto:
+                                await ch.send(embed=self.make_global_embed(record))
+                        elif ch.name == "surf-styles-globals":
+                            for record in surf_style:
+                                await ch.send(embed=self.make_global_embed(record))
+            
     @global_announcements.before_loop
     async def before_global_announcements(self):
         print("waiting for ready")
@@ -335,7 +336,7 @@ class MainCog(commands.Cog):
         for rank in ranks:
             username = rank[0]
             rank_data = rank[1]
-            formatted = f"{rank_data.rank_string} ({rank_data.rank})"
+            formatted = f"{rank_data} ({rank_data.rank})"
             msg += f"{rank_data.placement:10} | {username:20}| {formatted:19}| {rank_data.skill:.3f}%\n"
         await ctx.send(self.format_markdown_code(msg))
     
@@ -656,7 +657,7 @@ class MainCog(commands.Cog):
             name = user.username
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {name}", color=0x1dbde0)
         embed.set_thumbnail(url=self.get_user_headshot_url(user.id))
-        embed.add_field(name="Rank", value=f"{rank_data.rank_string} ({rank_data.rank})", inline=True)
+        embed.add_field(name="Rank", value=f"{rank_data} ({rank_data.rank})", inline=True)
         embed.add_field(name="Skill", value=f"{rank_data.skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}") if rank_data.placement > 0 else embed.add_field(name="Placement", value="n/a")
         embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Moderation status:** {user.state}")
