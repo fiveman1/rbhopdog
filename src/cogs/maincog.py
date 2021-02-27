@@ -72,11 +72,11 @@ class MessageBuilder:
         last_col = cols[-1]
         cols = cols[:-1]
         for col in cols:
-            msg.append(MessageBuilder._add_spaces(col.title, col.width) + "| ")
+            msg.append(f"{MessageBuilder._add_spaces(col.title, col.width)}| ")
         msg.append(f"{last_col.title}\n")
         for item in items:
             for col in cols:
-                msg.append(MessageBuilder._add_spaces(col.map(item), col.width) + "| ")
+                msg.append(f"{MessageBuilder._add_spaces(col.map(item), col.width)}| ")
             msg.append(f"{last_col.map(item)[:last_col.width]}\n")
         return "".join(msg)
     
@@ -274,9 +274,9 @@ class MainCog(commands.Cog):
             if sort == "name":
                 convert_ls = sorted(convert_ls, key = lambda i: i.map.displayname) #sort by map name
             elif sort == "date":
-                convert_ls = sorted(convert_ls, key = lambda i: i.date, reverse=True) #sort by date (most recent)
+                convert_ls = sorted(convert_ls, key = lambda i: i.date.timestamp, reverse=True) #sort by date (most recent)
             elif sort == "time":
-                convert_ls = sorted(convert_ls, key = lambda i: i.time) #sort by time
+                convert_ls = sorted(convert_ls, key = lambda i: i.time.millis) #sort by time
         cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
         if g == Game:
             game = "both"
