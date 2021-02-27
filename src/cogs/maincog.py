@@ -185,6 +185,9 @@ class MainCog(commands.Cog):
         else:
             page = 1
             map_name = " ".join(args)
+        if not map_name:
+            await ctx.send(self.format_markdown_code("Missing map name."))
+            return
         page = int(page)
         if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
