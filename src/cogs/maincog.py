@@ -444,6 +444,8 @@ class MainCog(commands.Cog):
                 return
             else:
                 user = roblox_user["robloxId"]
+        elif user.isnumeric():
+            user = int(user)
         else:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
@@ -454,10 +456,7 @@ class MainCog(commands.Cog):
                 else:
                     user = roblox_user["robloxId"]
         try:
-            if user.isnumeric():
-                user_data = rbhop.get_user_data(int(user))
-            else:
-                user_data = rbhop.get_user_data(user)
+            user_data = rbhop.get_user_data(user)
             embed = discord.Embed(color=0xfcba03)
             embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
