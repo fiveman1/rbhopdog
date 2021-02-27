@@ -460,6 +460,9 @@ def get_ranks(game:Game, style:Style, page) -> Tuple[List[Tuple[str, Rank]], int
         else:
             page_count = int(first_page_res.headers["Pagination-Count"])
             converted_page_count = find_max_pages("rank", params, page_count, 50, page_length)
+            params["page"] = page_count
+            data = get("rank", params).json()
+            page = converted_page_count
     ls = []
     if page % 2 == 1:
         data = data[:25]
