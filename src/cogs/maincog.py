@@ -1,14 +1,14 @@
 # maincog.py
-from typing import List, Tuple
+from typing import Callable, List, Union
 import discord
-from discord.errors import InvalidData, NotFound
+from discord.errors import InvalidData
 from discord.ext import commands, tasks
 import random
 import requests
 from io import StringIO
 
 from modules import rbhop_api as rbhop
-from modules.rbhop_api import Game, Style
+from modules.rbhop_api import Game, Style, User
 from modules import files
 from modules import messages
 
@@ -16,11 +16,76 @@ class ArgumentChecker:
     def __init__(self):
         self.game:Game = None
         self.style:Style = None
-        self.user_data:rbhop.User = None
+        self.user_data:User = None
         self.map:rbhop.Map = None
         self.valid = False
     def __bool__(self):
         return self.valid
+
+class Incrementer:
+    def __init__(self, i:int):
+        self.i = i - 1
+    def get(self) -> int:
+        self.i += 1
+        return self.i
+
+# contains some commonly used Cols designed for use with MessageBuilder
+class MessageCol:
+    class Col:
+        def __init__(self, title:str, width:int, map:Callable):
+            self.title = title + ":"
+            self.width = width
+            self.map = map
+
+    USERNAME = Col("Username", 20, lambda item: item.user.username)
+    MAP_NAME = Col("Map name", 30, lambda record: record.map.displayname)
+    TIME = Col("Time", 10, lambda record: str(record.time))
+    DATE = Col("Date", 11, lambda record: str(record.date))
+    GAME = Col("Game", 6, lambda record: record.game.name)
+    STYLE = Col("Style", 14, lambda record: record.style.name)
+    RANK = Col("Rank", 19, lambda rank: f"{rank} ({rank.rank})")
+    SKILL = Col("Skill", 10, lambda rank: f"{rank.skill:.3f}%")
+    PLACEMENT = Col("Placement", 11, lambda i: i.placement)
+
+# a builder object? what is this? Java???
+# title: title string, first line, will automatically have a newline placed at end
+# cols: list of Cols, columns are constructed in the order they appear in the list
+# col:
+#   col.title: column title 
+#   col.width: width in characters of column
+#   col.map: function which is given an item from a given row and returns the value corresponding to the column, will always be given 1 arg
+# items: list of items used to build the message
+class MessageBuilder:
+
+    def __init__(self, cols:List[MessageCol.Col], items:List, title:str=""):
+        self.title = title
+        self.cols = cols
+        self.items = items
+
+    def build(self) -> str:
+        return MessageBuilder._message_builder(self.title, self.cols, self.items)
+
+    # use list and a single join operation rather than concatenating strings hundreds of times to improve performance
+    @staticmethod
+    def _message_builder(title:str, cols:List[MessageCol.Col], items:List):
+        msg = [f"{title}\n"] if title != "" else []
+        last_col = cols[-1]
+        cols = cols[:-1]
+        for col in cols:
+            msg.append(MessageBuilder._add_spaces(col.title, col.width) + "| ")
+        msg.append(f"{last_col.title}\n")
+        for item in items:
+            for col in cols:
+                msg.append(MessageBuilder._add_spaces(col.map(item), col.width) + "| ")
+            msg.append(f"{last_col.map(item)[:last_col.width]}\n")
+        return "".join(msg)
+    
+    @staticmethod
+    def _add_spaces(s:Union[int, str], length:int):
+        if type(s) == str:
+            return f"{s:<{length}}"[:length]
+        else:
+            return f"{s:{length-1}} "[:length]
 
 class MainCog(commands.Cog):
     def __init__(self, bot):
@@ -87,7 +152,10 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, game=game, style=style)
         if not arguments:
             return
-        msg = self.message_builder(f"10 Recent WRs [game: {arguments.game}, style: {arguments.style}]", [("Username:", 20), ("Map name:", 30), ("Time:", 10), ("Date:", 11)], rbhop.get_recent_wrs(arguments.game, arguments.style))
+        msg = MessageBuilder(title=f"10 Recent WRs [game: {arguments.game}, style: {arguments.style}]", 
+            cols=[MessageCol.USERNAME, MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+            items=rbhop.get_recent_wrs(arguments.game, arguments.style)
+        ).build()
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="record")
@@ -100,10 +168,10 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}]"))
         else:
             placement, total_completions = rbhop.get_record_placement(record)
-            msg = f"{arguments.user_data.username}'s record on {record.map.displayname} [game: {arguments.game}, style: {arguments.style}]\n"
-            titles = ["Time:", "Date:", "Placement:"]
-            msg += f"{titles[0]:10}| {titles[1]:11}| {titles[2]}\n"
-            msg += f"{self.add_spaces(record.time_string, 10)}| {self.add_spaces(record.date_string, 11)}| {placement}{self.get_ordinal(placement)} / {total_completions}\n"
+            msg = MessageBuilder(title=f"{arguments.user_data.username}'s record on {record.map.displayname} [game: {arguments.game}, style: {arguments.style}]",
+                cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 15, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
+                items=[record]
+            ).build()
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="wrmap")
@@ -131,7 +199,11 @@ class MainCog(commands.Cog):
         else:
             if page > page_count:
                 page = page_count
-            msg = self.message_builder(f"Record list for map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", [("Rank:", 7), ("Username:", 20), ("Time:", 10), ("Date:", 11)], records, ((page - 1) * 25) + 1)
+            incrementer = Incrementer(((page - 1) * 25) + 1)
+            msg = MessageBuilder(title=f"Record list for map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", 
+                cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.get()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
+                items=records
+            ).build()
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -205,28 +277,30 @@ class MainCog(commands.Cog):
                 convert_ls = sorted(convert_ls, key = lambda i: i.date, reverse=True) #sort by date (most recent)
             elif sort == "time":
                 convert_ls = sorted(convert_ls, key = lambda i: i.time) #sort by time
-        cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
+        cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
         if g == Game:
             game = "both"
-            cols.append(("Game:", 6))
+            cols.append(MessageCol.GAME)
         else:
             game = arguments.game
         if s == Style:
             style = "all"
-            cols.append(("Style:", 14))
+            cols.append(MessageCol.STYLE)
         else:
             style = arguments.style
         if sort == "":
             sort = "default"
-        msg = self.message_builder("", cols, convert_ls)
-        msg_ls = messages.page_messages(msg, 1850)
         if page != -1:
-            total_pages = len(msg_ls)
-            page = total_pages if page > total_pages else page
-            await ctx.send(self.format_markdown_code(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n" + msg_ls[page-1]))
+            total_pages = ((len(convert_ls) - 1) // 25) + 1
+            if page > total_pages:
+                page = total_pages
+            msg = MessageBuilder(cols=cols, items=convert_ls[(page-1)*25:page*25]).build()
+            msg_ls = messages.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n" + msg)
+            for m in msg_ls:
+                await ctx.send(self.format_markdown_code(m))
         else:
             f = StringIO()
-            f.write(f"WR list for {user} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n" + msg)
+            f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n" + MessageBuilder(cols=cols, items=convert_ls).build())
             f.seek(0)
             await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
             return
@@ -333,14 +407,10 @@ class MainCog(commands.Cog):
             return
         elif page > page_count:
             page = page_count
-        msg = f"Ranks [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]\n"
-        titles = ["Placement:", "Username:", "Rank:", "Skill:"]
-        msg += f"{titles[0]:11}| {titles[1]:20}| {titles[2]:19}| {titles[3]}\n"
-        for rank in ranks:
-            username = rank[0]
-            rank_data = rank[1]
-            formatted = f"{rank_data} ({rank_data.rank})"
-            msg += f"{rank_data.placement:10} | {username:20}| {formatted:19}| {rank_data.skill:.3f}%\n"
+        msg = MessageBuilder(title=f"Ranks [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]",
+            cols=[MessageCol.PLACEMENT, MessageCol.USERNAME, MessageCol.RANK, MessageCol.SKILL],
+            items=ranks
+        ).build()
         await ctx.send(self.format_markdown_code(msg))
     
     @commands.command(name="times")
@@ -409,21 +479,27 @@ class MainCog(commands.Cog):
             return
         elif page > page_count:
             page = page_count
-        cols = [("Map name:", 30), ("Time:", 10), ("Date:", 11)]
+        cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
         if game == None:
             game = "both"
-            cols.append(("Game:", 6))
+            cols.append(MessageCol.GAME)
         if style == None:
             style = "all"
-            cols.append(("Style:", 14))
+            cols.append(MessageCol.STYLE)
         if page == -1:
-            msg = self.message_builder(f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}] (total: {len(record_list)})", cols, record_list)
+            msg = MessageBuilder(title=f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}] (total: {len(record_list)})", 
+                cols=cols, 
+                items=record_list
+            ).build()
             f = StringIO()
             f.write(msg)
             f.seek(0)
             await ctx.send(file=discord.File(f, filename=f"times_{arguments.user_data.username}_{game}_{style}.txt"))
             return
-        msg = self.message_builder(f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}, page: {page}/{page_count}]", cols, record_list)
+        msg = MessageBuilder(title=f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}, page: {page}/{page_count}]", 
+            cols=cols, 
+            items=record_list
+        ).build()
         for message in messages.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
     
@@ -456,7 +532,7 @@ class MainCog(commands.Cog):
                 else:
                     user = roblox_user["robloxId"]
         try:
-            user_data = rbhop.get_user_data(user)
+            user_data = User.get_user_data(user)
             embed = discord.Embed(color=0xfcba03)
             embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
@@ -497,7 +573,7 @@ class MainCog(commands.Cog):
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps(self, ctx):
-        rbhop.Map.setup_maps()
+        rbhop.Map.update_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
     
     def get_discord_user_id(self, s):
@@ -507,32 +583,6 @@ class MainCog(commands.Cog):
             return s[2:-1]
         else:
             return None
-    
-    #title: first line, cols: list of tuples: (column_name, length of string), records: a list of Records
-    def message_builder(self, title:str, cols:Tuple[str, int], records:List[rbhop.Record], i=1):
-        msg = f"{title}\n" if title != "" else ""
-        for col_title in cols[:-1]:
-            msg += self.add_spaces(col_title[0], col_title[1]) + "| "
-        last_title = cols[-1]
-        msg += f"{last_title[0]}\n"
-        for record in records:
-            d = {
-                    "Rank:":str(i),
-                    "Username:":record.user.username,
-                    "Map name:":record.map.displayname,
-                    "Time:":record.time_string,
-                    "Date:":record.date_string,
-                    "Style:":record.style.name,
-                    "Game:":record.game.name
-                }
-            for col_title in cols[:-1]:
-                msg += self.add_spaces(d[col_title[0]], col_title[1]) + "| "
-            msg += f"{d[last_title[0]][:last_title[1]]}\n"
-            i += 1
-        return msg
-    
-    def add_spaces(self, s:str, length:int):
-        return f"{s:<{length}}"[:length]
     
     #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
@@ -577,7 +627,7 @@ class MainCog(commands.Cog):
                     else:
                         user = roblox_user["robloxId"]
             try:
-                arguments.user_data = rbhop.get_user_data(user)
+                arguments.user_data = User.get_user_data(user)
             except InvalidData:
                 await ctx.send(self.format_markdown_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
                 return arguments
@@ -595,7 +645,7 @@ class MainCog(commands.Cog):
         return arguments
     
     #set the user_id and username of the argument_checker before passing it to this
-    async def check_user_status(self, ctx, user_data:rbhop.User):
+    async def check_user_status(self, ctx, user_data:User):
         res = rbhop.get_user_state(user_data)
         if res.status_code == 404:
             await ctx.send(self.format_markdown_code(f"'{user_data.username}' has not played bhop/surf."))
@@ -642,15 +692,15 @@ class MainCog(commands.Cog):
         embed.set_thumbnail(url=self.get_user_headshot_url(record.user.id))
         embed.add_field(name="Player", value=record.user.username, inline=True)
         if record.diff == -1:
-            embed.add_field(name="Time", value=f"{record.time_string} (-n/a s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** n/a", inline=False)
+            embed.add_field(name="Time", value=f"{record.time} (-n/a s)", inline=True)
+            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** n/a", inline=False)
         else:
-            embed.add_field(name="Time", value=f"{record.time_string} (-{record.diff:.3f} s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date_string}\n**Previous WR:** {record.previous_record.time_string} ({record.previous_record.user.username})", inline=False)
+            embed.add_field(name="Time", value=f"{record.time} (-{record.diff:.3f} s)", inline=True)
+            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** {record.previous_record.time} ({record.previous_record.user.username})", inline=False)
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user:rbhop.User, rank_data:rbhop.Rank, game:Game, style:Style, completions, total_maps):
+    def make_user_embed(self, user:User, rank_data:rbhop.Rank, game:Game, style:Style, completions, total_maps):
         ordinal = self.get_ordinal(rank_data.placement)
         wrs = rbhop.total_wrs(user, game, style)
         if user.username != user.displayname:

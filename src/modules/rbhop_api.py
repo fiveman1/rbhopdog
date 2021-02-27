@@ -130,10 +130,14 @@ class Map:
 
     @staticmethod
     def setup_maps():
-        files.write_maps("bhop")
-        files.write_maps("surf")
-        bhop_maps = open_json("files/bhop_maps.json")
-        surf_maps = open_json("files/surf_maps.json")
+        try:
+            bhop_maps = open_json("files/bhop_maps.json")
+            surf_maps = open_json("files/surf_maps.json")
+        except:
+            files.write_maps("bhop")
+            files.write_maps("surf")
+            bhop_maps = open_json("files/bhop_maps.json")
+            surf_maps = open_json("files/surf_maps.json")
 
         Map.bhop_map_count = len(bhop_maps)
         Map.surf_map_count = len(surf_maps)
@@ -153,6 +157,12 @@ class Map:
             Map.surf_map_pairs.append((map.displayname.lower(), map))
             Map.map_lookup[map.id] = map
         Map.surf_map_pairs.sort(key=lambda i: i[0])
+
+    @staticmethod
+    def update_maps():
+        files.write_maps("bhop")
+        files.write_maps("surf")
+        Map.setup_maps()
 
     # ls should be sorted
     # performs an iterative binary search
@@ -215,54 +225,54 @@ Map.setup_maps()
 class Rank:
     __ranks__ = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
 
-    def __init__(self, rank, skill, placement):
+    def __init__(self, rank, skill, placement, user:"User"):
         self.rank = rank
         self.skill = skill
         self.placement = placement
+        self.user = user
         self._rank_string = Rank.__ranks__[self.rank - 1]
 
     def __str__(self):
         return self._rank_string
 
     @staticmethod
-    def from_dict(data):
+    def from_dict(data, user:"User"):
         return Rank(
             1 + int(float(data["Rank"]) * 19),
             round(float(data["Skill"]) * 100.0, 3),
-            data["Placement"]
+            data["Placement"],
+            user
         )
 
 class Record:
     def __init__(self, id, time, user, map, date, style, mode, game):
         self.id:int = id
-        self.time:int = time
+        self.time:Time = time
         self.user:User = user
         self.map:Map = map
-        self.date:int = date
+        self.date:Date = date
         self.style:Style = style
         self.mode:int = mode
         self.game:Game = game
-        self.date_string:str = convert_date(self.date)
-        self.time_string:str = format_time(self.time)
         self.diff:float = -1.0
         self.previous_record:Record = None
 
     def __str__(self):
-        return f"Time: {self.time_string}\nMap: {self.map}\nUser: {self.user}\nGame: {self.game}, style: {self.style}"
+        return f"Time: {self.time}\nMap: {self.map}\nUser: {self.user}\nGame: {self.game}, style: {self.style}"
 
     #include user or map if they are known already
     @staticmethod
     def from_dict(d, user:"User"=None, map:Map=None) -> "Record":
         if not user:
-            user = get_user_data(d["User"])
+            user = User.get_user_data(d["User"])
         if not map:
             map = Map.from_id(d["Map"])
         return Record(
             d["ID"],
-            d["Time"],
+            Time(d["Time"]),
             user,
             map,
-            d["Date"],
+            Date(d["Date"]),
             Style(d["Style"]),
             d["Mode"],
             Game(d["Game"])
@@ -276,7 +286,7 @@ class Record:
             user_ids = set()
             for record in records:
                 user_ids.add(record["User"])
-            id_to_user = get_user_data_from_list(list(user_ids))
+            id_to_user = User.get_user_data_from_list(list(user_ids))
         for record in records:
             if not user:
                 ls.append(Record.from_dict(record, user=id_to_user[record["User"]], map=map))
@@ -302,6 +312,41 @@ class User:
         user.displayname = d["displayName"]
         return user
 
+    @staticmethod
+    def get_user_data(user : Union[str, int]) -> "User":
+        if type(user) == int:
+            res = requests.get(f"https://users.roblox.com/v1/users/{user}")
+            if res.status_code == 404:
+                raise InvalidData("Invalid user ID")
+            try:
+                data = res.json()
+                return User.from_dict(data)
+            except:
+                raise TimeoutError("Error getting user data")
+        else:
+            res = requests.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]})
+            d = res.json()
+            if not d:
+                raise TimeoutError("Error getting user data")
+            else:
+                data = d["data"]
+                if len(data) > 0:
+                    return User.from_dict(data[0])
+                else:
+                    raise InvalidData("Invalid username")
+
+    @staticmethod
+    def get_user_data_from_list(users) -> Dict[int, "User"]:
+        res = requests.post("https://users.roblox.com/v1/users", data={"userIds":users})
+        if res:
+            user_lookup = {}
+            for user_dict in res.json()["data"]:
+                user = User.from_dict(user_dict)
+                user_lookup[user_dict["id"]] = user
+            return user_lookup
+        else:
+            raise TimeoutError("Error getting user data")
+
 class UserState(Enum):
     DEFAULT = 0
     WHITELISTED = 1
@@ -315,65 +360,44 @@ class UserState(Enum):
     def __str__(self):
         return self.name
 
+class Time:
+    def __init__(self, millis:int):
+        self.millis = millis
+        self._time_str = Time.format_time(millis)
+
+    def __str__(self):
+        return self._time_str
+
+    @staticmethod
+    def format_time(time):
+        if time > 86400000:
+            return ">1 day"
+        millis = Time.format_helper(time % 1000, 3)
+        seconds = Time.format_helper((time // 1000) % 60, 2)
+        minutes = Time.format_helper((time // (1000 * 60)) % 60, 2)
+        hours = Time.format_helper((time // (1000 * 60 * 60)) % 24, 2)
+        if hours == "00":
+            return minutes + ":" + seconds + "." + millis
+        else:
+            return hours + ":" + minutes + ":" + seconds
+
+    @staticmethod
+    def format_helper(time, digits):
+        time = str(time)
+        while len(time) < digits:
+            time = "0" + time
+        return time
+
+class Date:
+    def __init__(self, timestamp:int):
+        self.timestamp = timestamp
+        self._date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
+    def __str__(self):
+        return self._date_str
+
 def get(end_of_url, params) -> Response:
     return requests.get(URL + end_of_url, headers=headers, params=params)
-
-def get_user_data(user : Union[str, int]) -> User:
-    if type(user) == int:
-        res = requests.get(f"https://users.roblox.com/v1/users/{user}")
-        if res.status_code == 404:
-            raise InvalidData("Invalid user ID")
-        try:
-            data = res.json()
-            return User.from_dict(data)
-        except:
-            raise TimeoutError("Error getting user data")
-    else:
-        res = requests.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]})
-        d = res.json()
-        if not d:
-            raise TimeoutError("Error getting user data")
-        else:
-            data = d["data"]
-            if len(data) > 0:
-                return User.from_dict(data[0])
-            else:
-                raise InvalidData("Invalid username")
-
-def get_user_data_from_list(users) -> Dict[int, User]:
-    res = requests.post("https://users.roblox.com/v1/users", data={"userIds":users})
-    if res:
-        user_lookup = {}
-        for user_dict in res.json()["data"]:
-            user = User.from_dict(user_dict)
-            user_lookup[user_dict["id"]] = user
-        return user_lookup
-    else:
-        raise TimeoutError("Error getting user data")
-
-#takes time value as input from json in miliseconds
-#TODO: time object
-def format_time(time):
-    if time > 86400000:
-        return ">1 day"
-    milis = format_helper(time % 1000, 3)
-    seconds = format_helper((time // 1000) % 60, 2)
-    minutes = format_helper((time // (1000 * 60)) % 60, 2)
-    hours = format_helper((time // (1000 * 60 * 60)) % 24, 2)
-    if hours == "00":
-        return minutes + ":" + seconds + "." + milis
-    else:
-        return hours + ":" + minutes + ":" + seconds
-
-def format_helper(time, digits):
-    time = str(time)
-    while len(time) < digits:
-        time = "0" + time
-    return time
-
-#TODO: date object
-def convert_date(date):
-    return datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
 
 def get_recent_wrs(game:Game, style:Style) -> List[Record]:
     res = get("time/recent/wr", {
@@ -427,7 +451,7 @@ def get_user_rank(user_data:User, game:Game, style:Style) -> Optional[Rank]:
     if data == None:
         return None
     else:
-        return Rank.from_dict(data)
+        return Rank.from_dict(data, user_data)
 
 def find_max_pages(url, params, page_count, page_length, custom_page_length) -> int:
     params["page"] = page_count
@@ -440,7 +464,7 @@ def find_max_pages(url, params, page_count, page_length, custom_page_length) -> 
         return 0
 
 #returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
-def get_ranks(game:Game, style:Style, page) -> Tuple[List[Tuple[str, Rank]], int]:
+def get_ranks(game:Game, style:Style, page) -> Tuple[List[Rank], int]:
     params = {
         "game":game.value,
         "style":style.value,
@@ -471,9 +495,9 @@ def get_ranks(game:Game, style:Style, page) -> Tuple[List[Tuple[str, Rank]], int
     users = []
     for i in data:
         users.append(i["User"])
-    user_lookup = get_user_data_from_list(users)
+    user_lookup = User.get_user_data_from_list(users)
     for i in data:
-        ls.append((user_lookup[i["User"]].username, Rank.from_dict(i)))
+        ls.append(Rank.from_dict(i, user_lookup[i["User"]]))
     return ls, converted_page_count
 
 # TODO: optimize this pls
@@ -548,7 +572,7 @@ def calculate_wr_diff(record:Record):
     sort_map(data)
     if len(data) > 1:
         record.previous_record = Record.from_dict(data[1])
-        record.diff = round((int(record.previous_record.time) - int(record.time)) / 1000.0, 3)
+        record.diff = round((record.previous_record.time.millis - record.time.millis) / 1000.0, 3)
 
 def search(ls, record):
     for i in ls:
