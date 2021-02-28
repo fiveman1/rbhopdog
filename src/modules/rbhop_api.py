@@ -616,7 +616,6 @@ def write_wrs():
         json.dump(get_wrs(), file)
 
 def get_new_wrs() -> List[Record]:
-    old_wrs = []
     try:
         old_wrs = open_json("files/recent_wrs.json")
     except FileNotFoundError:

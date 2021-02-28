@@ -84,7 +84,7 @@ class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
-        rbhop.write_wrs() #so that bot doesn't make a bunch of globals after downtime
+        self.globals_started = False
         self.global_announcements.start()
         print("maincog loaded")
     
@@ -94,6 +94,11 @@ class MainCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
+        # when the bot first runs, overwrite globals then stop
+        if not self.globals_started:
+            rbhop.write_wrs()
+            self.globals_started = True
+            return
         try:
             records = rbhop.get_new_wrs()
         except:
