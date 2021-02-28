@@ -240,50 +240,41 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user=user, game=None if game in [None, "both", "all"] else game, style=None if style in [None, "all"] else style)
         if not arguments:
             return
-        wrs = []
-        count = 0
         if game in [None, "both", "all"]:
-            g = [Game.BHOP, Game.SURF]
+            g = DEFAULT_GAMES
         else:
             g = [arguments.game]
         if style in [None, "all"]:
-            s = Style
+            s = DEFAULT_STYLES
         else:
             s = [arguments.style]
+
+        wrs:List[rbhop.Record] = []
         for _game in g:
             for _style in s:
-                if not (_game == Game.SURF and _style == Style.SCROLL) and _style != Style.FASTE:
+                if not (_game == Game.SURF and _style == Style.SCROLL):
                     record_list = rbhop.get_user_wrs(arguments.user_data, _game, _style)
-                    if record_list is not None:
-                        count += len(record_list)
-                        wrs.append(record_list)
+                    if record_list:
+                        wrs += record_list
+        count = len(wrs)
         if count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
             return
-        #default sort: sort by style, then within each style sort alphabetically
-        convert_ls = []
-        if sort == "":
-            for record_ls in wrs:
-                record_ls_sort = sorted(record_ls, key = lambda i: i.map.displayname)
-                for record in record_ls_sort:
-                    convert_ls.append(record)
-        else:
-            for record_ls in wrs:
-                for record in record_ls:
-                    convert_ls.append(record)
-            if sort == "name":
-                convert_ls = sorted(convert_ls, key = lambda i: i.map.displayname) #sort by map name
-            elif sort == "date":
-                convert_ls = sorted(convert_ls, key = lambda i: i.date.timestamp, reverse=True) #sort by date (most recent)
-            elif sort == "time":
-                convert_ls = sorted(convert_ls, key = lambda i: i.time.millis) #sort by time
+        if not sort:
+            wrs.sort(key = lambda i: (i.game.value, i.style.value, i.map.displayname))
+        elif sort == "name":
+            wrs.sort(key = lambda i: i.map.displayname)
+        elif sort == "date":
+            wrs.sort(key = lambda i: i.date.timestamp, reverse=True)
+        elif sort == "time":
+            wrs.sort(key = lambda i: i.time.millis)
         cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
-        if g == [Game.BHOP, Game.SURF]:
+        if g is DEFAULT_GAMES:
             game = "both"
             cols.append(MessageCol.GAME)
         else:
             game = arguments.game
-        if s == Style:
+        if s is DEFAULT_STYLES:
             style = "all"
             cols.append(MessageCol.STYLE)
         else:
@@ -291,16 +282,17 @@ class MainCog(commands.Cog):
         if sort == "":
             sort = "default"
         if page != -1:
-            total_pages = ((len(convert_ls) - 1) // 25) + 1
+            total_pages = ((count - 1) // 25) + 1
             if page > total_pages:
                 page = total_pages
-            msg = MessageBuilder(cols=cols, items=convert_ls[(page-1)*25:page*25]).build()
-            msg_ls = messages.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
-            for m in msg_ls:
+            msg = MessageBuilder(cols=cols, items=wrs[(page-1)*25:page*25]).build()
+            the_messages = messages.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
+            for m in the_messages:
                 await ctx.send(self.format_markdown_code(m))
         else:
             f = StringIO()
-            f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{MessageBuilder(cols=cols, items=convert_ls).build()}")
+            msg = MessageBuilder(cols=cols, items=wrs).build()
+            f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
             f.seek(0)
             await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
             return
@@ -510,16 +502,15 @@ class MainCog(commands.Cog):
 
     @commands.command(name="user")
     async def user_info(self, ctx, user:str):
-        user_data:Optional[User] = None
         if user == "me":
             roblox_user = self.get_roblox_user(ctx.author.id)
             if not roblox_user:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return
             else:
-                user_data = User.get_user_data(roblox_user["robloxId"])
+                the_user = roblox_user["robloxId"]
         elif user.isnumeric():
-            user_data = User.get_user_data(int(user))
+            the_user = int(user)
         else:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
@@ -528,8 +519,11 @@ class MainCog(commands.Cog):
                     await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
                     return
                 else:
-                    user_data = User.get_user_data(roblox_user["robloxId"])
+                    the_user = roblox_user["robloxId"]
+            else:
+                the_user = user
         try:
+            user_data = User.get_user_data(the_user)
             embed = discord.Embed(color=0xfcba03)
             embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
@@ -538,7 +532,7 @@ class MainCog(commands.Cog):
             embed.set_footer(text="User Info")
             await ctx.send(embed=embed)
         except InvalidData:
-            if type(user) == int:
+            if user.isnumeric():
                 await ctx.send(self.format_markdown_code(f"Invalid user ID (user ID '{user}' does not exist on Roblox)."))
                 return
             else:
@@ -688,11 +682,11 @@ class MainCog(commands.Cog):
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         embed.set_thumbnail(url=self.get_user_headshot_url(record.user.id))
         embed.add_field(name="Player", value=record.user.username, inline=True)
-        if record.diff == -1:
+        if not record.previous_record:
             embed.add_field(name="Time", value=f"{record.time} (-n/a s)", inline=True)
             embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** n/a", inline=False)
         else:
-            embed.add_field(name="Time", value=f"{record.time} (-{record.diff:.3f} s)", inline=True)
+            embed.add_field(name="Time", value=f"{record.time} ({record.diff:+.3f} s)", inline=True)
             embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** {record.previous_record.time} ({record.previous_record.user.username})", inline=False)
         embed.set_footer(text="World Record")
         return embed

@@ -1,5 +1,7 @@
 # messages.py
-def page_messages(msg, max_length=2000):
+from typing import List
+
+def page_messages(msg, max_length=2000) -> List[str]:
         ls = []
         lines = msg.split("\n")
         items = len(lines)

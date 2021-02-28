@@ -590,7 +590,7 @@ def calculate_wr_diff(record:Record):
     sort_map(data)
     if len(data) > 1:
         record.previous_record = Record.from_dict(data[1])
-        record.diff = round((record.previous_record.time.millis - record.time.millis) / 1000.0, 3)
+        record.diff = round((record.time.millis - record.previous_record.time.millis) / 1000.0, 3)
 
 def search(ls, record):
     for i in ls:
@@ -622,7 +622,7 @@ def get_new_wrs() -> List[Record]:
         write_wrs()
         return []
     new_wrs = get_wrs()
-    globals_ls = []
+    globals:List[Record] = []
     for i in range(len(new_wrs)):
         for record in new_wrs[i]:
             match = search(old_wrs[i], record)
@@ -630,22 +630,23 @@ def get_new_wrs() -> List[Record]:
                 #records by the same person on the same map have the same id even if they beat it
                 if record["Time"] != match["Time"]:
                     r = Record.from_dict(record)
-                    r.diff = round((int(match["Time"]) - int(record["Time"])) / 1000.0, 3)
+                    r.diff = round((int(record["Time"]) - int(match["Time"])) / 1000.0, 3)
                     r.previous_record = Record.from_dict(match)
-                    globals_ls.append(r)
+                    globals.append(r)
                 #we can break here because the lists are sorted in the same fashion
                 else:
                     break
             else:
                 r = Record.from_dict(record)
                 calculate_wr_diff(r)
-                globals_ls.append(r)
+                globals.append(r)
 
     #overwrite recent_wrs.json with new wrs if they exist
-    if len(globals_ls) > 0:
+    if len(globals) > 0:
         with open(fix_path("files/recent_wrs.json"), "w") as file:
             json.dump(new_wrs, file)
-    return sorted(globals_ls, key = lambda i: i.date, reverse=True)
+    globals.sort(key = lambda i: i.date.timestamp)
+    return globals
 
 # TODO: optimize this to reduce unnecessary api calls
 def get_map_times(style:Style, map:Map, page:int) -> Tuple[List[Record], int]:
