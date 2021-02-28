@@ -9,7 +9,7 @@ import requests
 from requests.models import Response
 from typing import Dict, List, Optional, Tuple, Union
 
-from modules import files
+from modules.utils import Incrementer
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -28,6 +28,9 @@ def open_json(path):
         data = file.read()
         return json.loads(data)
 
+def get(end_of_url, params) -> Response:
+    return requests.get(URL + end_of_url, headers=headers, params=params)
+
 def create_str_to_val(dict):
     str_to_val = {}
     for key, values in dict.items():
@@ -41,6 +44,42 @@ _GAMES = {
     2: ["surf"]
 }
 _STR_TO_GAME = create_str_to_val(_GAMES)
+
+class Time:
+    def __init__(self, millis:int):
+        self.millis = millis
+        self._time_str = Time.format_time(millis)
+
+    def __str__(self):
+        return self._time_str
+
+    @staticmethod
+    def format_time(time):
+        if time > 86400000:
+            return ">1 day"
+        millis = Time.format_helper(time % 1000, 3)
+        seconds = Time.format_helper((time // 1000) % 60, 2)
+        minutes = Time.format_helper((time // (1000 * 60)) % 60, 2)
+        hours = Time.format_helper((time // (1000 * 60 * 60)) % 24, 2)
+        if hours == "00":
+            return minutes + ":" + seconds + "." + millis
+        else:
+            return hours + ":" + minutes + ":" + seconds
+
+    @staticmethod
+    def format_helper(time, digits):
+        time = str(time)
+        while len(time) < digits:
+            time = "0" + time
+        return time
+
+class Date:
+    def __init__(self, timestamp:int):
+        self.timestamp = timestamp
+        self._date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
+    def __str__(self):
+        return self._date_str
 
 class Game(Enum):
     MAPTEST = 0
@@ -111,7 +150,7 @@ class Map:
         self.displayname:str = displayname
         self.creator:str = creator
         self.game:Game = game
-        self.date:int = date
+        self.date:Date = date
         self.playcount:int = playcount
 
     def __str__(self):
@@ -124,9 +163,26 @@ class Map:
             d["DisplayName"],
             d["Creator"],
             Game(d["Game"]),
-            d["Date"],
+            Date(d["Date"]),
             d["PlayCount"]
         )
+
+    @staticmethod
+    def write_maps(game:Game):
+        page = Incrementer(1)
+        first = get("map", {
+            "game":game.value,
+            "page":page.increment()
+        })
+        map_data = first.json()
+        page_count = int(first.headers["Pagination-Count"])
+        while page.get() <= page_count:
+            map_data += get("map", {
+                "game":game.value,
+                "page":page.increment()
+            }).json()
+        with open(fix_path(f"files/{game.name}_maps.json"), "w") as file:
+            json.dump(map_data, file)
 
     @staticmethod
     def setup_maps():
@@ -134,8 +190,8 @@ class Map:
             bhop_maps = open_json("files/bhop_maps.json")
             surf_maps = open_json("files/surf_maps.json")
         except:
-            files.write_maps("bhop")
-            files.write_maps("surf")
+            Map.write_maps(Game.BHOP)
+            Map.write_maps(Game.SURF)
             bhop_maps = open_json("files/bhop_maps.json")
             surf_maps = open_json("files/surf_maps.json")
 
@@ -160,8 +216,8 @@ class Map:
 
     @staticmethod
     def update_maps():
-        files.write_maps("bhop")
-        files.write_maps("surf")
+        Map.write_maps(Game.BHOP)
+        Map.write_maps(Game.SURF)
         Map.setup_maps()
 
     # ls should be sorted
@@ -360,45 +416,6 @@ class UserState(Enum):
     def __str__(self):
         return self.name
 
-class Time:
-    def __init__(self, millis:int):
-        self.millis = millis
-        self._time_str = Time.format_time(millis)
-
-    def __str__(self):
-        return self._time_str
-
-    @staticmethod
-    def format_time(time):
-        if time > 86400000:
-            return ">1 day"
-        millis = Time.format_helper(time % 1000, 3)
-        seconds = Time.format_helper((time // 1000) % 60, 2)
-        minutes = Time.format_helper((time // (1000 * 60)) % 60, 2)
-        hours = Time.format_helper((time // (1000 * 60 * 60)) % 24, 2)
-        if hours == "00":
-            return minutes + ":" + seconds + "." + millis
-        else:
-            return hours + ":" + minutes + ":" + seconds
-
-    @staticmethod
-    def format_helper(time, digits):
-        time = str(time)
-        while len(time) < digits:
-            time = "0" + time
-        return time
-
-class Date:
-    def __init__(self, timestamp:int):
-        self.timestamp = timestamp
-        self._date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-
-    def __str__(self):
-        return self._date_str
-
-def get(end_of_url, params) -> Response:
-    return requests.get(URL + end_of_url, headers=headers, params=params)
-
 def get_recent_wrs(game:Game, style:Style) -> List[Record]:
     res = get("time/recent/wr", {
         "game":game.value,
@@ -580,23 +597,36 @@ def search(ls, record):
             return i
     return None
 
+def write_wrs():
+    wrs_data = []
+    for game in [Game.BHOP, Game.SURF]:
+        for style in Style:
+            if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE:
+                wrs = get("time/recent/wr", {
+                        "game":game.value,
+                        "style":style.value
+                    })
+                wrs_data.append(wrs.json())
+    # LIST OF LIST OF WRS, EACH LIST IS A GAME AND STYLE
+    with open(fix_path("files/recent_wrs.json"), "w") as file:
+        json.dump(wrs_data, file)
+
 def get_new_wrs() -> List[Record]:
     new_wrs = []
-    for game in Game:
-        if not game == Game.MAPTEST:
-            for style in Style:
-                if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
-                    wrs = get("time/recent/wr", {
-                            "game":game.value,
-                            "style":style.value,
-                            "whitelist":True
-                        })
-                    new_wrs.append(wrs.json())
+    for game in [Game.BHOP, Game.SURF]:
+        for style in Style:
+            if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
+                wrs = get("time/recent/wr", {
+                        "game":game.value,
+                        "style":style.value,
+                        "whitelist":True
+                    })
+                new_wrs.append(wrs.json())
     old_wrs = []
     try:
         old_wrs = open_json("files/recent_wrs.json")
     except FileNotFoundError:
-        files.write_wrs()
+        write_wrs()
         return []
     globals_ls = []
     for i in range(len(new_wrs)):
@@ -621,7 +651,6 @@ def get_new_wrs() -> List[Record]:
     if len(globals_ls) > 0:
         with open(fix_path("files/recent_wrs.json"), "w") as file:
             json.dump(new_wrs, file)
-        file.close()
     return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
 # TODO: optimize this to reduce unnecessary api calls

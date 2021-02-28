@@ -9,8 +9,8 @@ from io import StringIO
 
 from modules import rbhop_api as rbhop
 from modules.rbhop_api import Game, Style, User
-from modules import files
 from modules import messages
+from modules.utils import Incrementer
 
 class ArgumentChecker:
     def __init__(self):
@@ -21,13 +21,6 @@ class ArgumentChecker:
         self.valid = False
     def __bool__(self):
         return self.valid
-
-class Incrementer:
-    def __init__(self, i:int):
-        self.i = i - 1
-    def get(self) -> int:
-        self.i += 1
-        return self.i
 
 # contains some commonly used Cols designed for use with MessageBuilder
 class MessageCol:
@@ -91,7 +84,7 @@ class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
-        files.write_wrs() #so that bot doesn't make a bunch of globals after downtime
+        rbhop.write_wrs() #so that bot doesn't make a bunch of globals after downtime
         self.global_announcements.start()
         print("maincog loaded")
     
@@ -169,7 +162,7 @@ class MainCog(commands.Cog):
         else:
             placement, total_completions = rbhop.get_record_placement(record)
             msg = MessageBuilder(title=f"{arguments.user_data.username}'s record on {record.map.displayname} [game: {arguments.game}, style: {arguments.style}]",
-                cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 15, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
+                cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 20, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
                 items=[record]
             ).build()
             await ctx.send(self.format_markdown_code(msg))
@@ -204,7 +197,7 @@ class MainCog(commands.Cog):
                 page = page_count
             incrementer = Incrementer(((page - 1) * 25) + 1)
             msg = MessageBuilder(title=f"Record list for map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", 
-                cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.get()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
+                cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.increment()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
                 items=records
             ).build()
             await ctx.send(self.format_markdown_code(msg))
