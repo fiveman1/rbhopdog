@@ -31,20 +31,6 @@ def open_json(path):
 def get(end_of_url, params) -> Response:
     return requests.get(URL + end_of_url, headers=headers, params=params)
 
-def create_str_to_val(dict):
-    str_to_val = {}
-    for key, values in dict.items():
-        for value in values:
-            str_to_val[value] = key
-    return str_to_val
-
-_GAMES = {
-    0: ["maptest"],
-    1: ["bhop"],
-    2: ["surf"]
-}
-_STR_TO_GAME = create_str_to_val(_GAMES)
-
 class Time:
     def __init__(self, millis:int):
         self.millis = millis
@@ -74,12 +60,26 @@ class Time:
         return time
 
 class Date:
-    def __init__(self, timestamp:int):
-        self.timestamp = timestamp
+    def __init__(self, timestamp):
+        self.timestamp:int = timestamp
         self._date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
 
     def __str__(self):
         return self._date_str
+
+def create_str_to_val(dict):
+    str_to_val = {}
+    for key, values in dict.items():
+        for value in values:
+            str_to_val[value] = key
+    return str_to_val
+
+_GAMES = {
+    0: ["maptest"],
+    1: ["bhop"],
+    2: ["surf"]
+}
+_STR_TO_GAME = create_str_to_val(_GAMES)
 
 class Game(Enum):
     MAPTEST = 0
@@ -97,8 +97,8 @@ class Game(Enum):
     def contains(obj):
         return obj in Game._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_GAME
 
-# !!! Hacky workaround warning !!!
 setattr(Game, "__new__", lambda cls, value: super(Game, cls).__new__(cls, _STR_TO_GAME[value] if isinstance(value, str) else value))
+DEFAULT_GAMES:List[Game] = [Game.BHOP, Game.SURF]
 
 _STYLES = {
     1: ["autohop", "auto", "a"],
@@ -133,8 +133,9 @@ class Style(Enum):
     def contains(obj):
         return obj in Style._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_STYLE
 
-# !!! Hacky workaround warning 2 !!!
+# This allows us to get an enum via the value, name, or name alias (ex. Style(1), Style("autohop"), Style("auto"))
 setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR_TO_STYLE[value] if isinstance(value, str) else value))
+DEFAULT_STYLES:List[Style] = [style for style in Style if style != Style.FASTE]
 
 class Map:
     bhop_map_pairs:List[Tuple[str, "Map"]] = []
@@ -280,11 +281,11 @@ Map.setup_maps()
 class Rank:
     __ranks__ = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
 
-    def __init__(self, rank, skill, placement, user:"User"):
-        self.rank = rank
-        self.skill = skill
-        self.placement = placement
-        self.user = user
+    def __init__(self, rank, skill, placement, user):
+        self.rank:int = rank
+        self.skill:float = skill
+        self.placement:int = placement
+        self.user:User = user
         self._rank_string = Rank.__ranks__[self.rank - 1]
 
     def __str__(self):
@@ -335,8 +336,9 @@ class Record:
 
     #include user or map if they are known already
     @staticmethod
-    def make_record_list(records, user:"User"=None, map:Map=None) -> List["Record"]:
+    def make_record_list(records:List, user:"User"=None, map:Map=None) -> List["Record"]:
         ls = []
+        id_to_user = None
         if not user:
             user_ids = set()
             for record in records:
@@ -391,7 +393,7 @@ class User:
                     raise InvalidData("Invalid username")
 
     @staticmethod
-    def get_user_data_from_list(users) -> Dict[int, "User"]:
+    def get_user_data_from_list(users:List[int]) -> Dict[int, "User"]:
         res = requests.post("https://users.roblox.com/v1/users", data={"userIds":users})
         if res:
             user_lookup = {}
@@ -480,7 +482,7 @@ def find_max_pages(url, params, page_count, page_length, custom_page_length) -> 
         return 0
 
 #returns 25 ranks at a given page number, page 1: top 25, page 2: 26-50, etc.
-def get_ranks(game:Game, style:Style, page) -> Tuple[List[Rank], int]:
+def get_ranks(game:Game, style:Style, page:int) -> Tuple[List[Rank], int]:
     params = {
         "game":game.value,
         "style":style.value,
@@ -517,7 +519,7 @@ def get_ranks(game:Game, style:Style, page) -> Tuple[List[Rank], int]:
     return ls, converted_page_count
 
 # TODO: optimize this pls
-def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[Record], int]:
+def get_user_times(user_data:User, game:Optional[Game], style:Optional[Style], page:int) -> Tuple[List[Record], int]:
     if page == -1:
         i = 1
         params = {"page":i}
@@ -575,7 +577,7 @@ def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, in
         return completions, 1
 
 #records is a list of records from a given map
-def sort_map(records):
+def sort_map(records:List):
     records.sort(key=lambda i: (i["Time"], i["Date"]))
 
 #changes a WR's diff and previous_record in place by comparing first and second place
@@ -596,37 +598,31 @@ def search(ls, record):
             return i
     return None
 
-def write_wrs():
-    wrs_data = []
-    for game in [Game.BHOP, Game.SURF]:
-        for style in Style:
-            if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE:
-                wrs = get("time/recent/wr", {
-                        "game":game.value,
-                        "style":style.value
-                    })
-                wrs_data.append(wrs.json())
-    # LIST OF LIST OF WRS, EACH LIST IS A GAME AND STYLE
-    with open(fix_path("files/recent_wrs.json"), "w") as file:
-        json.dump(wrs_data, file)
-
-def get_new_wrs() -> List[Record]:
-    new_wrs = []
-    for game in [Game.BHOP, Game.SURF]:
-        for style in Style:
-            if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
-                wrs = get("time/recent/wr", {
+# returns a list of lists of wrs, each list is a unique game/style combination
+def get_wrs():
+    wrs = []
+    for game in DEFAULT_GAMES:
+        for style in DEFAULT_STYLES:
+            if not (game == Game.SURF and style == Style.SCROLL):
+                wrs.append(get("time/recent/wr", {
                         "game":game.value,
                         "style":style.value,
                         "whitelist":True
-                    })
-                new_wrs.append(wrs.json())
+                    }).json())
+    return wrs
+
+def write_wrs():
+    with open(fix_path("files/recent_wrs.json"), "w") as file:
+        json.dump(get_wrs(), file)
+
+def get_new_wrs() -> List[Record]:
     old_wrs = []
     try:
         old_wrs = open_json("files/recent_wrs.json")
     except FileNotFoundError:
         write_wrs()
         return []
+    new_wrs = get_wrs()
     globals_ls = []
     for i in range(len(new_wrs)):
         for record in new_wrs[i]:
@@ -653,7 +649,7 @@ def get_new_wrs() -> List[Record]:
     return sorted(globals_ls, key = lambda i: i.date, reverse=True)
 
 # TODO: optimize this to reduce unnecessary api calls
-def get_map_times(style:Style, map:Map, page) -> Tuple[List[Record], int]:
+def get_map_times(style:Style, map:Map, page:int) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     params = {

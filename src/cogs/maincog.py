@@ -1,5 +1,5 @@
 # maincog.py
-from typing import Callable, List, Union
+from typing import Callable, List, Optional, Union
 import discord
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
@@ -8,7 +8,7 @@ import requests
 from io import StringIO
 
 from modules import rbhop_api as rbhop
-from modules.rbhop_api import Game, Style, User
+from modules.rbhop_api import Game, Style, User, DEFAULT_GAMES, DEFAULT_STYLES
 from modules import messages
 from modules.utils import Incrementer
 
@@ -326,9 +326,9 @@ class MainCog(commands.Cog):
             Game.BHOP: [],
             Game.SURF: []
         }
-        for game in [Game.BHOP, Game.SURF]:
-            for style in Style:
-                if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
+        for game in DEFAULT_GAMES:
+            for style in DEFAULT_STYLES:
+                if not (game == Game.SURF and style == Style.SCROLL): #skip surf/scroll
                     wrs = rbhop.total_wrs(arguments.user_data, game, style)
                     if wrs > 0:
                         dict[game].append((style, wrs))
@@ -504,16 +504,17 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="user")
-    async def user_info(self, ctx, user):
+    async def user_info(self, ctx, user:str):
+        user_data:Optional[User] = None
         if user == "me":
             roblox_user = self.get_roblox_user(ctx.author.id)
             if not roblox_user:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return
             else:
-                user = roblox_user["robloxId"]
+                user_data = User.get_user_data(roblox_user["robloxId"])
         elif user.isnumeric():
-            user = int(user)
+            user_data = User.get_user_data(int(user))
         else:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
@@ -522,9 +523,8 @@ class MainCog(commands.Cog):
                     await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
                     return
                 else:
-                    user = roblox_user["robloxId"]
+                    user_data = User.get_user_data(roblox_user["robloxId"])
         try:
-            user_data = User.get_user_data(user)
             embed = discord.Embed(color=0xfcba03)
             embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
@@ -533,7 +533,7 @@ class MainCog(commands.Cog):
             embed.set_footer(text="User Info")
             await ctx.send(embed=embed)
         except InvalidData:
-            if user.isnumeric():
+            if type(user) == int:
                 await ctx.send(self.format_markdown_code(f"Invalid user ID (user ID '{user}' does not exist on Roblox)."))
                 return
             else:
