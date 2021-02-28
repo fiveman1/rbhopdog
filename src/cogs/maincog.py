@@ -157,7 +157,7 @@ class MainCog(commands.Cog):
         if not arguments:
             return
         record = rbhop.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map)
-        if record == None:
+        if record is None:
             await ctx.send(self.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}]"))
         else:
             placement, total_completions = rbhop.get_record_placement(record)
@@ -238,7 +238,7 @@ class MainCog(commands.Cog):
         wrs = []
         count = 0
         if game in [None, "both", "all"]:
-            g = Game
+            g = [Game.BHOP, Game.SURF]
         else:
             g = [arguments.game]
         if style in [None, "all"]:
@@ -246,13 +246,12 @@ class MainCog(commands.Cog):
         else:
             s = [arguments.style]
         for _game in g:
-            if _game != Game.MAPTEST:
-                for _style in s:
-                    if not (_game == Game.SURF and _style == Style.SCROLL) and _style != Style.FASTE:
-                        record_list = rbhop.get_user_wrs(arguments.user_data, _game, _style)
-                        if record_list != None:
-                            count += len(record_list)
-                            wrs.append(record_list)
+            for _style in s:
+                if not (_game == Game.SURF and _style == Style.SCROLL) and _style != Style.FASTE:
+                    record_list = rbhop.get_user_wrs(arguments.user_data, _game, _style)
+                    if record_list is not None:
+                        count += len(record_list)
+                        wrs.append(record_list)
         if count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
             return
@@ -274,7 +273,7 @@ class MainCog(commands.Cog):
             elif sort == "time":
                 convert_ls = sorted(convert_ls, key = lambda i: i.time.millis) #sort by time
         cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
-        if g == Game:
+        if g == [Game.BHOP, Game.SURF]:
             game = "both"
             cols.append(MessageCol.GAME)
         else:
@@ -291,12 +290,12 @@ class MainCog(commands.Cog):
             if page > total_pages:
                 page = total_pages
             msg = MessageBuilder(cols=cols, items=convert_ls[(page-1)*25:page*25]).build()
-            msg_ls = messages.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n" + msg)
+            msg_ls = messages.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
             for m in msg_ls:
                 await ctx.send(self.format_markdown_code(m))
         else:
             f = StringIO()
-            f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n" + MessageBuilder(cols=cols, items=convert_ls).build())
+            f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{MessageBuilder(cols=cols, items=convert_ls).build()}")
             f.seek(0)
             await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
             return
@@ -327,14 +326,13 @@ class MainCog(commands.Cog):
             Game.BHOP: [],
             Game.SURF: []
         }
-        for game in Game:
-            if game != Game.MAPTEST:
-                for style in Style:
-                    if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
-                        wrs = rbhop.total_wrs(arguments.user_data, game, style)
-                        if wrs > 0:
-                            dict[game].append((style, wrs))
-                            count += wrs
+        for game in [Game.BHOP, Game.SURF]:
+            for style in Style:
+                if not (game == Game.SURF and style == Style.SCROLL) and style != Style.FASTE: #skip surf/scroll and faste
+                    wrs = rbhop.total_wrs(arguments.user_data, game, style)
+                    if wrs > 0:
+                        dict[game].append((style, wrs))
+                        count += wrs
         embed = discord.Embed(color=0xff94b8)
         embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_data.id))
         embed.set_footer(text="WR Count")
@@ -348,14 +346,12 @@ class MainCog(commands.Cog):
             if len(dict[Game.BHOP]) > 0:
                 body = ""
                 for c in dict[Game.BHOP]:
-                    if c[1] > 0:
-                        body += f"**{c[0]}:** {c[1]}\n"
+                    body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
             if len(dict[Game.SURF]) > 0:
                 body = ""
                 for c in dict[Game.SURF]:
-                    if c[1] > 0:
-                        body += f"**{c[0]}:** {c[1]}\n"
+                    body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
         else:
             embed.description = f"Total WRs: 0 \N{crying face}"
@@ -476,10 +472,10 @@ class MainCog(commands.Cog):
         elif page > page_count:
             page = page_count
         cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
-        if game == None:
+        if game is None:
             game = "both"
             cols.append(MessageCol.GAME)
-        if style == None:
+        if style is None:
             style = "all"
             cols.append(MessageCol.STYLE)
         if page == -1:

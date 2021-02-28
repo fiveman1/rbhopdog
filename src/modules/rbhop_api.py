@@ -136,7 +136,6 @@ class Style(Enum):
 # !!! Hacky workaround warning 2 !!!
 setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR_TO_STYLE[value] if isinstance(value, str) else value))
 
-# TODO: convert stuff that uses map_name and map_id to Map objects and also implement that :)
 class Map:
     bhop_map_pairs:List[Tuple[str, "Map"]] = []
     surf_map_pairs:List[Tuple[str, "Map"]] = []
@@ -454,7 +453,7 @@ def total_wrs(user_data:User, game:Game, style:Style) -> int:
         "style":style.value
     })
     data = res.json()
-    if data == None:
+    if data is None:
         return 0
     else:
         return len(data)
@@ -465,7 +464,7 @@ def get_user_rank(user_data:User, game:Game, style:Style) -> Optional[Rank]:
         "style":style.value
     })
     data = res.json()
-    if data == None:
+    if data is None:
         return None
     else:
         return Rank.from_dict(data, user_data)
@@ -522,9 +521,9 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
     if page == -1:
         i = 1
         params = {"page":i}
-        if game != None:
+        if game is not None:
             params["game"] = game.value
-        if style != None:
+        if style is not None:
             params["style"] = style.value
         times_ls = []
         while True:
@@ -541,9 +540,9 @@ def get_user_times(user_data:User, game:Game, style:Style, page) -> Tuple[List[R
     page_num, start = divmod((int(page) - 1) * page_length, 200)
     end = start + 25
     params = {"page":page_num + 1}
-    if game != None:
+    if game is not None:
         params["game"] = game.value
-    if style != None:
+    if style is not None:
         params["style"] = style.value
     res = get(f"time/user/{user_data.id}", params) 
     data = res.json()[start:end]
@@ -677,7 +676,6 @@ def get_map_times(style:Style, map:Map, page) -> Tuple[List[Record], int]:
             params["page"] = page_count
             converted_page_count = find_max_pages(f"time/map/{map.id}", params, page_count, 200, page_length)
             data = get(f"time/map/{map.id}", params).json()
-            #return [], converted_page_count
     #add the previous and next page so that we can sort the times across pages properly
     res2data = []
     if page_num > 0:
