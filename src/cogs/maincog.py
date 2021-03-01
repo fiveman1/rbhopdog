@@ -261,7 +261,7 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
             return
         if not sort:
-            wrs.sort(key = lambda i: (i.game.value, i.style.value, i.map.displayname))
+            wrs.sort(key = lambda i: (i.game.name, i.style.name, i.map.displayname))
         elif sort == "name":
             wrs.sort(key = lambda i: i.map.displayname)
         elif sort == "date":
