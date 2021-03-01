@@ -6,7 +6,7 @@ import os
 import traceback
 import sys
 
-from modules import messages
+from modules import utils
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -48,7 +48,7 @@ async def send_traceback(ctx, error):
             f"{ctx.author.name}#{ctx.author.discriminator}@{ctx.guild.name} in {ctx.channel.mention}."
             f"\n> {ctx.message.jump_url}\n"
         )
-    for msg in messages.page_messages(f"{type(error).__name__}: {error}\n" + tb):
+    for msg in utils.page_messages(f"{type(error).__name__}: {error}\n" + tb):
         await tb_channel.send(f"```\n{msg}\n```")
 
 #shamelessly adapted from here

@@ -9,8 +9,8 @@ from io import StringIO
 
 from modules import rbhop_api as rbhop
 from modules.rbhop_api import Game, Style, User, DEFAULT_GAMES, DEFAULT_STYLES
-from modules import messages
-from modules.utils import Incrementer
+from modules import utils
+from modules.utils import Incrementer, StringBuilder
 
 class ArgumentChecker:
     def __init__(self):
@@ -61,7 +61,9 @@ class MessageBuilder:
     # use list and a single join operation rather than concatenating strings hundreds of times to improve performance
     @staticmethod
     def _message_builder(title:str, cols:List[MessageCol.Col], items:List):
-        msg = [f"{title}\n"] if title != "" else []
+        msg = StringBuilder()
+        if title:
+            msg.append(f"{title}\n")
         last_col = cols[-1]
         cols = cols[:-1]
         for col in cols:
@@ -71,7 +73,7 @@ class MessageBuilder:
             for col in cols:
                 msg.append(f"{MessageBuilder._add_spaces(col.map(item), col.width)}| ")
             msg.append(f"{last_col.map(item)[:last_col.width]}\n")
-        return "".join(msg)
+        return msg.build()
     
     @staticmethod
     def _add_spaces(s:Union[int, str], length:int):
@@ -286,7 +288,7 @@ class MainCog(commands.Cog):
             if page > total_pages:
                 page = total_pages
             msg = MessageBuilder(cols=cols, items=wrs[(page-1)*25:page*25]).build()
-            the_messages = messages.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
+            the_messages = utils.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
             for m in the_messages:
                 await ctx.send(self.format_markdown_code(m))
         else:
@@ -489,7 +491,7 @@ class MainCog(commands.Cog):
             cols=cols, 
             items=record_list
         ).build()
-        for message in messages.page_messages(msg):
+        for message in utils.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
     
     @commands.command(name="mapcount")
@@ -558,7 +560,7 @@ class MainCog(commands.Cog):
             member_count += guild.member_count
             msg += f"{name:40}| {members}\n"
         msg = f"Total guilds: {len(self.bot.guilds)}, total members: {member_count}\n" + msg
-        for m in messages.page_messages(msg):
+        for m in utils.page_messages(msg):
             await ctx.send(self.format_markdown_code(m))
 
     @commands.command(name="updatemaps")
