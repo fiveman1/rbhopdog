@@ -1,11 +1,12 @@
 # maincog.py
-from typing import Callable, List, Optional, Union
+import asyncio
 import discord
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
+from io import StringIO
 import random
 import requests
-from io import StringIO
+from typing import Callable, List, Union
 
 from modules import rbhop_api as rbhop
 from modules.rbhop_api import Game, Style, User, DEFAULT_GAMES, DEFAULT_STYLES
@@ -98,11 +99,11 @@ class MainCog(commands.Cog):
     async def global_announcements(self):
         # when the bot first runs, overwrite globals then stop
         if not self.globals_started:
-            rbhop.write_wrs()
+            await rbhop.write_wrs()
             self.globals_started = True
             return
         try:
-            records = rbhop.get_new_wrs()
+            records = await rbhop.get_new_wrs()
         except:
             return
         if len(records) > 0:
@@ -251,14 +252,18 @@ class MainCog(commands.Cog):
         else:
             s = [arguments.style]
 
-        wrs:List[rbhop.Record] = []
+        tasks = []
         for _game in g:
             for _style in s:
                 if not (_game == Game.SURF and _style == Style.SCROLL):
-                    record_list = rbhop.get_user_wrs(arguments.user_data, _game, _style)
-                    if record_list:
-                        wrs += record_list
-        count = len(wrs)
+                    tasks.append(rbhop.get_user_wrs(arguments.user_data, _game, _style))  
+        results = await asyncio.gather(*tasks)
+        
+        wrs:List[rbhop.Record] = []
+        count = 0
+        for result in results:
+            wrs += result
+            count += len(result)
         if count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
             return
@@ -321,17 +326,22 @@ class MainCog(commands.Cog):
         if not arguments:
             return
         count = 0
-        dict = {
+        the_dict = {
             Game.BHOP: [],
             Game.SURF: []
         }
+        async def the_order(game, style):
+            return (game, style, await rbhop.total_wrs(arguments.user_data, game, style))
+        tasks = []
         for game in DEFAULT_GAMES:
             for style in DEFAULT_STYLES:
                 if not (game == Game.SURF and style == Style.SCROLL): #skip surf/scroll
-                    wrs = rbhop.total_wrs(arguments.user_data, game, style)
-                    if wrs > 0:
-                        dict[game].append((style, wrs))
-                        count += wrs
+                    tasks.append(the_order(game, style))        
+        results = await asyncio.gather(*tasks)
+        for game, style, wrs in results:
+            if wrs > 0:
+                the_dict[game].append((style, wrs))
+                count += wrs
         embed = discord.Embed(color=0xff94b8)
         embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_data.id))
         embed.set_footer(text="WR Count")
@@ -342,14 +352,14 @@ class MainCog(commands.Cog):
         embed.title = f"\U0001F4C4  {name}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
-            if len(dict[Game.BHOP]) > 0:
+            if len(the_dict[Game.BHOP]) > 0:
                 body = ""
-                for c in dict[Game.BHOP]:
+                for c in the_dict[Game.BHOP]:
                     body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
-            if len(dict[Game.SURF]) > 0:
+            if len(the_dict[Game.SURF]) > 0:
                 body = ""
-                for c in dict[Game.SURF]:
+                for c in the_dict[Game.SURF]:
                     body += f"**{c[0]}:** {c[1]}\n"
                 embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
         else:
@@ -364,7 +374,7 @@ class MainCog(commands.Cog):
         if arguments.style == Style.SCROLL:
             await ctx.send(self.format_markdown_code("Scroll is not eligible for faste."))
             return
-        wrs = rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
+        wrs = await rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
         if (arguments.style == Style.AUTOHOP and wrs >= 10) or wrs >= 50:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
         else:
@@ -375,13 +385,20 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
         if not arguments:
             return
-        rank_data = rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style)
+        tasks = [
+            rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style),
+            rbhop.get_user_completion(arguments.user_data, arguments.game, arguments.style),
+            rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
+        ]
+        results = await asyncio.gather(*tasks)
+        rank_data = results[0]
         if not rank_data:
             await ctx.send(self.format_markdown_code(f"No data available for {arguments.user_data.username} [game: {arguments.game}, style: {arguments.style}]"))
             return
         else:
-            completions, total_maps = rbhop.get_user_completion(arguments.user_data, arguments.game, arguments.style)
-            await ctx.send(embed=self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps))
+            completions, total_maps = results[1]
+            wrs = results[2]
+            await ctx.send(embed=self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
@@ -460,7 +477,7 @@ class MainCog(commands.Cog):
             style = arguments.style
         if game:
             game = arguments.game
-        record_list, page_count = rbhop.get_user_times(arguments.user_data, game, style, page)
+        record_list, page_count = await rbhop.get_user_times(arguments.user_data, game, style, page)
         if page_count == 0:
             if not style:
                 style = "all"
@@ -566,7 +583,7 @@ class MainCog(commands.Cog):
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps(self, ctx):
-        rbhop.Map.update_maps()
+        await rbhop.Map.update_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
     
     def get_discord_user_id(self, s):
@@ -639,12 +656,12 @@ class MainCog(commands.Cog):
     
     #set the user_id and username of the argument_checker before passing it to this
     async def check_user_status(self, ctx, user_data:User):
-        res = rbhop.get_user_state(user_data)
-        if res.status_code == 404:
+        res, data = await rbhop.get_user_state(user_data)
+        if res.status == 404:
             await ctx.send(self.format_markdown_code(f"'{user_data.username}' has not played bhop/surf."))
             return False
         else:
-            user_data.state = rbhop.UserState(res.json()["State"])
+            user_data.state = rbhop.UserState(data["State"])
             if user_data.state == rbhop.UserState.BLACKLISTED:
                 await ctx.send(self.format_markdown_code(f"{user_data.username} is blacklisted."))
                 return False
@@ -693,9 +710,8 @@ class MainCog(commands.Cog):
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user:User, rank_data:rbhop.Rank, game:Game, style:Style, completions, total_maps):
+    def make_user_embed(self, user:User, rank_data:rbhop.Rank, game:Game, style:Style, completions, total_maps, wrs):
         ordinal = self.get_ordinal(rank_data.placement)
-        wrs = rbhop.total_wrs(user, game, style)
         if user.username != user.displayname:
             name = f"{user.displayname} ({user.username})"
         else:

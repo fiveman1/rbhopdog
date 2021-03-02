@@ -1,4 +1,6 @@
 # rbhop_api.py
+import asyncio
+import aiohttp
 import datetime
 from discord.errors import InvalidData
 from dotenv import load_dotenv
@@ -27,6 +29,9 @@ def open_json(path):
     with open(fix_path(path)) as file:
         data = file.read()
         return json.loads(data)
+
+async def get_strafes(session:aiohttp.ClientSession, end_of_url, params={}) -> aiohttp.ClientResponse:
+    return await session.get(f"https://api.strafes.net/v1/{end_of_url}", headers=headers, params=params)
 
 def get(end_of_url, params) -> Response:
     return requests.get(URL + end_of_url, headers=headers, params=params)
@@ -168,30 +173,53 @@ class Map:
         )
 
     @staticmethod
-    def write_maps(game:Game):
-        page = Incrementer(1)
-        first = get("map", {
-            "game":game.value,
-            "page":page.increment()
-        })
-        map_data = first.json()
-        page_count = int(first.headers["Pagination-Count"])
-        while page.get() <= page_count:
-            map_data += get("map", {
-                "game":game.value,
-                "page":page.increment()
-            }).json()
-        with open(fix_path(f"files/{game.name}_maps.json"), "w") as file:
-            json.dump(map_data, file)
+    async def write_maps():
+        async with aiohttp.ClientSession() as session:
+            first_bhop = get_strafes(session, "map", {
+                "game":Game.BHOP.value,
+                "page":1
+            })
+            first_surf = get_strafes(session, "map", {
+                "game":Game.SURF.value,
+                "page":1
+            })
+            tasks = [first_bhop, first_surf]
+            responses = await asyncio.gather(*tasks)
+            bhop_data = await responses[0].json()
+            surf_data = await responses[1].json()
+            bhop_pages = int(responses[0].headers["Pagination-Count"])
+            surf_pages = int(responses[1].headers["Pagination-Count"])
+            async def mapper(game, page):
+                res = get_strafes(session, "map", {
+                    "game":game.value,
+                    "page":page
+                })
+                return game, await res
+            page = Incrementer(1)
+            tasks = []
+            while page.increment() < bhop_pages:
+                tasks.append(mapper(Game.BHOP, page.get()))
+            page = Incrementer(1)
+            while page.increment() < surf_pages:
+                tasks.append(mapper(Game.SURF, page.get()))
+            responses = await asyncio.gather(*tasks)
+            for game, res in responses:
+                if game == Game.BHOP:
+                    bhop_data += await res.json()
+                elif game == Game.SURF:
+                    surf_data += await res.json()
+            with open(fix_path("files/bhop_maps.json"), "w") as file:
+                json.dump(bhop_data, file)
+            with open(fix_path("files/surf_maps.json"), "w") as file:
+                json.dump(surf_data, file)
 
     @staticmethod
-    def setup_maps():
+    async def setup_maps():
         try:
             bhop_maps = open_json("files/bhop_maps.json")
             surf_maps = open_json("files/surf_maps.json")
         except:
-            Map.write_maps(Game.BHOP)
-            Map.write_maps(Game.SURF)
+            await Map.write_maps()
             bhop_maps = open_json("files/bhop_maps.json")
             surf_maps = open_json("files/surf_maps.json")
 
@@ -215,10 +243,9 @@ class Map:
         Map.surf_map_pairs.sort(key=lambda i: i[0])
 
     @staticmethod
-    def update_maps():
-        Map.write_maps(Game.BHOP)
-        Map.write_maps(Game.SURF)
-        Map.setup_maps()
+    async def update_maps():
+        await Map.write_maps()
+        await Map.setup_maps()
 
     # ls should be sorted
     # performs an iterative binary search
@@ -276,7 +303,7 @@ class Map:
         except KeyError:
             return Map(-1, "Missing map", "", Game.BHOP, -1, -1)
 
-Map.setup_maps()
+asyncio.get_event_loop().run_until_complete(Map.setup_maps())
 
 class Rank:
     __ranks__ = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
@@ -420,21 +447,23 @@ class UserState(Enum):
 def get_recent_wrs(game:Game, style:Style) -> List[Record]:
     res = get("time/recent/wr", {
         "game":game.value,
-        "style":style.value
+        "style":style.value,
+        "whitelist":"true"
     })
     data = res.json()
     return Record.make_record_list(data)
 
-def get_user_wrs(user_data:User, game:Game, style:Style) -> List[Record]:
-    res = get(f"time/user/{user_data.id}/wr", {
-        "game":game.value,
-        "style":style.value
-    })
-    data = res.json()
-    if data:
-        return Record.make_record_list(data, user=user_data)
-    else:
-        return []
+async def get_user_wrs(user_data:User, game:Game, style:Style) -> List[Record]:
+    async with aiohttp.ClientSession() as session:
+        res = await get_strafes(session, f"time/user/{user_data.id}/wr", {
+            "game":game.value,
+            "style":style.value
+        })
+        data = await res.json()
+        if data:
+            return Record.make_record_list(data, user=user_data)
+        else:
+            return []
 
 #returns a record object of a user's time on a given map
 def get_user_record(user_data:User, game:Game, style:Style, map:Map) -> Optional[Record]:
@@ -449,27 +478,29 @@ def get_user_record(user_data:User, game:Game, style:Style, map:Map) -> Optional
     else:
         return Record.from_dict(data[0], user=user_data)
 
-def total_wrs(user_data:User, game:Game, style:Style) -> int:
-    res = get(f"time/user/{user_data.id}/wr", {
-        "game":game.value,
-        "style":style.value
-    })
-    data = res.json()
-    if data is None:
-        return 0
-    else:
-        return len(data)
+async def total_wrs(user_data:User, game:Game, style:Style) -> int:
+    async with aiohttp.ClientSession() as session:
+        res = await get_strafes(session, f"time/user/{user_data.id}/wr", {
+            "game":game.value,
+            "style":style.value
+        })
+        data = await res.json()
+        if data:
+            return len(data)
+        else:
+            return 0
 
-def get_user_rank(user_data:User, game:Game, style:Style) -> Optional[Rank]:
-    res = get(f"rank/{user_data.id}", {
-        "game":game.value,
-        "style":style.value
-    })
-    data = res.json()
-    if data is None:
-        return None
-    else:
-        return Rank.from_dict(data, user_data)
+async def get_user_rank(user_data:User, game:Game, style:Style) -> Optional[Rank]:
+    async with aiohttp.ClientSession() as session:
+        res = await get_strafes(session, f"rank/{user_data.id}", {
+            "game":game.value,
+            "style":style.value
+        })
+        data = await res.json()
+        if data:
+            return Rank.from_dict(data, user_data)
+        else:
+            return None
 
 def find_max_pages(url, params, page_count, page_length, custom_page_length) -> int:
     params["page"] = page_count
@@ -518,56 +549,73 @@ def get_ranks(game:Game, style:Style, page:int) -> Tuple[List[Rank], int]:
         ls.append(Rank.from_dict(i, user_lookup[i["User"]]))
     return ls, converted_page_count
 
-# TODO: optimize this pls
-def get_user_times(user_data:User, game:Optional[Game], style:Optional[Style], page:int) -> Tuple[List[Record], int]:
-    if page == -1:
-        i = 1
-        params = {"page":i}
+def find_max_page(last_page, page_count, real_page_length, custom_page_length) -> int:
+    return int(((page_count - 1) * (real_page_length / custom_page_length)) + ((len(last_page) - 1) // custom_page_length) + 1)
+
+async def get_user_times(user_data:User, game:Optional[Game], style:Optional[Style], page:int) -> Tuple[List[Record], int]:
+    async with aiohttp.ClientSession() as session:
+        url = f"time/user/{user_data.id}"
+        params = {"page":1}
         if game is not None:
             params["game"] = game.value
         if style is not None:
             params["style"] = style.value
-        times_ls = []
-        while True:
-            params["page"] = i
-            res = get(f"time/user/{user_data.id}", params)
-            data = res.json()
-            if len(data) == 0:
-                break
-            else:
-                times_ls += data
-                i += 1
-        return Record.make_record_list(times_ls, user=user_data), i - 1
-    page_length = 25
-    page_num, start = divmod((int(page) - 1) * page_length, 200)
-    end = start + 25
-    params = {"page":page_num + 1}
-    if game is not None:
-        params["game"] = game.value
-    if style is not None:
-        params["style"] = style.value
-    res = get(f"time/user/{user_data.id}", params) 
-    data = res.json()[start:end]
-    if len(data) > 0:
-        page_count = int(res.headers["Pagination-Count"])
-        converted_page_count = find_max_pages(f"time/user/{user_data.id}", params, page_count, 200, page_length)
-    else:
-        params["page"] = 1
-        first_page_res = get(f"time/user/{user_data.id}", params)
-        if len(first_page_res.json()) == 0:
+        first_page_res = await get_strafes(session, url, params)
+        first_page_data = await first_page_res.json()
+        if len(first_page_data) == 0:
             return [], 0
+        pagination_count = int(first_page_res.headers["Pagination-Count"])
+        if page == -1:
+            tasks = []
+            the_page = Incrementer(1)
+            while the_page.increment() < pagination_count:
+                params_copy = params.copy()
+                params_copy["page"] = the_page.get()
+                tasks.append(get_strafes(session, url, params_copy))
+            responses = await asyncio.gather(*tasks)
+            results = first_page_data
+            for response in responses:
+                results += await response.json()
+            return Record.make_record_list(results, user=user_data), -1
         else:
-            page_count = int(first_page_res.headers["Pagination-Count"])
-            converted_page_count = find_max_pages(f"time/user/{user_data.id}", params, page_count, 200, page_length)
-            page_num, start = divmod((int(converted_page_count) - 1) * page_length, 200)
-            end = start + 25
-            params["page"] = page_count
-            data = get(f"time/user/{user_data.id}", params).json()[start:end]
-            print(data)
-    return Record.make_record_list(data, user=user_data), converted_page_count
+            page_length = 25
+            the_real_page, start = divmod((int(page) - 1) * page_length, 200)
+            the_real_page += 1
+            end = start + page_length
+            the_page_data = None
+            last_page_data = None
+            if pagination_count == 1:
+                the_page_data = first_page_data
+                last_page_data = first_page_data
+            elif the_real_page == 1:
+                the_page_data = first_page_data
+                params["page"] = pagination_count
+                the_res = await get_strafes(session, url, params)
+                last_page_data = await the_res.json()
+            elif the_real_page >= pagination_count:
+                params["page"] = pagination_count
+                the_res = await get_strafes(session, url, params)
+                last_page_data = await the_res.json()
+                the_page_data = last_page_data
+            else:
+                tasks = []
+                params_copy = params.copy()
+                params_copy["page"] = the_real_page
+                tasks.append(get_strafes(session, url, params_copy))
+                params_copy = params.copy()
+                params_copy["page"] = pagination_count
+                tasks.append(get_strafes(session, url, params_copy))
+                responses = await asyncio.gather(*tasks)
+                the_page_data = await responses[0].json()
+                last_page_data = await responses[1].json()           
+            max_page = find_max_page(last_page_data, pagination_count, 200, page_length)
+            if page > max_page:
+                start = ((int(max_page) - 1) * page_length) % 200
+                end = start + page_length
+            return Record.make_record_list(the_page_data[start:end], user=user_data), max_page
 
-def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, int]:
-    records, _ = get_user_times(user_data, game, style, -1)
+async def get_user_completion(user_data:User, game:Game, style:Style) -> Tuple[int, int]:
+    records, _ = await get_user_times(user_data, game, style, -1)
     completions = len(records)
     if game == Game.BHOP:
         return completions, Map.bhop_map_count
@@ -582,15 +630,38 @@ def sort_map(records:List):
 
 #changes a WR's diff and previous_record in place by comparing first and second place
 #times on the given map
-def calculate_wr_diff(record:Record):
-    res = get(f"time/map/{record.map.id}", {
+async def calculate_wr_diff(session, record:Record):
+    res = await get_strafes(session, f"time/map/{record.map.id}", {
         "style":record.style.value,
     })
-    data = res.json()
-    sort_map(data)
+    data = await res.json()
+    data = data[:20]
     if len(data) > 1:
+        sort_map(data)
         record.previous_record = Record.from_dict(data[1])
         record.diff = round((record.time.millis - record.previous_record.time.millis) / 1000.0, 3)
+
+# returns a list of lists of wrs, each list is a unique game/style combination
+async def get_wrs():
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for game in DEFAULT_GAMES:
+            for style in DEFAULT_STYLES:
+                if not (game == Game.SURF and style == Style.SCROLL):
+                    tasks.append(get_strafes(session, "time/recent/wr", {
+                            "game":game.value,
+                            "style":style.value,
+                            "whitelist":"true"
+                        }))
+        wrs = []
+        responses = await asyncio.gather(*tasks)
+        for res in responses:
+            wrs.append(await res.json())
+        return wrs
+
+async def write_wrs():
+    with open(fix_path("files/recent_wrs.json"), "w") as file:
+        json.dump(await get_wrs(), file)
 
 def search(ls, record):
     for i in ls:
@@ -598,30 +669,13 @@ def search(ls, record):
             return i
     return None
 
-# returns a list of lists of wrs, each list is a unique game/style combination
-def get_wrs():
-    wrs = []
-    for game in DEFAULT_GAMES:
-        for style in DEFAULT_STYLES:
-            if not (game == Game.SURF and style == Style.SCROLL):
-                wrs.append(get("time/recent/wr", {
-                        "game":game.value,
-                        "style":style.value,
-                        "whitelist":True
-                    }).json())
-    return wrs
-
-def write_wrs():
-    with open(fix_path("files/recent_wrs.json"), "w") as file:
-        json.dump(get_wrs(), file)
-
-def get_new_wrs() -> List[Record]:
+async def get_new_wrs() -> List[Record]:
     try:
         old_wrs = open_json("files/recent_wrs.json")
     except FileNotFoundError:
-        write_wrs()
+        await write_wrs()
         return []
-    new_wrs = get_wrs()
+    new_wrs = await get_wrs()
     globals:List[Record] = []
     for i in range(len(new_wrs)):
         for record in new_wrs[i]:
@@ -637,9 +691,13 @@ def get_new_wrs() -> List[Record]:
                 else:
                     break
             else:
-                r = Record.from_dict(record)
-                calculate_wr_diff(r)
-                globals.append(r)
+                globals.append(Record.from_dict(record))
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for wr in globals:
+            if not wr.previous_record:
+                tasks.append(calculate_wr_diff(session, wr))
+        await asyncio.gather(*tasks)
 
     #overwrite recent_wrs.json with new wrs if they exist
     if len(globals) > 0:
@@ -690,8 +748,10 @@ def get_map_times(style:Style, map:Map, page:int) -> Tuple[List[Record], int]:
     end = start + page_length
     return Record.make_record_list(data[start:end], map=map), converted_page_count
 
-def get_user_state(user_data:User) -> Response:
-    return get(f"user/{user_data.id}", {})
+async def get_user_state(user_data:User) -> Tuple[aiohttp.ClientResponse, Dict]:
+    async with aiohttp.ClientSession() as session:
+        res = await get_strafes(session, f"user/{user_data.id}", {})
+        return res, await res.json()
 
 def get_record_placement(record:Record) -> Tuple[int, int]:
     params = {
