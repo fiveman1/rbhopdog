@@ -4,21 +4,19 @@ import discord
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
 from io import StringIO
-import random
-import requests
 from typing import Callable, List, Union
 
-from modules import rbhop_api as rbhop
-from modules.rbhop_api import Game, Style, User, DEFAULT_GAMES, DEFAULT_STYLES
+from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
+from modules.strafes_wrapper import Client
 
 class ArgumentChecker:
     def __init__(self):
         self.game:Game = None
         self.style:Style = None
         self.user_data:User = None
-        self.map:rbhop.Map = None
+        self.map:Map = None
         self.valid = False
     def __bool__(self):
         return self.valid
@@ -83,10 +81,12 @@ class MessageBuilder:
         else:
             return f"{s:{length-1}} "[:length]
 
+# TODO: why do i have one cog for everything
 class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
+        self.strafes = Client()
         self.globals_started = False
         self.global_announcements.start()
         print("maincog loaded")
@@ -94,16 +94,17 @@ class MainCog(commands.Cog):
     def cog_unload(self):
         print("unloading maincog")
         self.global_announcements.cancel()
+        self.strafes.close()
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
         # when the bot first runs, overwrite globals then stop
         if not self.globals_started:
-            await rbhop.write_wrs()
+            await self.strafes.write_wrs()
             self.globals_started = True
             return
         try:
-            records = await rbhop.get_new_wrs()
+            records = await self.strafes.get_new_wrs()
         except:
             return
         if len(records) > 0:
@@ -126,19 +127,19 @@ class MainCog(commands.Cog):
                     try:
                         if ch.name == "globals":
                             for record in records:
-                                await ch.send(embed=self.make_global_embed(record))
+                                await ch.send(embed= await self.make_global_embed(record))
                         elif ch.name == "bhop-auto-globals":
                             for record in bhop_auto:
-                                await ch.send(embed=self.make_global_embed(record))
+                                await ch.send(embed= await self.make_global_embed(record))
                         elif ch.name == "bhop-styles-globals":
                             for record in bhop_style:
-                                await ch.send(embed=self.make_global_embed(record))
+                                await ch.send(embed= await self.make_global_embed(record))
                         elif ch.name == "surf-auto-globals":
                             for record in surf_auto:
-                                await ch.send(embed=self.make_global_embed(record))
+                                await ch.send(embed= await self.make_global_embed(record))
                         elif ch.name == "surf-styles-globals":
                             for record in surf_style:
-                                await ch.send(embed=self.make_global_embed(record))
+                                await ch.send(embed= await self.make_global_embed(record))
                     except discord.Forbidden:
                         pass
             
@@ -155,7 +156,7 @@ class MainCog(commands.Cog):
             return
         msg = MessageBuilder(title=f"10 Recent WRs [game: {arguments.game}, style: {arguments.style}]", 
             cols=[MessageCol.USERNAME, MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-            items=rbhop.get_recent_wrs(arguments.game, arguments.style)
+            items= await self.strafes.get_recent_wrs(arguments.game, arguments.style)
         ).build()
         await ctx.send(self.format_markdown_code(msg))
 
@@ -164,11 +165,11 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, user=user, game=game, style=style, map_name=map_name)
         if not arguments:
             return
-        record = rbhop.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map)
+        record = await self.strafes.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map)
         if record is None:
             await ctx.send(self.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}]"))
         else:
-            placement, total_completions = rbhop.get_record_placement(record)
+            placement, total_completions = await self.strafes.get_record_placement(record)
             msg = MessageBuilder(title=f"{arguments.user_data.username}'s record on {record.map.displayname} [game: {arguments.game}, style: {arguments.style}]",
                 cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 20, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
                 items=[record]
@@ -196,7 +197,7 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx, game=game, style=style, map_name=map_name)
         if not arguments:
             return
-        records, page_count = rbhop.get_map_times(arguments.style, arguments.map, page)
+        records, page_count = await self.strafes.get_map_times(arguments.style, arguments.map, page)
         if page_count == 0:
             await ctx.send(self.format_markdown_code(f"{arguments.map.displayname} has not yet been completed in {arguments.style}."))
             return
@@ -256,10 +257,10 @@ class MainCog(commands.Cog):
         for _game in g:
             for _style in s:
                 if not (_game == Game.SURF and _style == Style.SCROLL):
-                    tasks.append(rbhop.get_user_wrs(arguments.user_data, _game, _style))  
+                    tasks.append(self.strafes.get_user_wrs(arguments.user_data, _game, _style))  
         results = await asyncio.gather(*tasks)
         
-        wrs:List[rbhop.Record] = []
+        wrs:List[Record] = []
         count = 0
         for result in results:
             wrs += result
@@ -310,8 +311,7 @@ class MainCog(commands.Cog):
         if not arguments:
             return
         embed = discord.Embed(color=0x7c17ff)
-        res = requests.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={arguments.map.id}&size=250x250&format=Png&isCircular=false")
-        embed.set_thumbnail(url=res.json()["data"][0]["imageUrl"])
+        embed.set_thumbnail(url= await self.strafes.get_asset_thumbnail(arguments.map.id))
         embed.set_footer(text="Map Info")
         embed.title = f"\U0001F5FA  {arguments.map.displayname}"
         embed.add_field(name="Creator", value=arguments.map.creator)
@@ -331,7 +331,7 @@ class MainCog(commands.Cog):
             Game.SURF: []
         }
         async def the_order(game, style):
-            return (game, style, await rbhop.total_wrs(arguments.user_data, game, style))
+            return (game, style, await self.strafes.total_wrs(arguments.user_data, game, style))
         tasks = []
         for game in DEFAULT_GAMES:
             for style in DEFAULT_STYLES:
@@ -343,7 +343,7 @@ class MainCog(commands.Cog):
                 the_dict[game].append((style, wrs))
                 count += wrs
         embed = discord.Embed(color=0xff94b8)
-        embed.set_thumbnail(url=self.get_user_headshot_url(arguments.user_data.id))
+        embed.set_thumbnail(url=await self.strafes.get_user_headshot_url(arguments.user_data.id))
         embed.set_footer(text="WR Count")
         if arguments.user_data.username != arguments.user_data.displayname:
             name = f"{arguments.user_data.displayname} ({arguments.user_data.username})"
@@ -374,7 +374,7 @@ class MainCog(commands.Cog):
         if arguments.style == Style.SCROLL:
             await ctx.send(self.format_markdown_code("Scroll is not eligible for faste."))
             return
-        wrs = await rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
+        wrs = await self.strafes.total_wrs(arguments.user_data, arguments.game, arguments.style)
         if (arguments.style == Style.AUTOHOP and wrs >= 10) or wrs >= 50:
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
         else:
@@ -386,19 +386,19 @@ class MainCog(commands.Cog):
         if not arguments:
             return
         tasks = [
-            rbhop.get_user_rank(arguments.user_data, arguments.game, arguments.style),
-            rbhop.get_user_completion(arguments.user_data, arguments.game, arguments.style),
-            rbhop.total_wrs(arguments.user_data, arguments.game, arguments.style)
+            self.strafes.get_user_rank(arguments.user_data, arguments.game, arguments.style),
+            self.strafes.get_user_completion(arguments.user_data, arguments.game, arguments.style),
+            self.strafes.total_wrs(arguments.user_data, arguments.game, arguments.style)
         ]
         results = await asyncio.gather(*tasks)
-        rank_data = results[0]
-        if not rank_data:
+        rank_data:Rank = results[0]
+        if not rank_data or rank_data.placement < 1:
             await ctx.send(self.format_markdown_code(f"No data available for {arguments.user_data.username} [game: {arguments.game}, style: {arguments.style}]"))
             return
         else:
             completions, total_maps = results[1]
             wrs = results[2]
-            await ctx.send(embed=self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps, wrs))
+            await ctx.send(embed= await self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx, game, style, page=1):
@@ -409,7 +409,7 @@ class MainCog(commands.Cog):
         arguments = await self.argument_checker(ctx,game=game, style=style)
         if not arguments:
             return
-        ranks, page_count = rbhop.get_ranks(arguments.game, arguments.style, page)
+        ranks, page_count = await self.strafes.get_ranks(arguments.game, arguments.style, page)
         if page_count == 0:
             await ctx.send(self.format_markdown_code(f"No ranks found [game: {arguments.game}, style: {arguments.style}] (???)."))
             return
@@ -477,7 +477,7 @@ class MainCog(commands.Cog):
             style = arguments.style
         if game:
             game = arguments.game
-        record_list, page_count = await rbhop.get_user_times(arguments.user_data, game, style, page)
+        record_list, page_count = await self.strafes.get_user_times(arguments.user_data, game, style, page)
         if page_count == 0:
             if not style:
                 style = "all"
@@ -514,15 +514,15 @@ class MainCog(commands.Cog):
     @commands.command(name="mapcount")
     async def map_count(self, ctx):
         embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
-        embed.add_field(name="Bhop Maps", value=str(rbhop.Map.bhop_map_count))
-        embed.add_field(name="Surf Maps", value=str(rbhop.Map.surf_map_count))
+        embed.add_field(name="Bhop Maps", value=str(await self.strafes.get_map_count(Game.BHOP)))
+        embed.add_field(name="Surf Maps", value=str(await self.strafes.get_map_count(Game.SURF)))
         embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
         await ctx.send(embed=embed)
 
     @commands.command(name="user")
     async def user_info(self, ctx, user:str):
         if user == "me":
-            roblox_user = self.get_roblox_user(ctx.author.id)
+            roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
             if not roblox_user:
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return
@@ -533,7 +533,7 @@ class MainCog(commands.Cog):
         else:
             discord_user_id = self.get_discord_user_id(user)
             if discord_user_id:
-                roblox_user = self.get_roblox_user(discord_user_id)
+                roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
                 if not roblox_user:
                     await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
                     return
@@ -542,9 +542,9 @@ class MainCog(commands.Cog):
             else:
                 the_user = user
         try:
-            user_data = User.get_user_data(the_user)
+            user_data = await self.strafes.get_user_data(the_user)
             embed = discord.Embed(color=0xfcba03)
-            embed.set_thumbnail(url=self.get_user_headshot_url(user_data.id))
+            embed.set_thumbnail(url= await self.strafes.get_user_headshot_url(user_data.id))
             embed.add_field(name="Username", value=user_data.username, inline=True)
             embed.add_field(name="ID", value=user_data.id, inline=True)
             embed.add_field(name="Display name", value=user_data.displayname, inline=True)
@@ -583,7 +583,7 @@ class MainCog(commands.Cog):
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps(self, ctx):
-        await rbhop.Map.update_maps()
+        await self.strafes.update_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
     
     def get_discord_user_id(self, s):
@@ -617,7 +617,7 @@ class MainCog(commands.Cog):
             return arguments
         if user:
             if user == "me":
-                roblox_user = self.get_roblox_user(ctx.author.id)
+                roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
                 if not roblox_user:
                     await ctx.send(self.format_markdown_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
                     return arguments
@@ -626,7 +626,7 @@ class MainCog(commands.Cog):
             else:
                 discord_user_id = self.get_discord_user_id(user)
                 if discord_user_id:
-                    roblox_user = self.get_roblox_user(discord_user_id)
+                    roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
                     if not roblox_user:
                         try:
                             discord_user = await self.bot.fetch_user(int(discord_user_id))
@@ -637,7 +637,7 @@ class MainCog(commands.Cog):
                     else:
                         user = roblox_user["robloxId"]
             try:
-                arguments.user_data = User.get_user_data(user)
+                arguments.user_data = await self.strafes.get_user_data(user)
             except InvalidData:
                 await ctx.send(self.format_markdown_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
                 return arguments
@@ -647,7 +647,7 @@ class MainCog(commands.Cog):
             if not await self.check_user_status(ctx, arguments.user_data):
                 return arguments
         if map_name:
-            arguments.map = rbhop.Map.from_name(map_name, arguments.game)
+            arguments.map = await self.strafes.map_from_name(map_name, arguments.game)
             if not arguments.map:
                 await ctx.send(self.format_markdown_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
                 return arguments
@@ -656,26 +656,19 @@ class MainCog(commands.Cog):
     
     #set the user_id and username of the argument_checker before passing it to this
     async def check_user_status(self, ctx, user_data:User):
-        res, data = await rbhop.get_user_state(user_data)
-        if res.status == 404:
+        state = await self.strafes.get_user_state(user_data)
+        if not state:
             await ctx.send(self.format_markdown_code(f"'{user_data.username}' has not played bhop/surf."))
             return False
         else:
-            user_data.state = rbhop.UserState(data["State"])
-            if user_data.state == rbhop.UserState.BLACKLISTED:
+            user_data.state = state
+            if user_data.state == UserState.BLACKLISTED:
                 await ctx.send(self.format_markdown_code(f"{user_data.username} is blacklisted."))
                 return False
-            elif user_data.state == rbhop.UserState.PENDING:
+            elif user_data.state == UserState.PENDING:
                 await ctx.send(self.format_markdown_code(f"{user_data.username} is pending moderation."))
                 return False
         return True
-
-    def get_roblox_user(self, user_id):
-        res = requests.get(f"https://verify.eryn.io/api/user/{user_id}")
-        if res:
-            return res.json()
-        else:
-            return None
 
     def format_markdown_code(self, s):
         return f"```\n{s}```"
@@ -691,15 +684,11 @@ class MainCog(commands.Cog):
             elif n == 3:
                 ordinal = "rd"
         return ordinal
-
-    def get_user_headshot_url(self, user_id):
-        res = requests.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false")
-        return f"{res.json()['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
     
-    def make_global_embed(self, record:rbhop.Record):
+    async def make_global_embed(self, record:Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        embed.set_thumbnail(url=self.get_user_headshot_url(record.user.id))
+        embed.set_thumbnail(url=await self.strafes.get_user_headshot_url(record.user.id))
         embed.add_field(name="Player", value=record.user.username, inline=True)
         if not record.previous_record:
             embed.add_field(name="Time", value=f"{record.time} (-n/a s)", inline=True)
@@ -710,14 +699,14 @@ class MainCog(commands.Cog):
         embed.set_footer(text="World Record")
         return embed
     
-    def make_user_embed(self, user:User, rank_data:rbhop.Rank, game:Game, style:Style, completions, total_maps, wrs):
+    async def make_user_embed(self, user:User, rank_data:Rank, game:Game, style:Style, completions, total_maps, wrs):
         ordinal = self.get_ordinal(rank_data.placement)
         if user.username != user.displayname:
             name = f"{user.displayname} ({user.username})"
         else:
             name = user.username
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {name}", color=0x1dbde0)
-        embed.set_thumbnail(url=self.get_user_headshot_url(user.id))
+        embed.set_thumbnail(url=await self.strafes.get_user_headshot_url(user.id))
         embed.add_field(name="Rank", value=f"{rank_data} ({rank_data.rank})", inline=True)
         embed.add_field(name="Skill", value=f"{rank_data.skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}") if rank_data.placement > 0 else embed.add_field(name="Placement", value="n/a")
@@ -725,6 +714,7 @@ class MainCog(commands.Cog):
         embed.set_footer(text="User Profile")
         return embed
     
+    # TODO: this should be improved. make a help.txt that's easier to edit maybe?
     def make_help_embed(self):
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
