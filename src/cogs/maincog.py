@@ -1,9 +1,11 @@
 # maincog.py
 import asyncio
 import discord
+from dotenv import load_dotenv
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
 from io import StringIO
+import os
 from typing import Callable, List, Union
 
 from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
@@ -86,7 +88,8 @@ class MainCog(commands.Cog):
     def __init__(self, bot):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
-        self.strafes = Client()
+        load_dotenv()
+        self.strafes = Client(os.getenv("API_KEY"))
         self.globals_started = False
         self.global_announcements.start()
         print("maincog loaded")
