@@ -1,4 +1,5 @@
 # strafes_wrapper.py
+from aiocache import cached
 from modules import strafes
 from modules.strafes import Game, Style, Rank, Record, Map, User, UserState
 import random
@@ -44,6 +45,7 @@ class Client(strafes.Client):
     async def get_record_placement(self, record:Record) -> Tuple[int, int]:
         return await strafes.get_record_placement(self, record)
 
+    @cached(ttl=60*60)
     async def get_user_data(self, user : Union[str, int]) -> User:
         return await strafes.User.get_user_data(self, user)
 
@@ -56,15 +58,23 @@ class Client(strafes.Client):
     async def get_map_count(self, game:Game) -> int:
         return await strafes.Map.get_map_count(self, game)
 
-    async def get_roblox_user_from_discord(self, discord_user_id:int):
+    # this doesn't cache values that return None
+    @cached(ttl=24*60*60)
+    async def get_roblox_user_from_discord(self, discord_user_id:int) -> int:
         async with await self.session.get(f"https://verify.eryn.io/api/user/{discord_user_id}") as res:
-            return await res.json() if res else None
+            if res.status >= 200 and res.status < 300:
+                data = await res.json()
+                return data["robloxId"]
+            else:
+                return None
 
+    @cached(ttl=60*60)
     async def get_user_headshot_url(self, user_id:int) -> str:
         async with await self.session.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false") as res:
             data = await res.json()
             return f"{data['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
 
+    @cached()
     async def get_asset_thumbnail(self, asset_id:int) -> str:
         async with await self.session.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size=250x250&format=Png&isCircular=false") as res:
             data = await res.json()

@@ -3,7 +3,6 @@ import aiohttp
 import asyncio
 import datetime
 from discord.errors import InvalidData
-from dotenv import load_dotenv
 from enum import Enum
 import json
 import os
@@ -25,7 +24,11 @@ class Client:
         self.api_key = api_key
 
     def close(self):
-        self.session.loop.create_task(self.session.close())
+        if self.session:
+            self.session.loop.create_task(self.session.close())
+
+    def __del__(self):
+        self.close()
 
 class JSONRes:
     def __init__(self, res:aiohttp.ClientResponse, json):

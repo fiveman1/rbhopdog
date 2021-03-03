@@ -530,7 +530,7 @@ class MainCog(commands.Cog):
                 await ctx.send(self.format_markdown_code("Invalid username. No Roblox username associated with your Discord account."))
                 return
             else:
-                the_user = roblox_user["robloxId"]
+                the_user = roblox_user
         elif user.isnumeric():
             the_user = int(user)
         else:
@@ -541,7 +541,7 @@ class MainCog(commands.Cog):
                     await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
                     return
                 else:
-                    the_user = roblox_user["robloxId"]
+                    the_user = roblox_user
             else:
                 the_user = user
         try:
@@ -625,7 +625,7 @@ class MainCog(commands.Cog):
                     await ctx.send(self.format_markdown_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
                     return arguments
                 else:
-                    user = roblox_user["robloxId"]
+                    user = roblox_user
             else:
                 discord_user_id = self.get_discord_user_id(user)
                 if discord_user_id:
@@ -638,7 +638,7 @@ class MainCog(commands.Cog):
                             await ctx.send(self.format_markdown_code(f"Invalid discord user ID."))
                         return arguments
                     else:
-                        user = roblox_user["robloxId"]
+                        user = roblox_user
             try:
                 arguments.user_data = await self.strafes.get_user_data(user)
             except InvalidData:
