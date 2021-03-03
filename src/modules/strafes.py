@@ -688,7 +688,7 @@ async def get_new_wrs(client:Client) -> List[Record]:
                 if record["Time"] != match["Time"]:
                     r = await Record.from_dict(client, record)
                     r.diff = round((int(record["Time"]) - int(match["Time"])) / 1000.0, 3)
-                    r.previous_record = Record.from_dict(client, match)
+                    r.previous_record = await Record.from_dict(client, match)
                     globals.append(r)
                 #we can break here because the lists are sorted in the same fashion
                 else:
