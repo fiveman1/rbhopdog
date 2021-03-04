@@ -148,10 +148,13 @@ class MainCog(commands.Cog):
                         except:
                             pass
         except Exception as error:
-            tb_channel = self.bot.get_channel(812768023920115742)
-            tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-            for msg in utils.page_messages(f"Error in globals!\n{type(error).__name__}: {error}\n" + tb):
-                await tb_channel.send(f"```\n{msg}\n```")
+            try:
+                tb_channel = self.bot.get_channel(812768023920115742)
+                tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+                for msg in utils.page_messages(f"Error in globals!\n{type(error).__name__}: {error}\n" + tb):
+                    await tb_channel.send(f"```\n{msg}\n```")
+            except:
+                pass
             
     @global_announcements.before_loop
     async def before_global_announcements(self):
