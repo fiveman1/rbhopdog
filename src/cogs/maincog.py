@@ -6,6 +6,7 @@ from discord.errors import InvalidData
 from discord.ext import commands, tasks
 from io import StringIO
 import os
+import traceback
 from typing import Callable, List, Union
 
 from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
@@ -101,16 +102,16 @@ class MainCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
+        # this is wrapped in a try-except because if this raises
+        # an error the entire task stops and we don't want that :)
+        # yeah this is a bad practice but idk what else to do
         try:
             # when the bot first runs, overwrite globals then stop
             if not self.globals_started:
                 await self.strafes.write_wrs()
                 self.globals_started = True
                 return
-            try:
-                records = await self.strafes.get_new_wrs()
-            except:
-                return
+            records = await self.strafes.get_new_wrs()
             if len(records) > 0:
                 bhop_auto = []
                 bhop_style = []
@@ -144,10 +145,13 @@ class MainCog(commands.Cog):
                             elif ch.name == "surf-styles-globals":
                                 for record in surf_style:
                                     await ch.send(embed= await self.make_global_embed(record))
-                        except discord.Forbidden:
+                        except:
                             pass
-        except:
-            pass
+        except Exception as error:
+            tb_channel = self.bot.get_channel(812768023920115742)
+            tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+            for msg in utils.page_messages(f"Error in globals!\n{type(error).__name__}: {error}\n" + tb):
+                await tb_channel.send(f"```\n{msg}\n```")
             
     @global_announcements.before_loop
     async def before_global_announcements(self):
@@ -541,7 +545,15 @@ class MainCog(commands.Cog):
             if discord_user_id:
                 roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
                 if not roblox_user:
-                    await ctx.send(self.format_markdown_code(f"Invalid username ('{self.bot.get_user(int(discord_user_id)).name}' does not have a Roblox account associated with their Discord account.)"))
+                    try:
+                        u  = await self.bot.fetch_user(int(discord_user_id))
+                        if u:
+                            await ctx.send(self.format_markdown_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
+                        else:
+                            # I think this is redundant but I'm not sure
+                            await ctx.send(self.format_markdown_code(f"Invalid username (no user associated with that Discord account.)"))
+                    except:
+                        await ctx.send(self.format_markdown_code(f"Invalid discord user ID."))
                     return
                 else:
                     the_user = roblox_user
@@ -635,8 +647,11 @@ class MainCog(commands.Cog):
                     roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
                     if not roblox_user:
                         try:
-                            discord_user = await self.bot.fetch_user(int(discord_user_id))
-                            await ctx.send(self.format_markdown_code(f"Invalid username ('{discord_user.name}' does not have a Roblox account associated with their Discord account.)"))
+                            u = await self.bot.fetch_user(int(discord_user_id))
+                            if u:
+                                await ctx.send(self.format_markdown_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
+                            else:
+                                await ctx.send(self.format_markdown_code(f"Invalid username (no user associated with that Discord account.)"))
                         except:
                             await ctx.send(self.format_markdown_code(f"Invalid discord user ID."))
                         return arguments
