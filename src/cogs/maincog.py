@@ -100,6 +100,15 @@ class MainCog(commands.Cog):
         self.global_announcements.cancel()
         self.strafes.close()
 
+    async def try_except(self, coroutine):
+        try:
+            await coroutine
+        except:
+            pass
+
+    async def add_to_ls(self, ls, record):
+        ls.append(await self.make_global_embed(record))
+
     @tasks.loop(minutes=1)
     async def global_announcements(self):
         # this is wrapped in a try-except because if this raises
@@ -113,40 +122,43 @@ class MainCog(commands.Cog):
                 return
             records = await self.strafes.get_new_wrs()
             if len(records) > 0:
+                embed_tasks = []
+                all_embeds = []
                 bhop_auto = []
                 bhop_style = []
                 surf_auto = []
                 surf_style = []
                 for record in records:
                     print(f"New global:\n{record}")
+                    embed_tasks.append(self.add_to_ls(all_embeds, record))
                     if record.game == Game.BHOP and record.style == Style.AUTOHOP:
-                        bhop_auto.append(record)
+                        embed_tasks.append(self.add_to_ls(bhop_auto, record))
                     elif record.game == Game.BHOP and record.style != Style.AUTOHOP:
-                        bhop_style.append(record)
+                        embed_tasks.append(self.add_to_ls(bhop_style, record))
                     elif record.game == Game.SURF and record.style == Style.AUTOHOP:
-                        surf_auto.append(record)
+                        embed_tasks.append(self.add_to_ls(surf_auto, record))
                     elif record.game == Game.SURF and record.style != Style.AUTOHOP:
-                        surf_style.append(record)
+                        embed_tasks.append(self.add_to_ls(surf_style, record))
+                await asyncio.gather(*embed_tasks)
+                tasks = []
                 for guild in self.bot.guilds:
                     for ch in guild.text_channels:
-                        try:
-                            if ch.name == "globals":
-                                for record in records:
-                                    await ch.send(embed= await self.make_global_embed(record))
-                            elif ch.name == "bhop-auto-globals":
-                                for record in bhop_auto:
-                                    await ch.send(embed= await self.make_global_embed(record))
-                            elif ch.name == "bhop-styles-globals":
-                                for record in bhop_style:
-                                    await ch.send(embed= await self.make_global_embed(record))
-                            elif ch.name == "surf-auto-globals":
-                                for record in surf_auto:
-                                    await ch.send(embed= await self.make_global_embed(record))
-                            elif ch.name == "surf-styles-globals":
-                                for record in surf_style:
-                                    await ch.send(embed= await self.make_global_embed(record))
-                        except:
-                            pass
+                        if ch.name == "globals":
+                            for embed in all_embeds:
+                                tasks.append(self.try_except(ch.send(embed=embed)))
+                        elif ch.name == "bhop-auto-globals":
+                            for embed in bhop_auto:
+                                tasks.append(self.try_except(ch.send(embed=embed)))
+                        elif ch.name == "bhop-styles-globals":
+                            for embed in bhop_style:
+                                tasks.append(self.try_except(ch.send(embed=embed)))
+                        elif ch.name == "surf-auto-globals":
+                            for embed in surf_auto:
+                                tasks.append(self.try_except(ch.send(embed=embed)))
+                        elif ch.name == "surf-styles-globals":
+                            for embed in surf_style:
+                                tasks.append(self.try_except(ch.send(embed=embed)))
+                await asyncio.gather(*tasks)
         except Exception as error:
             try:
                 tb_channel = self.bot.get_channel(812768023920115742)
