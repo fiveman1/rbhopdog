@@ -108,9 +108,6 @@ class MainCog(commands.Cog):
         except:
             pass
 
-    # async def add_to_ls(self, ls, record):
-    #     ls.append(await self.make_global_embed(record))
-
     async def create_global_embed(self, record):
         return (record.game, record.style, await self.make_global_embed(record))
 
@@ -156,7 +153,7 @@ class MainCog(commands.Cog):
                 for guild in self.bot.guilds:
                     for ch in guild.text_channels:
                         if ch.name == "globals":
-                            for embed in all_embeds:
+                            for _,_,embed in all_embeds:
                                 tasks.append(self.try_except(ch.send(embed=embed)))
                         elif ch.name == "bhop-auto-globals":
                             for embed in bhop_auto:
