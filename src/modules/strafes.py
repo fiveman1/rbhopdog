@@ -37,7 +37,13 @@ class JSONRes:
 
 async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
     async with client.session.get(f"https://api.strafes.net/v1/{end_of_url}", headers={"api-key":client.api_key}, params=params) as res:
-        return JSONRes(res, await res.json())
+        try:
+            json = await res.json()
+            return JSONRes(res, json)
+        except aiohttp.ContentTypeError:
+            body = await res.text()
+            raise Exception(body)
+        
 
 class Time:
     def __init__(self, millis:int):
