@@ -9,6 +9,8 @@ import os
 import traceback
 from typing import Callable, List, Union
 
+import time
+
 from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
@@ -106,8 +108,11 @@ class MainCog(commands.Cog):
         except:
             pass
 
-    async def add_to_ls(self, ls, record):
-        ls.append(await self.make_global_embed(record))
+    # async def add_to_ls(self, ls, record):
+    #     ls.append(await self.make_global_embed(record))
+
+    async def create_global_embed(self, record):
+        return (record.game, record.style, await self.make_global_embed(record))
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
@@ -120,26 +125,33 @@ class MainCog(commands.Cog):
                 await self.strafes.write_wrs()
                 self.globals_started = True
                 return
+            start = time.time()
             records = await self.strafes.get_new_wrs()
             if len(records) > 0:
+                end = time.time()
+                print(f"get new wrs: {end-start}s")
+                start = time.time()
                 embed_tasks = []
-                all_embeds = []
+                for record in records:
+                    print(f"New global:\n{record}")
+                    embed_tasks.append(self.create_global_embed(record))
+                all_embeds = await asyncio.gather(*embed_tasks)
+                end = time.time()
+                print(f"embeds created: {end-start}s")
+                start = time.time()
                 bhop_auto = []
                 bhop_style = []
                 surf_auto = []
                 surf_style = []
-                for record in records:
-                    print(f"New global:\n{record}")
-                    embed_tasks.append(self.add_to_ls(all_embeds, record))
-                    if record.game == Game.BHOP and record.style == Style.AUTOHOP:
-                        embed_tasks.append(self.add_to_ls(bhop_auto, record))
-                    elif record.game == Game.BHOP and record.style != Style.AUTOHOP:
-                        embed_tasks.append(self.add_to_ls(bhop_style, record))
-                    elif record.game == Game.SURF and record.style == Style.AUTOHOP:
-                        embed_tasks.append(self.add_to_ls(surf_auto, record))
-                    elif record.game == Game.SURF and record.style != Style.AUTOHOP:
-                        embed_tasks.append(self.add_to_ls(surf_style, record))
-                await asyncio.gather(*embed_tasks)
+                for game, style, embed in all_embeds:
+                    if game == Game.BHOP and style == Style.AUTOHOP:
+                        bhop_auto.append(embed)
+                    elif game == Game.BHOP and style != Style.AUTOHOP:
+                        bhop_style.append(embed)
+                    elif game == Game.SURF and style == Style.AUTOHOP:
+                        surf_auto.append(embed)
+                    elif game == Game.SURF and style != Style.AUTOHOP:
+                        surf_style.append(embed)
                 tasks = []
                 for guild in self.bot.guilds:
                     for ch in guild.text_channels:
@@ -159,6 +171,8 @@ class MainCog(commands.Cog):
                             for embed in surf_style:
                                 tasks.append(self.try_except(ch.send(embed=embed)))
                 await asyncio.gather(*tasks)
+                end = time.time()
+                print(f"embeds posted: {end-start}s")
         except Exception as error:
             try:
                 tb_channel = self.bot.get_channel(812768023920115742)
