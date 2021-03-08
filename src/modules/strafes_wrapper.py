@@ -72,7 +72,10 @@ class Client(strafes.Client):
     async def get_user_headshot_url(self, user_id:int) -> str:
         async with await self.session.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false") as res:
             data = await res.json()
-            return f"{data['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
+            if data['data'][0]['imageUrl']:
+                return f"{data['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
+            else:
+                return None
 
     @cached()
     async def get_asset_thumbnail(self, asset_id:int) -> str:

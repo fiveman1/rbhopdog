@@ -379,7 +379,9 @@ class MainCog(commands.Cog):
                 the_dict[game].append((style, wrs))
                 count += wrs
         embed = discord.Embed(color=0xff94b8)
-        embed.set_thumbnail(url=await self.strafes.get_user_headshot_url(arguments.user_data.id))
+        url = await self.strafes.get_user_headshot_url(arguments.user_data.id)
+        if url:
+            embed.set_thumbnail(url=url)
         embed.set_footer(text="WR Count")
         if arguments.user_data.username != arguments.user_data.displayname:
             name = f"{arguments.user_data.displayname} ({arguments.user_data.username})"
@@ -588,7 +590,9 @@ class MainCog(commands.Cog):
         try:
             user_data = await self.strafes.get_user_data(the_user)
             embed = discord.Embed(color=0xfcba03)
-            embed.set_thumbnail(url= await self.strafes.get_user_headshot_url(user_data.id))
+            url = await self.strafes.get_user_headshot_url(user_data.id)
+            if url:
+                embed.set_thumbnail(url=url)
             embed.add_field(name="Username", value=user_data.username, inline=True)
             embed.add_field(name="ID", value=user_data.id, inline=True)
             embed.add_field(name="Display name", value=user_data.displayname, inline=True)
@@ -735,7 +739,9 @@ class MainCog(commands.Cog):
     async def make_global_embed(self, record:Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        embed.set_thumbnail(url=await self.strafes.get_user_headshot_url(record.user.id))
+        url = await self.strafes.get_user_headshot_url(record.user.id)
+        if url:
+            embed.set_thumbnail(url=url)
         embed.add_field(name="Player", value=record.user.username, inline=True)
         if not record.previous_record:
             embed.add_field(name="Time", value=f"{record.time} (-n/a s)", inline=True)
@@ -753,7 +759,9 @@ class MainCog(commands.Cog):
         else:
             name = user.username
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {name}", color=0x1dbde0)
-        embed.set_thumbnail(url=await self.strafes.get_user_headshot_url(user.id))
+        url = await self.strafes.get_user_headshot_url(user.id)
+        if url:
+            embed.set_thumbnail(url=url)
         embed.add_field(name="Rank", value=f"{rank_data} ({rank_data.rank})", inline=True)
         embed.add_field(name="Skill", value=f"{rank_data.skill:.3f}%", inline=True)
         embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}") if rank_data.placement > 0 else embed.add_field(name="Placement", value="n/a")
