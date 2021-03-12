@@ -422,38 +422,38 @@ class User:
     @staticmethod
     async def get_user_data(client:Client, user : Union[str, int]) -> "User":
         if type(user) == int:
-            res = await client.session.get(f"https://users.roblox.com/v1/users/{user}")
-            if res.status == 404:
-                raise InvalidData("Invalid user ID")
-            try:
-                data = await res.json()
-                return User.from_dict(data)
-            except:
-                raise TimeoutError("Error getting user data")
+            async with client.session.get(f"https://users.roblox.com/v1/users/{user}") as res:
+                if res.status == 404:
+                    raise InvalidData("Invalid user ID")
+                try:
+                    data = await res.json()
+                    return User.from_dict(data)
+                except:
+                    raise TimeoutError("Error getting user data")
         else:
-            res = await client.session.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]})
-            d = await res.json()
-            if not d:
-                raise TimeoutError("Error getting user data")
-            else:
-                data = d["data"]
-                if len(data) > 0:
-                    return User.from_dict(data[0])
+            async with client.session.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]}) as res:
+                d = await res.json()
+                if not d:
+                    raise TimeoutError("Error getting user data")
                 else:
-                    raise InvalidData("Invalid username")
+                    data = d["data"]
+                    if len(data) > 0:
+                        return User.from_dict(data[0])
+                    else:
+                        raise InvalidData("Invalid username")
 
     @staticmethod
     async def get_user_data_from_list(client:Client, users:List[int]) -> Dict[int, "User"]:
-        res = await client.session.post("https://users.roblox.com/v1/users", data={"userIds":users})
-        if res:
-            user_lookup = {}
-            data = await res.json()
-            for user_dict in data["data"]:
-                user = User.from_dict(user_dict)
-                user_lookup[user_dict["id"]] = user
-            return user_lookup
-        else:
-            raise TimeoutError("Error getting user data")
+        async with client.session.post("https://users.roblox.com/v1/users", data={"userIds":users}) as res:
+            if res:
+                user_lookup = {}
+                data = await res.json()
+                for user_dict in data["data"]:
+                    user = User.from_dict(user_dict)
+                    user_lookup[user_dict["id"]] = user
+                return user_lookup
+            else:
+                raise TimeoutError("Error getting user data")
 
 class UserState(Enum):
     DEFAULT = 0

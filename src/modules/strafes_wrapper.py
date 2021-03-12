@@ -81,4 +81,7 @@ class Client(strafes.Client):
     async def get_asset_thumbnail(self, asset_id:int) -> str:
         async with await self.session.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size=250x250&format=Png&isCircular=false") as res:
             data = await res.json()
-            return data["data"][0]["imageUrl"]
+            if data["data"][0]["imageUrl"]:
+                return data["data"][0]["imageUrl"]
+            else:
+                return None

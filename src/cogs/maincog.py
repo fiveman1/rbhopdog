@@ -347,12 +347,14 @@ class MainCog(commands.Cog):
         if not arguments:
             return
         embed = discord.Embed(color=0x7c17ff)
-        embed.set_thumbnail(url= await self.strafes.get_asset_thumbnail(arguments.map.id))
+        url = await self.strafes.get_asset_thumbnail(arguments.map.id)
+        if url:
+            embed.set_thumbnail(url=url)
         embed.set_footer(text="Map Info")
         embed.title = f"\U0001F5FA  {arguments.map.displayname}"
         embed.add_field(name="Creator", value=arguments.map.creator)
         embed.add_field(name="Map ID", value=arguments.map.id)
-        embed.add_field(name="Play Count", value=arguments.map.playcount)
+        embed.add_field(name="Server Load Count", value=arguments.map.playcount)
         await ctx.send(embed=embed)
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
