@@ -58,6 +58,9 @@ class Client(strafes.Client):
     async def get_map_count(self, game:Game) -> int:
         return await strafes.Map.get_map_count(self, game)
 
+    async def get_maps_by_creator(self, creator:str) -> List[Map]:
+        return await strafes.Map.get_maps_by_creator(self, creator)
+
     # this doesn't cache values that return None
     @cached(ttl=24*60*60)
     async def get_roblox_user_from_discord(self, discord_user_id:int) -> int:

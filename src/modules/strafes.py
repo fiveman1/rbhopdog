@@ -328,6 +328,19 @@ class Map:
         else:
             return 1
 
+    @staticmethod
+    async def get_maps_by_creator(client:Client, creator:str) -> List["Map"]:
+        if not Map.maps_loaded:
+            await Map.setup_maps(client)
+        if not creator:
+            return list(Map.map_lookup.values())
+        creator = creator.lower()
+        matches = []
+        for map in Map.map_lookup.values():
+            if creator in map.creator.lower():
+                matches.append(map)
+        return matches
+
 class Rank:
     __ranks__ = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")
 

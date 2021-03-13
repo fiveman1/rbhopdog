@@ -1,6 +1,7 @@
 # maincog.py
 import asyncio
 import discord
+from discord.ext.commands.context import Context
 from dotenv import load_dotenv
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
@@ -186,7 +187,7 @@ class MainCog(commands.Cog):
         await self.bot.wait_until_ready()
 
     @commands.command(name="recentwrs")
-    async def get_recent_wrs(self, ctx, game, style="autohop"):
+    async def get_recent_wrs(self, ctx:Context, game, style="autohop"):
         arguments = await self.argument_checker(ctx, game=game, style=style)
         if not arguments:
             return
@@ -197,7 +198,7 @@ class MainCog(commands.Cog):
         await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="record")
-    async def get_user_record(self, ctx, user, game, style, *, map_name):
+    async def get_user_record(self, ctx:Context, user, game, style, *, map_name):
         arguments = await self.argument_checker(ctx, user=user, game=game, style=style, map_name=map_name)
         if not arguments:
             return
@@ -213,7 +214,7 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(msg))
 
     @commands.command(name="wrmap")
-    async def get_wrmap(self, ctx, game, style, *args):
+    async def get_wrmap(self, ctx:Context, game, style, *args):
         if len(args) == 0:
             await ctx.send(self.format_markdown_code("Missing map name."))
             return
@@ -249,7 +250,7 @@ class MainCog(commands.Cog):
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
-    async def wr_list(self, ctx, user, *args):
+    async def wr_list(self, ctx:Context, user, *args):
         valid_sorts = ["", "date", "time", "name"]
         sort = ""
         page = 1
@@ -339,10 +340,9 @@ class MainCog(commands.Cog):
             f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
             f.seek(0)
             await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
-            return
 
     @commands.command(name="map")
-    async def map_info(self, ctx, game, *, map_name):
+    async def map_info(self, ctx:Context, game, *, map_name):
         arguments = await self.argument_checker(ctx, game=game, map_name=map_name)
         if not arguments:
             return
@@ -359,7 +359,7 @@ class MainCog(commands.Cog):
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrcount")
-    async def wr_count(self, ctx, user):
+    async def wr_count(self, ctx:Context, user):
         arguments = await self.argument_checker(ctx, user=user)
         if not arguments:
             return
@@ -407,7 +407,7 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="fastecheck")
-    async def faste_check(self, ctx, user, game, style):
+    async def faste_check(self, ctx:Context, user, game, style):
         arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
         if not arguments:
             return
@@ -421,7 +421,7 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
 
     @commands.command(name="profile")
-    async def user_rank(self, ctx, user, game, style):
+    async def user_rank(self, ctx:Context, user, game, style):
         arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
         if not arguments:
             return
@@ -441,7 +441,7 @@ class MainCog(commands.Cog):
             await ctx.send(embed= await self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
-    async def ranks(self, ctx, game, style, page=1):
+    async def ranks(self, ctx:Context, game, style, page=1):
         page = int(page)
         if page < 1:
             await ctx.send(self.format_markdown_code("Page number cannot be less than 1."))
@@ -462,7 +462,7 @@ class MainCog(commands.Cog):
         await ctx.send(self.format_markdown_code(msg))
     
     @commands.command(name="times")
-    async def times(self, ctx, user, *args):
+    async def times(self, ctx:Context, user, *args):
         if len(args) == 0:
             game = None
             style = None
@@ -552,15 +552,73 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code(message))
     
     @commands.command(name="mapcount")
-    async def map_count(self, ctx):
+    async def map_count(self, ctx:Context):
         embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
         embed.add_field(name="Bhop Maps", value=str(await self.strafes.get_map_count(Game.BHOP)))
         embed.add_field(name="Surf Maps", value=str(await self.strafes.get_map_count(Game.SURF)))
         embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
         await ctx.send(embed=embed)
 
+    @commands.command(name="maps")
+    async def maps(self, ctx:Context, *args):
+        creator = None
+        page = 1
+        if len(args) > 1:
+            creator = args[0]
+            page = int(args[1]) if args[1].isnumeric() else None
+        if len(args) == 1:
+            if args[0].isnumeric():
+                page = int(args[0])
+            elif args[0] == "txt":
+                page = None
+            else:
+                creator = args[0]
+        the_maps = await self.strafes.get_maps_by_creator(creator)
+        if not the_maps:
+            await ctx.send(self.format_markdown_code(f"No maps found by '{creator}'."))
+            return
+        the_maps.sort(key=lambda k: (k.game.name, k.displayname))
+        cols = [MessageCol.Col("Map name", 30, lambda m: m.displayname),
+                    MessageCol.Col("Creator", 35, lambda m: m.creator),
+                    MessageCol.GAME,
+                    MessageCol.Col("Server loads", 14, lambda m: str(m.playcount))]
+        if page:
+            total_pages = (len(the_maps) - 1) // 20 + 1
+            if page > total_pages:
+                page = total_pages
+            the_maps = the_maps[(page-1)*20:page*20]
+            if creator:
+                msg = MessageBuilder(title=f"Search result for maps by '{creator}' [page: {page} / {total_pages}]",
+                    cols=cols,
+                    items=the_maps
+                ).build()
+                await ctx.send(self.format_markdown_code(msg))
+            else:
+                msg = MessageBuilder(title=f"List of all maps [page: {page} / {total_pages}]",
+                    cols=cols,
+                    items=the_maps
+                ).build()
+                await ctx.send(self.format_markdown_code(msg))
+        else:
+            if creator:
+                msg = MessageBuilder(title=f"Search result for maps by '{creator}'",
+                    cols=cols,
+                    items=the_maps
+                ).build()
+                fname = f"maps_by_{creator}.txt"
+            else:
+                msg = MessageBuilder(title=f"List of all maps",
+                    cols=cols,
+                    items=the_maps
+                ).build()
+                fname = "all_maps.txt"
+            f = StringIO()
+            f.write(msg)
+            f.seek(0)
+            await ctx.send(file=discord.File(f, filename=fname))
+
     @commands.command(name="user")
-    async def user_info(self, ctx, user:str):
+    async def user_info(self, ctx:Context, user:str):
         if user == "me":
             roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
             if not roblox_user:
@@ -612,12 +670,12 @@ class MainCog(commands.Cog):
             return
 
     @commands.command(name="help")
-    async def help(self, ctx):
+    async def help(self, ctx:Context):
         await ctx.send(embed=self.make_help_embed())
     
     @commands.command(name="guilds")
     @commands.is_owner()
-    async def guilds(self, ctx):
+    async def guilds(self, ctx:Context):
         member_count = 0
         titles = ["Name:", "Members:", "Owner:"]
         msg = f"{titles[0]:40}| {titles[1]}\n"
@@ -632,7 +690,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="updatemaps")
     @commands.is_owner()
-    async def update_maps(self, ctx):
+    async def update_maps(self, ctx:Context):
         await self.strafes.update_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
     
@@ -648,7 +706,7 @@ class MainCog(commands.Cog):
     #passing None as argument to any of these fields will pass the check for that field
     #returns an ArgumentChecker object with the properly converted arguments
     #is falsy if the check failed, truthy if it passed
-    async def argument_checker(self, ctx, user:str=None, game:str=None, style:str=None, map_name:str=None) -> ArgumentChecker:
+    async def argument_checker(self, ctx:Context, user:str=None, game:str=None, style:str=None, map_name:str=None) -> ArgumentChecker:
         arguments = ArgumentChecker()
         if game:
             try:
@@ -708,7 +766,7 @@ class MainCog(commands.Cog):
         return arguments
     
     #set the user_id and username of the argument_checker before passing it to this
-    async def check_user_status(self, ctx, user_data:User):
+    async def check_user_status(self, ctx:Context, user_data:User):
         state = await self.strafes.get_user_state(user_data)
         if not state:
             await ctx.send(self.format_markdown_code(f"'{user_data.username}' has not played bhop/surf."))
@@ -778,6 +836,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
         embed.add_field(name="!map game {map_name}", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
         embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
+        embed.add_field(name="!maps {creator} {page}", value="Gives a list of maps containing {creator} in the creator name. Use 'txt' for the page to get a .txt file with every map.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
