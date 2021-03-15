@@ -753,11 +753,12 @@ async def get_map_times(client:Client, style:Style, map:Map, page:int) -> Tuple[
             the_res = await get_strafes(client, f"time/map/{map.id}", params)
             data = the_res.json
     #add the previous and next page so that we can sort the times across pages properly
-    res2data = []
+    res2len = 0
     if page_num > 0:
         params["page"] = page_num
         res2 = await get_strafes(client, f"time/map/{map.id}", params)
         data = res2.json + data
+        res2len = len(res2.json)
     if page_num + 2 <= converted_page_count:
         params["page"] = page_num + 2
         res3 = await get_strafes(client, f"time/map/{map.id}", params)
@@ -765,7 +766,7 @@ async def get_map_times(client:Client, style:Style, map:Map, page:int) -> Tuple[
     sort_map(data)
     if page > converted_page_count:
         start = ((int(converted_page_count) - 1) * page_length) % 200
-    start += len(res2data)
+    start += res2len
     end = start + page_length
     return await Record.make_record_list(client, data[start:end], map=map), converted_page_count
 
