@@ -122,7 +122,8 @@ _STYLES = {
     5: ["w-only", "wonly", "wo", "w"],
     6: ["a-only", "aonly", "ao"],
     7: ["backwards", "bw"],
-    8: ["faste"]
+    8: ["faste"],
+    9: ["sustain", "sus"]
 }
 _STR_TO_STYLE = create_str_to_val(_STYLES)
 
@@ -135,6 +136,7 @@ class Style(Enum):
     AONLY = 6
     BACKWARDS = 7
     FASTE = 8
+    SUSTAIN = 9
 
     @property
     def name(self):
@@ -149,7 +151,7 @@ class Style(Enum):
 
 # This allows us to get an enum via the value, name, or name alias (ex. Style(1), Style("autohop"), Style("auto"))
 setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR_TO_STYLE[value] if isinstance(value, str) else value))
-DEFAULT_STYLES:List[Style] = [style for style in Style if style != Style.FASTE]
+DEFAULT_STYLES:List[Style] = [style for style in Style if style != Style.FASTE and style != Style.SUSTAIN]
 
 class Map:
     bhop_map_pairs:List[Tuple[str, "Map"]] = []
