@@ -670,7 +670,7 @@ async def calculate_wr_diff(client:Client, record:Record):
 async def get_wrs(client:Client):
     tasks = []
     for game in DEFAULT_GAMES:
-        for style in DEFAULT_STYLES:
+        for style in DEFAULT_STYLES + [Style.SUSTAIN]:
             if not (game == Game.SURF and style == Style.SCROLL):
                 tasks.append(get_strafes(client, "time/recent/wr", {
                         "game":game.value,
