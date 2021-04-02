@@ -133,14 +133,7 @@ class MainCog(commands.Cog):
                 for record in records:
                     print(f"New global:\n{record}")
                     embed_tasks.append(self.create_global_embed(record))
-                globals = await asyncio.gather(*embed_tasks)
-                all_embeds = []
-                sus = []
-                for game, style, embed in globals:
-                    if style == Style.SUSTAIN:
-                        sus.append(embed)
-                    else:
-                        all_embeds.append((game, style, embed))
+                all_embeds = await asyncio.gather(*embed_tasks)
                 end = time.time()
                 print(f"embeds created: {end-start}s")
                 start = time.time()
@@ -162,9 +155,6 @@ class MainCog(commands.Cog):
                     for ch in guild.text_channels:
                         if ch.name == "globals":
                             for _,_,embed in all_embeds:
-                                tasks.append(self.try_except(ch.send(embed=embed)))
-                        elif ch.name == "sustain-globals":
-                            for embed in sus:
                                 tasks.append(self.try_except(ch.send(embed=embed)))
                         elif ch.name == "bhop-auto-globals":
                             for embed in bhop_auto:
