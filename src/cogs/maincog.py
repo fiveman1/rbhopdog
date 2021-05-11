@@ -645,28 +645,30 @@ class MainCog(commands.Cog):
         else:
             await ctx.send(embed=embed)
         if txt:
-            msg1 = MessageBuilder(title=f"Game: {game}, style: {style}\n{user1.username} wins:", 
+            msgs = []
+            msgs.append(MessageBuilder(title=f"Game: {game}, style: {style}\n{user1.username} wins:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
                 items=player1
-            ).build()
-            msg2 = MessageBuilder(title=f"\n{user2.username} wins:", 
+            ).build())
+            msgs.append(MessageBuilder(title=f"\n{user2.username} wins:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
                 items=player2
-            ).build()
-            msg3 = MessageBuilder(title=f"\nTies:", 
+            ).build())
+            msgs.append(MessageBuilder(title=f"\nTies:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME], 
                 items=tied
-            ).build()
-            msg4 = MessageBuilder(title=f"\nOnly completed by {user1.username}:", 
+            ).build())
+            msgs.append(MessageBuilder(title=f"\nOnly completed by {user1.username}:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
                 items=not_shared1
-            ).build()
-            msg5 = MessageBuilder(title=f"\nOnly completed by {user2.username}:", 
+            ).build())
+            msgs.append(MessageBuilder(title=f"\nOnly completed by {user2.username}:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
                 items=not_shared2
-            ).build()
+            ).build())
             with StringIO() as f:
-                f.write(msg1 + msg2 + msg3 + msg4 + msg5)
+                for msg in msgs:
+                    f.write(msg)
                 f.seek(0)
                 await ctx.send(file=discord.File(f, filename=f"{user1.username}_vs_{user2.username}_{game}_{style}.txt"))    
 
