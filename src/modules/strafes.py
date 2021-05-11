@@ -173,6 +173,12 @@ class Map:
     def __str__(self):
         return self.displayname
 
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
     @staticmethod
     def from_dict(d) -> "Map":
         return Map(

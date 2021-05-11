@@ -1,5 +1,6 @@
 # maincog.py
 import asyncio
+import colorsys
 import discord
 from discord.ext.commands.context import Context
 from dotenv import load_dotenv
@@ -628,7 +629,8 @@ class MainCog(commands.Cog):
                     elif val > 183:
                         new_pixels[i][j] = pixels2[i][j]
                     else:
-                        new_pixels[i][j] = numpy.asarray([0, 0, 0, 255], dtype=numpy.uint8)
+                        r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
+                        new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
             new_image = Image.fromarray(numpy.array(new_pixels))
             # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
             with BytesIO() as image_binary:
@@ -670,7 +672,30 @@ class MainCog(commands.Cog):
                 for msg in msgs:
                     f.write(msg)
                 f.seek(0)
-                await ctx.send(file=discord.File(f, filename=f"{user1.username}_vs_{user2.username}_{game}_{style}.txt"))    
+                await ctx.send(file=discord.File(f, filename=f"{user1.username}_vs_{user2.username}_{game}_{style}.txt"))
+
+    @commands.command(name="mapstatus")
+    async def map_status(self, ctx:Context, user, game, style):
+        args = await self.argument_checker(ctx, user, game, style)
+        if not args:
+            return
+        records = await self.strafes.get_user_times(args.user_data, args.game, args.style, -1)
+        completed_maps = set(i.map.id for i in records[0])
+        incompleted_maps = []
+        map_count = await self.strafes.get_map_count(args.game)
+        for id, map in Map.map_lookup.items():
+            if map.game == args.game and id not in completed_maps:
+                # TODO: binary search insert
+                incompleted_maps.append(map)
+        incompleted_maps.sort(key=lambda i: i.displayname)
+        msg = MessageBuilder(title=f"Incomplete maps for {args.user_data.username} [game: {args.game}, style: {args.style}] (total: {len(incompleted_maps)} / {map_count})",
+            cols=[MessageCol.Col("Map name", 30, lambda i: i.displayname)],
+            items=incompleted_maps
+            ).build()
+        with StringIO() as f:
+            f.write(msg)
+            f.seek(0)
+            await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{args.user_data.username}_{args.game}_{args.style}.txt"))
 
     @commands.command(name="maps")
     async def maps(self, ctx:Context, *args):
@@ -951,6 +976,7 @@ class MainCog(commands.Cog):
         embed.add_field(name="!map game {map_name}", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
         embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
         embed.add_field(name="!maps {creator} {page}", value="Gives a list of maps containing {creator} in the creator name. Use 'txt' for the page to get a .txt file with every map.", inline=False)
+        embed.add_field(name="!mapstatus {user} {game} {style}", value="Shows what maps a user hasn't completed in a given game and style.", inline=False)
         embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
         embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
         embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
