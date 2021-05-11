@@ -601,7 +601,7 @@ class MainCog(commands.Cog):
             else:
                 not_shared1.append(time1)
         not_shared2 = []
-        for key in dict2:
+        for key, time2 in dict2.items():
             if key not in dict1:
                 not_shared2.append(time2)
 
