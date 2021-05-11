@@ -581,7 +581,10 @@ class MainCog(commands.Cog):
                     return
                 else:
                     if arguments.user_data in users:
-                        await ctx.send(self.format_markdown_code("You cannot compare users to themselves!"))
+                        await ctx.send(self.format_markdown_code(f"You cannot compare users to themselves! (user: {arguments.user_data.username})"))
+                        return
+                    elif len(users) + 1 > 8:
+                        await ctx.send(self.format_markdown_code("You can only compare up to 8 users at a time."))
                         return
                     else:
                         users.append(arguments.user_data)
