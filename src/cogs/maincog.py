@@ -5,12 +5,14 @@ from discord.ext.commands.context import Context
 from dotenv import load_dotenv
 from discord.errors import InvalidData
 from discord.ext import commands, tasks
-from io import StringIO
+from io import BytesIO, StringIO
+import numpy
 import os
-import traceback
-from typing import Callable, List, Union
-
+from PIL import Image
+import requests
 import time
+import traceback
+from typing import Callable, Dict, List, Union
 
 from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
 from modules import utils
@@ -335,11 +337,11 @@ class MainCog(commands.Cog):
             for m in the_messages:
                 await ctx.send(self.format_markdown_code(m))
         else:
-            f = StringIO()
-            msg = MessageBuilder(cols=cols, items=wrs).build()
-            f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
-            f.seek(0)
-            await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
+            with StringIO() as f:
+                msg = MessageBuilder(cols=cols, items=wrs).build()
+                f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
+                f.seek(0)
+                await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
 
     @commands.command(name="map")
     async def map_info(self, ctx:Context, game, *, map_name):
@@ -539,11 +541,11 @@ class MainCog(commands.Cog):
                 cols=cols, 
                 items=record_list
             ).build()
-            f = StringIO()
-            f.write(msg)
-            f.seek(0)
-            await ctx.send(file=discord.File(f, filename=f"times_{arguments.user_data.username}_{game}_{style}.txt"))
-            return
+            with StringIO() as f:
+                f.write(msg)
+                f.seek(0)
+                await ctx.send(file=discord.File(f, filename=f"times_{arguments.user_data.username}_{game}_{style}.txt"))
+                return
         msg = MessageBuilder(title=f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}, page: {page}/{page_count}]", 
             cols=cols, 
             items=record_list
@@ -558,6 +560,115 @@ class MainCog(commands.Cog):
         embed.add_field(name="Surf Maps", value=str(await self.strafes.get_map_count(Game.SURF)))
         embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
         await ctx.send(embed=embed)
+
+    @commands.command(name="compare")
+    async def compare(self, ctx:Context, user1, user2, game, style, *args):
+        arguments1 = await self.argument_checker(ctx, user1, game, style)
+        if not arguments1:
+            return
+        arguments2 = await self.argument_checker(ctx, user2)
+        if not arguments2:
+            return
+        txt = False
+        if len(args) > 0:
+            if args[0] == "txt":
+                txt = True
+        user1 = arguments1.user_data
+        user2 = arguments2.user_data
+        game = arguments1.game
+        style = arguments1.style
+        tasks = [self.strafes.get_user_times(user1, game, style, -1), self.strafes.get_user_times(user2, game, style, -1)]
+        times = await asyncio.gather(*tasks)
+        dict1 : Dict[int, Record] = {}
+        for time in times[0][0]:
+            dict1[time.map.id] = time
+        dict2 : Dict[int, Record] = {}
+        for time in times[1][0]:
+            dict2[time.map.id] = time
+        player1 = []
+        player2 = []
+        tied = []
+        not_shared1 = []
+        for key, time1 in dict1.items():
+            if key in dict2:
+                time2 = dict2[key]
+                if time1.time.millis < time2.time.millis:
+                    player1.append(time1)
+                elif time1.time.millis > time2.time.millis:
+                    player2.append(time2)
+                else:
+                    tied.append(time1)
+            else:
+                not_shared1.append(time1)
+        not_shared2 = []
+        for key in dict2:
+            if key not in dict1:
+                not_shared2.append(time2)
+
+        embed = discord.Embed(title=f"{user1.username} vs. {user2.username}", color=0x00ff7f)
+
+        tasks = [self.strafes.get_user_headshot_url(user1.id), self.strafes.get_user_headshot_url(user2.id)]
+        urls = await asyncio.gather(*tasks)
+        url1 = urls[0]
+        url2 = urls[1]
+        file = None
+        if url1 is not None and url2 is not None:
+            # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
+            img1 = Image.open(requests.get(url1, stream=True).raw)
+            img2 = Image.open(requests.get(url2, stream=True).raw)
+            pixels1 = numpy.asarray(img1)
+            pixels2 = numpy.asarray(img2)
+            # Create a new image by drawing a diagonal line between the two images and combining them
+            new_pixels = [list(range(180)) for _ in range(180)]
+            for i in range(180):
+                for j in range(180):
+                    val = i + j
+                    if val < 177:
+                        new_pixels[i][j] = pixels1[i][j]
+                    elif val > 183:
+                        new_pixels[i][j] = pixels2[i][j]
+                    else:
+                        new_pixels[i][j] = numpy.asarray([0, 0, 0, 255], dtype=numpy.uint8)
+            new_image = Image.fromarray(numpy.array(new_pixels))
+            # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
+            with BytesIO() as image_binary:
+                new_image.save(image_binary, "PNG")
+                image_binary.seek(0)
+                file = discord.File(fp=image_binary, filename="thumb.png")
+                embed.set_thumbnail(url="attachment://thumb.png")
+
+
+        msg = f"{user1.username} wins: **{len(player1)}**\n{user2.username} wins: **{len(player2)}**\nTies: **{len(tied)}**\nOnly completed by {user1.username}: **{len(not_shared1)}**\nOnly completed by {user2.username}: **{len(not_shared2)}**"
+        embed.add_field(name=f"Info (game: {game}, style: {style})", value=msg)
+        if file is not None:
+            await ctx.send(embed=embed, file=file)
+        else:
+            await ctx.send(embed=embed)
+        if txt:
+            msg1 = MessageBuilder(title=f"Game: {game}, style: {style}\n{user1.username} wins:", 
+                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                items=player1
+            ).build()
+            msg2 = MessageBuilder(title=f"\n{user2.username} wins:", 
+                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                items=player2
+            ).build()
+            msg3 = MessageBuilder(title=f"\nTies:", 
+                cols=[MessageCol.MAP_NAME, MessageCol.TIME], 
+                items=tied
+            ).build()
+            msg4 = MessageBuilder(title=f"\nOnly completed by {user1.username}:", 
+                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                items=not_shared1
+            ).build()
+            msg5 = MessageBuilder(title=f"\nOnly completed by {user2.username}:", 
+                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                items=not_shared2
+            ).build()
+            with StringIO() as f:
+                f.write(msg1 + msg2 + msg3 + msg4 + msg5)
+                f.seek(0)
+                await ctx.send(file=discord.File(f, filename=f"{user1.username}_vs_{user2.username}_{game}_{style}.txt"))    
 
     @commands.command(name="maps")
     async def maps(self, ctx:Context, *args):
@@ -612,10 +723,10 @@ class MainCog(commands.Cog):
                     items=the_maps
                 ).build()
                 fname = "all_maps.txt"
-            f = StringIO()
-            f.write(msg)
-            f.seek(0)
-            await ctx.send(file=discord.File(f, filename=fname))
+            with StringIO() as f:
+                f.write(msg)
+                f.seek(0)
+                await ctx.send(file=discord.File(f, filename=fname))
 
     @commands.command(name="user")
     async def user_info(self, ctx:Context, user:str):
@@ -833,6 +944,7 @@ class MainCog(commands.Cog):
     def make_help_embed(self):
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
+        embed.add_field(name="!compare user1 user2 game style OPTIONAL[txt]", value="Compares two users times across a game and style.", inline=False)
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
         embed.add_field(name="!map game {map_name}", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
         embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
