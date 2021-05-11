@@ -13,7 +13,7 @@ from PIL import Image
 import requests
 import time
 import traceback
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Tuple, Union
 
 from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
 from modules import utils
@@ -563,116 +563,179 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="compare")
-    async def compare(self, ctx:Context, user1, user2, game, style, *args):
-        arguments1 = await self.argument_checker(ctx, user1, game, style)
-        if not arguments1:
-            return
-        arguments2 = await self.argument_checker(ctx, user2)
-        if not arguments2:
-            return
-        txt = False
-        if len(args) > 0:
-            if args[0] == "txt":
+    async def compare(self, ctx:Context, *args):
+        game : Game = None
+        txt : bool = False
+        styles : List[Style] = []
+        users : List[User] = []
+        for arg in args:
+            if arg == "txt":
                 txt = True
-        user1 = arguments1.user_data
-        user2 = arguments2.user_data
-        game = arguments1.game
-        style = arguments1.style
-        tasks = [self.strafes.get_user_times(user1, game, style, -1), self.strafes.get_user_times(user2, game, style, -1)]
-        times = await asyncio.gather(*tasks)
-        dict1 : Dict[int, Record] = {}
-        for time in times[0][0]:
-            dict1[time.map.id] = time
-        dict2 : Dict[int, Record] = {}
-        for time in times[1][0]:
-            dict2[time.map.id] = time
-        player1 = []
-        player2 = []
-        tied = []
-        not_shared1 = []
-        for key, time1 in dict1.items():
-            if key in dict2:
-                time2 = dict2[key]
-                if time1.time.millis < time2.time.millis:
-                    player1.append(time1)
-                elif time1.time.millis > time2.time.millis:
-                    player2.append(time2)
-                else:
-                    tied.append(time1)
+            elif Game.contains(arg):
+                game = Game(arg)
+            elif Style.contains(arg):
+                styles.append(Style(arg))
             else:
-                not_shared1.append(time1)
-        not_shared2 = []
-        for key, time2 in dict2.items():
-            if key not in dict1:
-                not_shared2.append(time2)
-
-        embed = discord.Embed(title=f"{user1.username} vs. {user2.username}", color=0x00ff7f)
-
-        tasks = [self.strafes.get_user_headshot_url(user1.id), self.strafes.get_user_headshot_url(user2.id)]
-        urls = await asyncio.gather(*tasks)
-        url1 = urls[0]
-        url2 = urls[1]
-        file = None
-        if url1 is not None and url2 is not None:
-            # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
-            img1 = Image.open(requests.get(url1, stream=True).raw)
-            img2 = Image.open(requests.get(url2, stream=True).raw)
-            pixels1 = numpy.asarray(img1)
-            pixels2 = numpy.asarray(img2)
-            # Create a new image by drawing a diagonal line between the two images and combining them
-            new_pixels = [list(range(180)) for _ in range(180)]
-            for i in range(180):
-                for j in range(180):
-                    val = i + j
-                    if val < 177:
-                        new_pixels[i][j] = pixels1[i][j]
-                    elif val > 183:
-                        new_pixels[i][j] = pixels2[i][j]
+                arguments = await self.argument_checker(ctx, arg)
+                if not arguments:
+                    return
+                else:
+                    if arguments.user_data in users:
+                        await ctx.send(self.format_markdown_code("You cannot compare users to themselves!"))
+                        return
                     else:
-                        r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
-                        new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
-            new_image = Image.fromarray(numpy.array(new_pixels))
-            # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
-            with BytesIO() as image_binary:
-                new_image.save(image_binary, "PNG")
-                image_binary.seek(0)
-                file = discord.File(fp=image_binary, filename="thumb.png")
-                embed.set_thumbnail(url="attachment://thumb.png")
+                        users.append(arguments.user_data)
+        if game is None:
+            await ctx.send(self.format_markdown_code("No game specified."))
+            return
+        elif len(users) < 2:
+            await ctx.send(self.format_markdown_code("Not enough users specified."))
+            return
+        elif len(styles) != 1 and len(styles) != len(users):
+            await ctx.send(self.format_markdown_code("No style specified or the number of styles does not match the number of users."))
+            return
+        user_styles : List[Tuple[User, Style]] = []
+        user_to_idx : Dict[User, int] = {}
+        i = 0
+        for user in users:
+            if len(styles) == 1:
+                user_styles.append((user, styles[0]))
+            else:
+                user_styles.append((user, styles[i]))
+            user_to_idx[user] = i
+            i += 1
+        tasks = []
+        for user, style in user_styles:
+            tasks.append(self.strafes.get_user_times(user, game, style, -1))
+        times : List[Tuple[List[Record], int]] = await asyncio.gather(*tasks)
 
+        wins : List[List[Record]] = [[] for _ in range(len(users))]
+        ties : List[Record] = []
+        not_shared : List[List[Record]] = [[] for _ in range(len(users))]
+        combined : Dict[Map, List[Record]] = {}
+        for records, _ in times:
+            for record in records:
+                if record.map in combined:
+                    combined[record.map].append(record)
+                else:
+                    combined[record.map] = [record]
+        for records in combined.values():
+            if len(records) == 1:
+                not_shared[user_to_idx[records[0].user]].append(records[0])
+            else:
+                best = None
+                tie = False
+                for record in records:
+                    if best is None:
+                        best = record
+                    elif record.time.millis < best.time.millis:
+                        tie = False
+                        record.previous_record = best
+                        best = record
+                    elif record.time.millis == best.time.millis:
+                        tie = True
+                    elif best.previous_record is None or best.previous_record.time.millis > record.time.millis:
+                        best.previous_record = record
+                if tie:
+                    ties.append(best)
+                else:
+                    wins[user_to_idx[best.user]].append(best)
+        for ls in wins:
+            ls.sort(key=lambda i : i.map.displayname)
+        ties.sort(key=lambda i : i.map.displayname)
+        for ls in not_shared:
+            ls.sort(key=lambda i : i.map.displayname)
 
-        msg = f"{user1.username} wins: **{len(player1)}**\n{user2.username} wins: **{len(player2)}**\nTies: **{len(tied)}**\nOnly completed by {user1.username}: **{len(not_shared1)}**\nOnly completed by {user2.username}: **{len(not_shared2)}**"
-        embed.add_field(name=f"Info (game: {game}, style: {style})", value=msg)
+        if len(styles) > 1:
+            title = " vs. ".join([f"{user.username} ({user_styles[user_to_idx[user]][1]})" for user in users])
+        else:
+            title = " vs. ".join([user.username for user in users])
+        embed = discord.Embed(title=title, color=0x00ff7f)
+        file = None
+
+        if len(users) == 2:
+            tasks = [self.strafes.get_user_headshot_url(users[0].id), self.strafes.get_user_headshot_url(users[1].id)]
+            urls = await asyncio.gather(*tasks)
+            url1 = urls[0]
+            url2 = urls[1]
+            if url1 is not None and url2 is not None:
+                # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
+                img1 = Image.open(requests.get(url1, stream=True).raw)
+                img2 = Image.open(requests.get(url2, stream=True).raw)
+                pixels1 = numpy.asarray(img1)
+                pixels2 = numpy.asarray(img2)
+                # Create a new image by drawing a diagonal line between the two images and combining them
+                new_pixels = [list(range(180)) for _ in range(180)]
+                for i in range(180):
+                    for j in range(180):
+                        val = i + j
+                        if val < 177:
+                            new_pixels[i][j] = pixels1[i][j]
+                        elif val > 183:
+                            new_pixels[i][j] = pixels2[i][j]
+                        else:
+                            r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
+                            new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
+                new_image = Image.fromarray(numpy.array(new_pixels))
+                # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
+                with BytesIO() as image_binary:
+                    new_image.save(image_binary, "PNG")
+                    image_binary.seek(0)
+                    file = discord.File(fp=image_binary, filename="thumb.png")
+                    embed.set_thumbnail(url="attachment://thumb.png")
+
+        msg = []
+        i = 0
+        for ls in wins:
+            msg.append(f"{users[i].username} wins: **{len(ls)}**")
+            i += 1
+        msg.append(f"Ties: **{len(ties)}**")
+        i = 0
+        for ls in not_shared:
+            msg.append(f"Only completed by {users[i].username}: **{len(ls)}**")
+            i += 1
+        if len(styles) == 1:
+            name = f"Info (game: {game}, style: {styles[0]})"
+        else:
+            name = f"Info (game: {game})"
+        embed.add_field(name=name, value="\n".join(msg))
         if file is not None:
             await ctx.send(embed=embed, file=file)
         else:
             await ctx.send(embed=embed)
+
         if txt:
-            msgs = []
-            msgs.append(MessageBuilder(title=f"Game: {game}, style: {style}\n{user1.username} wins:", 
-                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-                items=player1
-            ).build())
-            msgs.append(MessageBuilder(title=f"\n{user2.username} wins:", 
-                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-                items=player2
-            ).build())
-            msgs.append(MessageBuilder(title=f"\nTies:", 
+            msgs = [f"Game: {game}"]
+            i = 0
+            for ls in wins:
+                msgs.append(MessageBuilder(title=f"{users[i].username} wins (style: {user_styles[user_to_idx[users[i]]][1]}):", 
+                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE, MessageCol.Col(title="Next best", width=30, map=self.compare_formatter)], 
+                    items=ls
+                ).build())
+                i += 1
+            msgs.append(MessageBuilder(title="Ties:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME], 
-                items=tied
+                items=ties
             ).build())
-            msgs.append(MessageBuilder(title=f"\nOnly completed by {user1.username}:", 
-                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-                items=not_shared1
-            ).build())
-            msgs.append(MessageBuilder(title=f"\nOnly completed by {user2.username}:", 
-                cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-                items=not_shared2
-            ).build())
+            i = 0
+            for ls in not_shared:
+                msgs.append(MessageBuilder(title=f"Only completed by {users[i].username} (style: {user_styles[user_to_idx[users[i]]][1]}):", 
+                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                    items=ls
+                ).build())
+                i += 1
             with StringIO() as f:
-                for msg in msgs:
-                    f.write(msg)
+                f.write("\n".join(msgs))
                 f.seek(0)
-                await ctx.send(file=discord.File(f, filename=f"{user1.username}_vs_{user2.username}_{game}_{style}.txt"))
+                fname = "_vs_".join([user.username for user in users]) + f"_{game}"
+                if len(styles) == 1:
+                    fname += f"_{style}"
+                fname += ".txt"
+                await ctx.send(file=discord.File(f, filename=fname))
+    
+    def compare_formatter(self, record: Record) -> str:
+        diff = (record.previous_record.time.millis - record.time.millis) / 1000.0
+        return f"{record.previous_record.user.username} (+{diff:.3f}s)"
 
     @commands.command(name="mapstatus")
     async def map_status(self, ctx:Context, user, game, style):
@@ -971,7 +1034,7 @@ class MainCog(commands.Cog):
     def make_help_embed(self):
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
-        embed.add_field(name="!compare user1 user2 game style OPTIONAL[txt]", value="Compares two users times across a game and style.", inline=False)
+        embed.add_field(name="!compare {users} {styles} {game} OPTIONAL[txt]", value="Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto", inline=False)
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
         embed.add_field(name="!map game {map_name}", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
         embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
