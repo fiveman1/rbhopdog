@@ -597,24 +597,19 @@ class MainCog(commands.Cog):
         elif len(styles) != 1 and len(styles) != len(users):
             await ctx.send(self.format_markdown_code("No style specified or the number of styles does not match the number of users."))
             return
-        user_styles : List[Tuple[User, Style]] = []
         user_to_idx : Dict[User, int] = {}
-        i = 0
-        for user in users:
-            if len(styles) == 1:
-                user_styles.append((user, styles[0]))
-            else:
-                user_styles.append((user, styles[i]))
+        user_to_style : Dict[User, Style] = {}
+        for i, user in enumerate(users):
             user_to_idx[user] = i
-            i += 1
+            user_to_style[user] = styles[i] if len(styles) > 1 else styles[0]
         tasks = []
-        for user, style in user_styles:
-            tasks.append(self.strafes.get_user_times(user, game, style, -1))
+        for user in users:
+            tasks.append(self.strafes.get_user_times(user, game, user_to_style[user], -1))
         times : List[Tuple[List[Record], int]] = await asyncio.gather(*tasks)
 
-        wins : List[List[Record]] = [[] for _ in range(len(users))]
+        wins : List[List[Record]] = [[] for _ in users]
         ties : List[Record] = []
-        not_shared : List[List[Record]] = [[] for _ in range(len(users))]
+        not_shared : List[List[Record]] = [[] for _ in users]
         combined : Dict[Map, List[Record]] = {}
         for records, _ in times:
             for record in records:
@@ -650,7 +645,7 @@ class MainCog(commands.Cog):
             ls.sort(key=lambda i : i.map.displayname)
 
         if len(styles) > 1:
-            title = " vs. ".join([f"{user.username} ({user_styles[user_to_idx[user]][1]})" for user in users])
+            title = " vs. ".join([f"{user.username} ({user_to_style[user]})" for user in users])
         else:
             title = " vs. ".join([user.username for user in users])
         embed = discord.Embed(title=title, color=0x00ff7f)
@@ -709,30 +704,28 @@ class MainCog(commands.Cog):
 
         if txt:
             msgs = [f"Game: {game}"]
-            i = 0
-            for ls in wins:
-                msgs.append(MessageBuilder(title=f"{users[i].username} wins (style: {user_styles[user_to_idx[users[i]]][1]}):", 
+            for i, ls in enumerate(wins):
+                user = users[i]
+                msgs.append(MessageBuilder(title=f"{user.username} wins (style: {user_to_style[user]}):", 
                     cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE, MessageCol.Col(title="Next best", width=30, map=self.compare_formatter)], 
                     items=ls
                 ).build())
-                i += 1
             msgs.append(MessageBuilder(title="Ties:", 
                 cols=[MessageCol.MAP_NAME, MessageCol.TIME], 
                 items=ties
             ).build())
-            i = 0
-            for ls in not_shared:
-                msgs.append(MessageBuilder(title=f"Only completed by {users[i].username} (style: {user_styles[user_to_idx[users[i]]][1]}):", 
+            for i, ls in enumerate(not_shared):
+                user = users[i]
+                msgs.append(MessageBuilder(title=f"Only completed by {user.username} (style: {user_to_style[user]}):", 
                     cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
                     items=ls
                 ).build())
-                i += 1
             with StringIO() as f:
                 f.write("\n".join(msgs))
                 f.seek(0)
                 fname = "_vs_".join([user.username for user in users]) + f"_{game}"
                 if len(styles) == 1:
-                    fname += f"_{style}"
+                    fname += f"_{styles[0]}"
                 fname += ".txt"
                 await ctx.send(file=discord.File(f, filename=fname))
     
