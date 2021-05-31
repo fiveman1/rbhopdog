@@ -90,6 +90,18 @@ class MessageBuilder:
         else:
             return f"{s:{length-1}} "[:length]
 
+class ComparableUserStyle:
+
+    def __init__(self, user : User, style : Style):
+        self.user = user
+        self.style = style
+
+    def __hash__(self) -> int:
+        return hash(self.user) + hash(self.style)
+
+    def __eq__(self, o: object) -> bool:
+        return self.user == o.user and self.style == o.style
+
 # TODO: why do i have one cog for everything
 class MainCog(commands.Cog):
     def __init__(self, bot):
@@ -580,14 +592,14 @@ class MainCog(commands.Cog):
                 if not arguments:
                     return
                 else:
-                    if arguments.user_data in users:
-                        await ctx.send(self.format_markdown_code(f"You cannot compare users to themselves! (user: {arguments.user_data.username})"))
-                        return
-                    elif len(users) + 1 > 8:
+                    if len(users) > 7:
                         await ctx.send(self.format_markdown_code("You can only compare up to 8 users at a time."))
                         return
                     else:
                         users.append(arguments.user_data)
+        if len(users) == 1 and len(styles) > 1:
+            user = users[0]
+            users = [user for _ in range(len(styles))]
         if game is None:
             await ctx.send(self.format_markdown_code("No game specified."))
             return
@@ -597,14 +609,22 @@ class MainCog(commands.Cog):
         elif len(styles) != 1 and len(styles) != len(users):
             await ctx.send(self.format_markdown_code("No style specified or the number of styles does not match the number of users."))
             return
-        user_to_idx : Dict[User, int] = {}
-        user_to_style : Dict[User, Style] = {}
+
+        comparables : Dict[ComparableUserStyle, int] = {}
+        comparables_list : List[ComparableUserStyle] = []
         for i, user in enumerate(users):
-            user_to_idx[user] = i
-            user_to_style[user] = styles[i] if len(styles) > 1 else styles[0]
+            style = styles[i] if len(styles) > 1 else styles[0]
+            comparable = ComparableUserStyle(user, style)
+            if comparable in comparables:
+                await ctx.send(self.format_markdown_code(f"You cannot compare users to themselves with the same style (user: {user}, style: {style})"))
+                return
+            else:
+                comparables[comparable] = i
+                comparables_list.append(comparable)
+        
         tasks = []
-        for user in users:
-            tasks.append(self.strafes.get_user_times(user, game, user_to_style[user], -1))
+        for c in comparables:
+            tasks.append(self.strafes.get_user_times(c.user, game, c.style, -1))
         times : List[Tuple[List[Record], int]] = await asyncio.gather(*tasks)
 
         wins : List[List[Record]] = [[] for _ in users]
@@ -619,7 +639,7 @@ class MainCog(commands.Cog):
                     combined[record.map] = [record]
         for records in combined.values():
             if len(records) == 1:
-                not_shared[user_to_idx[records[0].user]].append(records[0])
+                not_shared[self.record_to_idx(records[0], comparables)].append(records[0])
             else:
                 best = None
                 tie = False
@@ -637,7 +657,7 @@ class MainCog(commands.Cog):
                 if tie:
                     ties.append(best)
                 else:
-                    wins[user_to_idx[best.user]].append(best)
+                    wins[self.record_to_idx(best, comparables)].append(best)
         for ls in wins:
             ls.sort(key=lambda i : i.map.displayname)
         ties.sort(key=lambda i : i.map.displayname)
@@ -645,7 +665,7 @@ class MainCog(commands.Cog):
             ls.sort(key=lambda i : i.map.displayname)
 
         if len(styles) > 1:
-            title = " vs. ".join([f"{user.username} ({user_to_style[user]})" for user in users])
+            title = " vs. ".join([f"{c.user} ({c.style})" for c in comparables_list])
         else:
             title = " vs. ".join([user.username for user in users])
         embed = discord.Embed(title=title, color=0x00ff7f)
@@ -683,19 +703,24 @@ class MainCog(commands.Cog):
                     embed.set_thumbnail(url="attachment://thumb.png")
 
         msg = []
-        i = 0
-        for ls in wins:
-            msg.append(f"{users[i].username} wins: **{len(ls)}**")
-            i += 1
-        msg.append(f"Ties: **{len(ties)}**")
-        i = 0
-        for ls in not_shared:
-            msg.append(f"Only completed by {users[i].username}: **{len(ls)}**")
-            i += 1
         if len(styles) == 1:
             name = f"Info (game: {game}, style: {styles[0]})"
+            for i, ls in enumerate(wins):
+                c = comparables_list[i]
+                msg.append(f"{c.user} wins: **{len(ls)}**")
+            msg.append(f"Ties: **{len(ties)}**")
+            for i, ls in enumerate(not_shared):
+                c = comparables_list[i]
+                msg.append(f"Only completed by {c.user}: **{len(ls)}**")
         else:
             name = f"Info (game: {game})"
+            for i, ls in enumerate(wins):
+                c = comparables_list[i]
+                msg.append(f"{c.user} ({c.style}) wins: **{len(ls)}**")
+            msg.append(f"Ties: **{len(ties)}**")
+            for i, ls in enumerate(not_shared):
+                c = comparables_list[i]
+                msg.append(f"Only completed by {c.user} ({c.style}): **{len(ls)}**")
         embed.add_field(name=name, value="\n".join(msg))
         if file is not None:
             await ctx.send(embed=embed, file=file)
@@ -705,19 +730,19 @@ class MainCog(commands.Cog):
         if txt:
             msgs = [f"Game: {game}"]
             for i, ls in enumerate(wins):
-                user = users[i]
-                msgs.append(MessageBuilder(title=f"{user.username} wins (style: {user_to_style[user]}):", 
-                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE, MessageCol.Col(title="Next best", width=30, map=self.compare_formatter)], 
+                c = comparables_list[i]
+                msgs.append(MessageBuilder(title=f"{c.user} wins (style: {c.style}):",
+                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE, MessageCol.Col(title="Next best", width=30, map=self.compare_formatter)],
                     items=ls
                 ).build())
-            msgs.append(MessageBuilder(title="Ties:", 
-                cols=[MessageCol.MAP_NAME, MessageCol.TIME], 
+            msgs.append(MessageBuilder(title="Ties:",
+                cols=[MessageCol.MAP_NAME, MessageCol.TIME],
                 items=ties
             ).build())
             for i, ls in enumerate(not_shared):
-                user = users[i]
-                msgs.append(MessageBuilder(title=f"Only completed by {user.username} (style: {user_to_style[user]}):", 
-                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                c = comparables_list[i]
+                msgs.append(MessageBuilder(title=f"Only completed by {c.user} (style: {c.style}):",
+                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE],
                     items=ls
                 ).build())
             with StringIO() as f:
@@ -732,6 +757,9 @@ class MainCog(commands.Cog):
     def compare_formatter(self, record: Record) -> str:
         diff = (record.previous_record.time.millis - record.time.millis) / 1000.0
         return f"{record.previous_record.user.username} (+{diff:.3f}s)"
+
+    def record_to_idx(self, record : Record, comparables) -> int:
+        return comparables[ComparableUserStyle(record.user, record.style)]
 
     @commands.command(name="mapstatus")
     async def map_status(self, ctx:Context, user, game, style):
