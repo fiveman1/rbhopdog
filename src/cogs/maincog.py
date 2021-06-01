@@ -357,19 +357,33 @@ class MainCog(commands.Cog):
                 await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
 
     @commands.command(name="map")
-    async def map_info(self, ctx:Context, game, *, map_name):
-        arguments = await self.argument_checker(ctx, game=game, map_name=map_name)
-        if not arguments:
+    async def map_info(self, ctx:Context, *args):
+        if not Game.contains(args[-1]):
+            game = None
+            map_name = " ".join(args)
+        else:
+            game = Game(args[-1])
+            map_name = " ".join(args[:-1])
+        if map_name == "":
+            await ctx.send(self.format_markdown_code("No map specified."))
             return
+        the_map = await self.strafes.map_from_name(map_name, game)
+        if the_map is None:
+            if map_name.isnumeric():
+                the_map = await self.strafes.map_from_id(int(map_name))
+            if the_map is None or the_map.id == -1:
+                await ctx.send(self.format_markdown_code(f"\"{map_name}\" is not a valid map."))
+                return
+        
         embed = discord.Embed(color=0x7c17ff)
-        url = await self.strafes.get_asset_thumbnail(arguments.map.id)
+        url = await self.strafes.get_asset_thumbnail(the_map.id)
         if url:
             embed.set_thumbnail(url=url)
         embed.set_footer(text="Map Info")
-        embed.title = f"\U0001F5FA  {arguments.map.displayname}"
-        embed.add_field(name="Creator", value=arguments.map.creator)
-        embed.add_field(name="Map ID", value=arguments.map.id)
-        embed.add_field(name="Server Load Count", value=arguments.map.playcount)
+        embed.title = f"\U0001F5FA  {the_map.displayname} ({the_map.game})"
+        embed.add_field(name="Creator", value=the_map.creator)
+        embed.add_field(name="Map ID", value=the_map.id)
+        embed.add_field(name="Server Load Count", value=the_map.playcount)
         await ctx.send(embed=embed)
 
     @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
@@ -1060,7 +1074,7 @@ class MainCog(commands.Cog):
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         embed.add_field(name="!compare {users} {styles} {game} OPTIONAL[txt]", value="Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto", inline=False)
         embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
-        embed.add_field(name="!map game {map_name}", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
+        embed.add_field(name="!map {map_name} OPTIONAL[game]", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
         embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
         embed.add_field(name="!maps {creator} {page}", value="Gives a list of maps containing {creator} in the creator name. Use 'txt' for the page to get a .txt file with every map.", inline=False)
         embed.add_field(name="!mapstatus {user} {game} {style}", value="Shows what maps a user hasn't completed in a given game and style.", inline=False)

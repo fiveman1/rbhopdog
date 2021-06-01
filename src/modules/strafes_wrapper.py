@@ -49,8 +49,17 @@ class Client(strafes.Client):
     async def get_user_data(self, user : Union[str, int]) -> User:
         return await strafes.User.get_user_data(self, user)
 
-    async def map_from_name(self, map_name:str, game:Game) -> Optional[Map]:
-        return await strafes.Map.from_name(self, map_name, game)
+    async def map_from_name(self, map_name:str, game:Game = None) -> Optional[Map]:
+        if game is None:
+            res = await strafes.Map.from_name(self, map_name, Game.BHOP)
+            if res is None:
+                res = await strafes.Map.from_name(self, map_name, Game.SURF)
+            return res
+        else:
+            return await strafes.Map.from_name(self, map_name, game)
+
+    async def map_from_id(self, map_id:int) -> Map:
+        return await strafes.Map.from_id(self, map_id)
 
     async def update_maps(self):
         await strafes.Map.update_maps(self)
