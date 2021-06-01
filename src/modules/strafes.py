@@ -18,6 +18,9 @@ def open_json(path):
         data = file.read()
         return json.loads(data)
 
+# TODO: combine all requests into a single client instance
+# so I don't have to use strafes_wrapper.py
+
 class Client:
     def __init__(self, api_key):
         self.session = aiohttp.ClientSession()
@@ -667,7 +670,9 @@ def sort_map(records:List):
 
 #changes a WR's diff and previous_record in place by comparing first and second place
 #times on the given map
-async def calculate_wr_diff(client:Client, record:Record):
+async def calculate_wr_diff(client:Client, record:Record) -> bool:
+    if record.previous_record is not None:
+        return True
     res = await get_strafes(client, f"time/map/{record.map.id}", {
         "style":record.style.value,
     })
@@ -675,8 +680,11 @@ async def calculate_wr_diff(client:Client, record:Record):
     data = data[:20]
     if len(data) > 1:
         sort_map(data)
+        if data[0]["ID"] != record.id:
+            return False
         record.previous_record = await Record.from_dict(client, data[1])
         record.diff = round((record.time.millis - record.previous_record.time.millis) / 1000.0, 3)
+    return True
 
 # returns a list of lists of wrs, each list is a unique game/style combination
 async def get_wrs(client:Client):
@@ -709,7 +717,7 @@ async def get_new_wrs(client:Client) -> List[Record]:
     try:
         old_wrs = open_json("files/recent_wrs.json")
     except FileNotFoundError:
-        await write_wrs()
+        await write_wrs(client)
         return []
     new_wrs = await get_wrs(client)
     globals:List[Record] = []
@@ -728,18 +736,24 @@ async def get_new_wrs(client:Client) -> List[Record]:
                     break
             else:
                 globals.append(await Record.from_dict(client, record))
-    tasks = []
-    for wr in globals:
-        if not wr.previous_record:
-            tasks.append(calculate_wr_diff(client, wr))
-    await asyncio.gather(*tasks)
 
     #overwrite recent_wrs.json with new wrs if they exist
     if len(globals) > 0:
         with open(fix_path("files/recent_wrs.json"), "w") as file:
             json.dump(new_wrs, file)
-    globals.sort(key = lambda i: i.date.timestamp)
-    return globals
+    
+    tasks = []
+    for wr in globals:
+        tasks.append(calculate_wr_diff(client, wr))
+    rets = await asyncio.gather(*tasks)
+
+    checked_globals = []
+    for i, wr in enumerate(globals):
+        if rets[i]:
+            checked_globals.append(wr)
+    
+    checked_globals.sort(key = lambda i: i.date.timestamp)
+    return checked_globals
 
 # TODO: optimize this to reduce unnecessary api calls
 async def get_map_times(client:Client, style:Style, map:Map, page:int) -> Tuple[List[Record], int]:
