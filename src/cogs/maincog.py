@@ -358,7 +358,10 @@ class MainCog(commands.Cog):
 
     @commands.command(name="map")
     async def map_info(self, ctx:Context, *args):
-        if not Game.contains(args[-1]):
+        if len(args) == 0:
+            await ctx.send(self.format_markdown_code("Missing arguments."))
+            return
+        elif not Game.contains(args[-1]):
             game = None
             map_name = " ".join(args)
         else:
