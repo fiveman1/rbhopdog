@@ -693,31 +693,35 @@ class MainCog(commands.Cog):
             urls = await asyncio.gather(*tasks)
             url1 = urls[0]
             url2 = urls[1]
+            file = None
             if url1 is not None and url2 is not None:
-                # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
-                img1 = Image.open(requests.get(url1, stream=True).raw)
-                img2 = Image.open(requests.get(url2, stream=True).raw)
-                pixels1 = numpy.asarray(img1)
-                pixels2 = numpy.asarray(img2)
-                # Create a new image by drawing a diagonal line between the two images and combining them
-                new_pixels = [list(range(180)) for _ in range(180)]
-                for i in range(180):
-                    for j in range(180):
-                        val = i + j
-                        if val < 177:
-                            new_pixels[i][j] = pixels1[i][j]
-                        elif val > 183:
-                            new_pixels[i][j] = pixels2[i][j]
-                        else:
-                            r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
-                            new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
-                new_image = Image.fromarray(numpy.array(new_pixels))
-                # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
-                with BytesIO() as image_binary:
-                    new_image.save(image_binary, "PNG")
-                    image_binary.seek(0)
-                    file = discord.File(fp=image_binary, filename="thumb.png")
-                    embed.set_thumbnail(url="attachment://thumb.png")
+                try:
+                    # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
+                    img1 = Image.open(requests.get(url1, stream=True).raw)
+                    img2 = Image.open(requests.get(url2, stream=True).raw)
+                    pixels1 = numpy.asarray(img1)
+                    pixels2 = numpy.asarray(img2)
+                    # Create a new image by drawing a diagonal line between the two images and combining them
+                    new_pixels = [list(range(180)) for _ in range(180)]
+                    for i in range(180):
+                        for j in range(180):
+                            val = i + j
+                            if val < 177:
+                                new_pixels[i][j] = pixels1[i][j]
+                            elif val > 183:
+                                new_pixels[i][j] = pixels2[i][j]
+                            else:
+                                r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
+                                new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
+                    new_image = Image.fromarray(numpy.array(new_pixels))
+                    # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
+                    with BytesIO() as image_binary:
+                        new_image.save(image_binary, "PNG")
+                        image_binary.seek(0)
+                        file = discord.File(fp=image_binary, filename="thumb.png")
+                        embed.set_thumbnail(url="attachment://thumb.png")
+                except:
+                    pass
 
         msg = []
         if len(styles) == 1:
