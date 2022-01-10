@@ -1,0 +1,62 @@
+{
+    "compare": {
+        "args": "{users} {game} {styles} OPTIONAL[txt]",
+        "blurb": "Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto"
+    },
+    "fastecheck": {
+        "args": "{user} {game} {style}",
+        "blurb": "Determines if a player is eligible for faste in a given game and style."
+    },
+    "map": {
+        "args": "{map_name} OPTIONAL[game]",
+        "blurb": "Gives info about the given map such as the creator, total play count, and the map's asset ID."
+    },
+    "mapcount": {
+        "args": "",
+        "blurb": "Gives the total map count for bhop and surf."
+    },
+    "maps": {
+        "args": "{creator} {page}",
+        "blurb": "Gives a list of maps containing {creator} in the creator name. Use 'txt' for the page to get a .txt file with every map."
+    },
+    "mapstatus": {
+        "args": "{user} {game} {style}",
+        "blurb": "Shows what maps a user hasn't completed in a given game and style."
+    },
+    "profile": {
+        "args": "{user} {game} {style}",
+        "blurb": "Gives a player's rank and skill% in the given game and style."
+    },
+    "ranks": {
+        "args": "{game} {style} {page=1}",
+        "blurb": "Gives 25 ranks in the given game and style at the specified page number (25 ranks per page)."
+    },
+    "recentwrs": {
+        "args": "{game} {style}",
+        "blurb": "Get a list of the 10 most recent WRs in a given game and style."
+    },
+    "record": {
+        "args": "{user} {game} {style} {map_name}",
+        "blurb": "Get a user's time on a given map and their placement (ex. 31st / 5690)."
+    },
+    "times": {
+        "args": "{user} {game=both} {style=all} {page=1}",
+        "blurb": "Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'txt', you will get a .txt with every time."
+    },
+    "user": {
+        "args": "{user}",
+        "blurb": "Gets the username, user ID, and profile picture of a given user. Can be used with discord accounts that have been verified via the RoVer API."
+    },
+    "wrcount": {
+        "args": "{user}",
+        "blurb": "Gives a count of a user's WRs in every game and style."
+    },
+    "wrlist": {
+        "args": "{user} {game=both} {style=all} {sort=default} {page=1} OPTIONAL[txt]",
+        "blurb": "Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist bhop auto M1nerss txt"
+    },
+    "wrmap": {
+        "args": "{game} {style} {map_name} {page=1}",
+        "blurb": "Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\""
+    }
+}

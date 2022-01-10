@@ -16,7 +16,7 @@ import time
 import traceback
 from typing import Callable, Dict, List, Tuple, Union
 
-from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES
+from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES, open_json
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
 from modules.strafes_wrapper import Client
@@ -917,8 +917,25 @@ class MainCog(commands.Cog):
             return
 
     @commands.command(name="help")
-    async def help(self, ctx:Context):
-        await ctx.send(embed=self.make_help_embed())
+    async def help(self, ctx:Context, cmd : str = ""):
+        cmd = cmd.lower()
+        embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
+        embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
+        commands_json = open_json("files/help.json")
+        if cmd:
+            if cmd in commands_json:
+                command = commands_json[cmd]
+                embed.add_field(name=f"{self.bot.command_prefix}{cmd} {command['args']}", value=command['blurb'], inline=False)
+            else:
+                await ctx.send(self.format_markdown_code(f"Command '{cmd}' not recognized! Use !help with no command to get a list of valid commands."))
+                return
+        else:
+            embed.add_field(name="How to use", value="Do !help {command} to get info on how to use a command.", inline=False)
+            cmds = [c for c in commands_json.keys()]
+            cmds.sort()
+            embed.add_field(name="All Commands", value=", ".join(cmds), inline=False)
+
+        await ctx.send(embed=embed)
     
     @commands.command(name="guilds")
     @commands.is_owner()
@@ -1075,27 +1092,6 @@ class MainCog(commands.Cog):
         embed.add_field(name="Placement", value=f"{rank_data.placement}{ordinal}") if rank_data.placement > 0 else embed.add_field(name="Placement", value="n/a")
         embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Moderation status:** {user.state}")
         embed.set_footer(text="User Profile")
-        return embed
-    
-    # TODO: this should be improved. make a help.txt that's easier to edit maybe?
-    def make_help_embed(self):
-        embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
-        embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
-        embed.add_field(name="!compare {users} {styles} {game} OPTIONAL[txt]", value="Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto", inline=False)
-        embed.add_field(name="!fastecheck username game style", value="Determines if a player is eligible for faste in a given game and style.", inline=False)
-        embed.add_field(name="!map {map_name} OPTIONAL[game]", value="Gives info about the given map such as the creator, total play count, and the map's asset ID.", inline=False)
-        embed.add_field(name="!mapcount", value="Gives the total map count for bhop and surf.", inline=False)
-        embed.add_field(name="!maps {creator} {page}", value="Gives a list of maps containing {creator} in the creator name. Use 'txt' for the page to get a .txt file with every map.", inline=False)
-        embed.add_field(name="!mapstatus {user} {game} {style}", value="Shows what maps a user hasn't completed in a given game and style.", inline=False)
-        embed.add_field(name="!profile username game style", value="Gives a player's rank and skill% in the given game and style.", inline=False)
-        embed.add_field(name="!ranks game style page:1", value="Gives 25 ranks in the given game and style at the specified page number (25 ranks per page).", inline=False)
-        embed.add_field(name="!recentwrs game style", value="Get a list of the 10 most recent WRs in a given game and style.", inline=False)
-        embed.add_field(name="!record user game style {map_name}", value="Get a user's time on a given map and their placement (ex. 31st / 5690).", inline=False)
-        embed.add_field(name="!times user game:both style:all page:1", value="Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'txt', you will get a .txt with every time.", inline=False)
-        embed.add_field(name="!user user", value="Gets the username, user ID, and profile picture of a given user. Can be used with discord accounts that have been verified via the RoVer API.", inline=False)
-        embed.add_field(name="!wrcount username", value="Gives a count of a user's WRs in every game and style.", inline=False)
-        embed.add_field(name="!wrlist username game:both style:all sort:default page:1", value="Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist M1nerss bhop auto txt", inline=False)
-        embed.add_field(name="!wrmap game style {map_name} page:1", value="Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\"", inline=False)
         return embed
 
 def setup(bot):
