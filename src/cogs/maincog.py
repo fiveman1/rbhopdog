@@ -10,6 +10,7 @@ from io import BytesIO, StringIO
 import numpy
 import os
 from PIL import Image
+import re
 import requests
 import time
 import traceback
@@ -1027,7 +1028,8 @@ class MainCog(commands.Cog):
                 return False
         return True
 
-    def format_markdown_code(self, s):
+    def format_markdown_code(self, s : str):
+        s = s.replace("`", "") # don't allow the ` character to prevent escaping code blocks
         return f"```\n{s}```"
 
     def get_ordinal(self, num:int) -> str:
