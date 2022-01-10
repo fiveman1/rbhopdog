@@ -2,7 +2,16 @@
 
 discord.py bot that uses primarily the strafes.net api to access data from rbhop/rsurf among other things
 
-Commands:
+### Command Text Clues
+```
+? = optional
+{text} = custom input
+x:y = specific input (ex.: y can only be 1, 2, or 3)
+```
+
+### Commands
+
+**!help {command}?**
 
 **!fastecheck username game style**
 
@@ -46,7 +55,7 @@ Commands:
 
 **!wrlist username game:both style:all sort:default**
 
-    Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist bhop auto M1nerss txt
+    Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist bhop auto M1ners txt
 
 **!wrmap game style {map_name} page:1**
 
