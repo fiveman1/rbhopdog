@@ -407,7 +407,7 @@ class MainCog(commands.Cog):
         for game in DEFAULT_GAMES:
             for style in DEFAULT_STYLES:
                 if not (game == Game.SURF and style == Style.SCROLL): #skip surf/scroll
-                    tasks.append(the_order(game, style))        
+                    tasks.append(the_order(game, style))
         results = await asyncio.gather(*tasks)
         for game, style, wrs in results:
             if wrs > 0:
@@ -422,7 +422,7 @@ class MainCog(commands.Cog):
             name = f"{arguments.user_data.displayname} ({arguments.user_data.username})"
         else:
             name = arguments.user_data.username
-        embed.title = f"\U0001F4C4  {name}"
+        embed.title = f"\U0001F4C4 {name}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
             if len(the_dict[Game.BHOP]) > 0:
@@ -493,7 +493,7 @@ class MainCog(commands.Cog):
             items=ranks
         ).build()
         await ctx.send(self.format_markdown_code(msg))
-    
+
     @commands.command(name="times")
     async def times(self, ctx:Context, user, *args):
         if len(args) == 0:
@@ -583,10 +583,10 @@ class MainCog(commands.Cog):
         ).build()
         for message in utils.page_messages(msg):
             await ctx.send(self.format_markdown_code(message))
-    
+
     @commands.command(name="mapcount")
     async def map_count(self, ctx:Context):
-        embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
+        embed = discord.Embed(title=f"\N{CLIPBOARD} Map Count", color=0xfc9c00)
         embed.add_field(name="Bhop Maps", value=str(await self.strafes.get_map_count(Game.BHOP)))
         embed.add_field(name="Surf Maps", value=str(await self.strafes.get_map_count(Game.SURF)))
         embed.add_field(name="More info", value="https://wiki.strafes.net/maps")
@@ -639,7 +639,7 @@ class MainCog(commands.Cog):
             else:
                 comparables[comparable] = i
                 comparables_list.append(comparable)
-        
+
         tasks = []
         for c in comparables:
             tasks.append(self.strafes.get_user_times(c.user, game, c.style, -1))
@@ -919,7 +919,7 @@ class MainCog(commands.Cog):
     @commands.command(name="help")
     async def help(self, ctx:Context, cmd : str = ""):
         cmd = cmd.lower()
-        embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
+        embed = discord.Embed(title="\U00002753 Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
         commands_json = open_json("files/help.json")
         if cmd:
@@ -936,7 +936,7 @@ class MainCog(commands.Cog):
             embed.add_field(name="All Commands", value=", ".join(cmds), inline=False)
 
         await ctx.send(embed=embed)
-    
+
     @commands.command(name="guilds")
     @commands.is_owner()
     async def guilds(self, ctx:Context):
@@ -957,7 +957,7 @@ class MainCog(commands.Cog):
     async def update_maps(self, ctx:Context):
         await self.strafes.update_maps()
         await ctx.send(self.format_markdown_code("Maps updated."))
-    
+
     def get_discord_user_id(self, s):
         if s[:3] == "<@!" and s[-1] == ">":
             return s[3:-1]
@@ -965,7 +965,7 @@ class MainCog(commands.Cog):
             return s[2:-1]
         else:
             return None
-    
+
     #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
     #returns an ArgumentChecker object with the properly converted arguments
@@ -1060,9 +1060,9 @@ class MainCog(commands.Cog):
             elif n == 3:
                 ordinal = "rd"
         return ordinal
-    
+
     async def make_global_embed(self, record:Record):
-        embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
+        embed = discord.Embed(title=f"\N{CROWN} {record.map.displayname}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         url = await self.strafes.get_user_headshot_url(record.user.id)
         if url:
@@ -1076,14 +1076,14 @@ class MainCog(commands.Cog):
             embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** {record.previous_record.time} ({record.previous_record.user.username})", inline=False)
         embed.set_footer(text="World Record")
         return embed
-    
+
     async def make_user_embed(self, user:User, rank_data:Rank, game:Game, style:Style, completions, total_maps, wrs):
         ordinal = self.get_ordinal(rank_data.placement)
         if user.username != user.displayname:
             name = f"{user.displayname} ({user.username})"
         else:
             name = user.username
-        embed = discord.Embed(title=f"\N{NEWSPAPER}  {name}", color=0x1dbde0)
+        embed = discord.Embed(title=f"\N{NEWSPAPER} {name}", color=0x1dbde0)
         url = await self.strafes.get_user_headshot_url(user.id)
         if url:
             embed.set_thumbnail(url=url)
