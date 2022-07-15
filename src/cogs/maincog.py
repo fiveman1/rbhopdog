@@ -234,8 +234,12 @@ class MainCog(commands.Cog):
             await ctx.send(self.format_markdown_code("Missing map name."))
             return
         if args[-1].isnumeric():
-            page = args[-1]
-            map_name = " ".join(args[:-1])
+            if len(args) == 1:
+                page = 1
+                map_name = args[-1]
+            else:
+                page = args[-1]
+                map_name = " ".join(args[:-1])
         else:
             page = 1
             map_name = " ".join(args)
