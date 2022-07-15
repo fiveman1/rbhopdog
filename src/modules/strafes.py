@@ -179,14 +179,14 @@ class Map:
     def __hash__(self):
         return hash(self.id)
 
-    def __eq__(self, other):
+    def __eq__(self, other : "Map"):
         return self.id == other.id
 
     @staticmethod
     def from_dict(d) -> "Map":
         return Map(
             d["ID"],
-            d["DisplayName"],
+            d["DisplayName"].replace(u'\xa0', ' '),
             d["Creator"],
             Game(d["Game"]),
             Date(d["Date"]),
@@ -272,7 +272,7 @@ class Map:
     # performs an iterative binary search
     # returns the first index where the item was found according to the compare function
     @staticmethod
-    def _find_item(ls, compare):
+    def _find_item(ls, compare) -> int:
         left = 0
         right = len(ls) - 1
         while left <= right:
@@ -287,7 +287,7 @@ class Map:
         return -1
 
     @staticmethod
-    def _compare_maps(name, map_name):
+    def _compare_maps(name : str, map_name : str) -> int:
         if map_name.startswith(name):
             return 0
         elif map_name < name:
@@ -296,7 +296,7 @@ class Map:
             return 1
 
     @staticmethod
-    def _from_name(name, ls):
+    def _from_name(name : str, ls : List[Tuple[str, "Map"]]) -> Optional["Map"]:
         name = name.lower()
         idx = Map._find_item(ls, lambda m : Map._compare_maps(name, m[0]))
         if idx != -1:
@@ -307,7 +307,13 @@ class Map:
                     break
             return ls[idx][1]
         else:
-            return None
+            the_map = None
+            shortest_name = None
+            for map_name, m in ls:
+                if name in map_name and (shortest_name is None or len(map_name) < len(shortest_name)):
+                    shortest_name = map_name
+                    the_map = m
+            return the_map
 
     @staticmethod
     async def from_name(client:Client, map_name:str, game:Game) -> Optional["Map"]:

@@ -10,7 +10,6 @@ from io import BytesIO, StringIO
 import numpy
 import os
 from PIL import Image
-import re
 import requests
 import time
 import traceback
