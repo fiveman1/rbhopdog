@@ -6,7 +6,6 @@ on:
 
 jobs:
   release:
-  name: deploy bot
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
