@@ -186,7 +186,7 @@ class Map:
     def from_dict(d) -> "Map":
         return Map(
             d["ID"],
-            d["DisplayName"].replace(u'\xa0', ' '),
+            d["DisplayName"].replace(u'\u200a', ' '),
             d["Creator"],
             Game(d["Game"]),
             Date(d["Date"]),
