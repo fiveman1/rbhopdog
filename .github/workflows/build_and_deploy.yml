@@ -5,7 +5,7 @@ on:
     branches: [ master ]
 
 jobs:
-  release:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -16,7 +16,7 @@ jobs:
         uses: garygrossgarten/github-action-scp@release
         with:
           local: rbhopdog
-          remote: ~/rbhopdog
+          remote: rbhopdog
           host: ${{ secrets.HOST }}
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USERNAME }}
