@@ -3,9 +3,9 @@ name: Deploy bot
 on:
   push:
     branches: [ master ]
-    
+
 jobs:
-  deploy:
+  release:
   name: deploy bot
     runs-on: ubuntu-latest
     steps:
@@ -22,3 +22,4 @@ jobs:
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USERNAME }}
           privateKey: ${{ secrets.KEY }}
+      
