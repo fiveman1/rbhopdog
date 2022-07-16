@@ -8,17 +8,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Update and run bot
+        uses: appleboy/ssh-action@master 
         with:
-          path: rbhopdog
-      - name: Copy repo to remote
-        uses: garygrossgarten/github-action-scp@release
-        with:
-          local: rbhopdog
-          remote: rbhopdog
           host: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
           username: ${{ secrets.USERNAME }}
-          privateKey: ${{ secrets.KEY }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd rbhopdog
+            git pull
+            
       
