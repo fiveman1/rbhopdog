@@ -18,5 +18,6 @@ jobs:
           script: |
             cd rbhopdog
             git pull
+            pm2 restart src/bot.py
             
       
