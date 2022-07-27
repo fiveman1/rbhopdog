@@ -3,10 +3,6 @@
         "args": "{users} {game} {styles} OPTIONAL[txt]",
         "blurb": "Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto"
     },
-    "fastecheck": {
-        "args": "{user} {game} {style}",
-        "blurb": "Determines if a player is eligible for faste in a given game and style."
-    },
     "map": {
         "args": "{map_name} OPTIONAL[game]",
         "blurb": "Gives info about the given map such as the creator, total play count, and the map's asset ID."
@@ -35,8 +31,8 @@
         "args": "{game} {style}",
         "blurb": "Get a list of the 10 most recent WRs in a given game and style."
     },
-    "record": {
-        "args": "{user} {game} {style} {map_name}",
+    "pb": {
+        "args": "{user} OPTIONAL[game] {style} {map_name}",
         "blurb": "Get a user's time on a given map and their placement (ex. 31st / 5690)."
     },
     "times": {
@@ -56,7 +52,7 @@
         "blurb": "Lists all of a player's world records. Valid sorts: 'date', 'name', and 'time'. Use 'txt' as an argument to get a .txt file with all WRs ex. !wrlist bhop auto M1nerss txt"
     },
     "wrmap": {
-        "args": "{game} {style} {map_name} {page=1}",
+        "args": "OPTIONAL[game] {style} {map_name} {page=1}",
         "blurb": "Gives the 25 best times on a given map and style. The page number defaults to 1 (25 records per page). If the map ends in a number you can enclose it in quotes ex. !wrmap bhop auto \"Emblem 2\""
     }
 }

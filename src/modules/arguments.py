@@ -55,6 +55,7 @@ class UserValue(ArgumentValue):
     def __init__(self):
         super().__init__()
         self.check_status = True
+        self.allow_id = False
 
 class ArgumentValidator:
 
@@ -72,7 +73,7 @@ class ArgumentValidator:
             user = await self.strafes.get_roblox_user_from_discord(author_id)
             if not user:
                 return False, "Invalid username (no Roblox username associated with your Discord account. Visit https://rover.link/login)"
-        else:
+        elif isinstance(user, str):
             discord_user_id = get_discord_user_id(user)
             if discord_user_id:
                 roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
@@ -116,8 +117,8 @@ class ArgumentValidator:
     async def evaluate(self, args : List[str], author_id : int = None) -> Tuple[bool, str]:
         args = list(args)
         if not self.game.is_not_required():
-            if len(args) == 0:
-                return False, "Missing game!"
+            if len(args) == 0 and self.game.is_required():
+                return False, "Missing game."
             found = False
             for i, arg in enumerate(args):
                 lowercase = arg.lower()
@@ -128,10 +129,10 @@ class ArgumentValidator:
             if found:
                 del args[i]
             elif self.game.is_required():
-                return False, "No valid game found (try bhop or surf)"
+                return False, "No valid game found. (try bhop or surf)"
         if not self.style.is_not_required():
-            if len(args) == 0:
-                return False, "Missing style!"
+            if len(args) == 0 and self.style.is_required():
+                return False, "Missing style."
             found = False
             for i, arg in enumerate(args):
                 lowercase = arg.lower()
@@ -141,21 +142,27 @@ class ArgumentValidator:
                     break
             if found:
                 del args[i]
+                if self.style.value == Style.SCROLL:
+                    if self.game.value == Game.SURF:
+                        return False, "Scroll and surf cannot be combined."
+                    else:
+                        self.game.value = Game.BHOP
             elif self.style.is_required():
-                return False, "No valid style found (try autohop/auto/a, aonly/ao, sideways/sw, etc.)"
+                return False, "No valid style found. (try autohop/auto/a, aonly/ao, sideways/sw, etc.)"
         if not self.page.is_not_required():
             found = False
-            if len(args) > 1 and args[-1].isnumeric():
+            len_required = 1 if self.map.is_required() else 0
+            if len(args) > len_required and args[-1].isnumeric():
                 self.page.value = int(args[-1])
                 found = True
             if found:
                 del args[-1]
             elif self.page.is_required():
-                return False, "No valid page number found"
+                return False, "No valid page number found."
         user_found = False
         if self.map.is_required():
             if len(args) == 0:
-                return False, "Missing map!"
+                return False, "Missing map."
             if not self.user.is_required():
                 map_name = " ".join(args)
                 smap = await self.strafes.map_from_name(map_name, self.game.value)
@@ -165,31 +172,40 @@ class ArgumentValidator:
                     else:
                         return False, f"\"{map_name}\" is not a valid map."
             else:
-                if len(args) < 2:
-                    return False, "Missing map or user!"
-                username = args[0]
-                map_name = " ".join(args[1:])
-                smap = await self.strafes.map_from_name(map_name, self.game.value)
-                if not smap:
-                    smap = await self.strafes.map_from_name(" ".join(args[:-1]), self.game.value)
-                    if smap:
-                        username = args[-1]
-                    else:
-                        if self.game.value is not None:
-                            return False, f"\"{map_name}\" is not a {self.game.value} valid map."
+                smap = await self.strafes.map_from_name(" ".join(args), self.game.value)
+                if smap:
+                    args.clear()
+                elif len(args) < 2:
+                    return False, "Missing map or user."
+                else:
+                    username = args[0]
+                    map_name = " ".join(args[1:])
+                    smap = await self.strafes.map_from_name(map_name, self.game.value)
+                    if not smap:
+                        smap = await self.strafes.map_from_name(" ".join(args[:-1]), self.game.value)
+                        if smap:
+                            username = args[-1]
                         else:
-                            return False, f"\"{map_name}\" is not a valid map."
-                valid, err = await self.set_user(username, author_id)
-                if not valid:
-                    return False, err
-                user_found = True
+                            if self.game.value is not None:
+                                return False, f"\"{map_name}\" is not a {self.game.value} valid map."
+                            else:
+                                return False, f"\"{map_name}\" is not a valid map."
+                    valid, err = await self.set_user(username, author_id)
+                    if not valid:
+                        return False, err
+                    user_found = True
             self.game.value = smap.game
             self.map.value = smap
         if not user_found and self.user.is_required():
             if len(args) < 1:
-                return False, "Missing user!"
-            username = " ".join(args)
-            valid, err = await self.set_user(username, author_id)
-            if not valid:
-                return False, err
+                valid, err = await self.set_user(None, author_id)
+                if not valid:
+                    return False, "No user specified and no Roblox username associated with your Discord account. Visit https://rover.link/login"
+            else:
+                username = " ".join(args)
+                if self.user.allow_id and username.isnumeric():
+                    username = int(username)
+                valid, err = await self.set_user(username, author_id)
+                if not valid:
+                    return False, err
         return True, ""

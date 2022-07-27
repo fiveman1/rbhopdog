@@ -203,31 +203,49 @@ class MainCog(commands.Cog):
         await self.bot.wait_until_ready()
 
     @commands.command(name="recentwrs")
-    async def get_recent_wrs(self, ctx:Context, game, style="autohop"):
-        arguments = await self.argument_checker(ctx, game=game, style=style)
-        if not arguments:
+    async def get_recent_wrs(self, ctx:Context, *args):
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_required()
+        arguments.style.make_required()
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        msg = MessageBuilder(title=f"10 Recent WRs [game: {arguments.game}, style: {arguments.style}]", 
-            cols=[MessageCol.USERNAME, MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-            items= await self.strafes.get_recent_wrs(arguments.game, arguments.style)
-        ).build()
-        await ctx.send(utils.format_markdown_code(msg))
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
 
-    @commands.command(name="record")
-    async def get_user_record(self, ctx:Context, user, game, style, *, map_name):
-        arguments = await self.argument_checker(ctx, user=user, game=game, style=style, map_name=map_name)
-        if not arguments:
+        msg = MessageBuilder(title=f"10 Recent WRs [game: {game}, style: {style}]", 
+            cols=[MessageCol.USERNAME, MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+            items= await self.strafes.get_recent_wrs(game, style)
+        ).build()
+        await ctx.send(utils.fmt_md_code(msg))
+
+    @commands.command(name="pb", aliases=["record"])
+    async def get_user_pb(self, ctx:Context, *args):
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_optional()
+        arguments.style.make_required()
+        arguments.user.make_required()
+        arguments.map.make_required()
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        record = await self.strafes.get_user_record(arguments.user_data, arguments.game, arguments.style, arguments.map)
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+        map : Map = arguments.map.value
+
+        record = await self.strafes.get_user_record(user, game, style, map)
         if record is None:
-            await ctx.send(utils.format_markdown_code(f"No record by {arguments.user_data.username} found on map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}]"))
+            await ctx.send(utils.fmt_md_code(f"No record by {user.username} found on map: {map.displayname} [game: {game}, style: {style}]"))
         else:
             placement, total_completions = await self.strafes.get_record_placement(record)
-            msg = MessageBuilder(title=f"{arguments.user_data.username}'s record on {record.map.displayname} [game: {arguments.game}, style: {arguments.style}]",
+            msg = MessageBuilder(title=f"{user.username}'s record on {record.map.displayname} [game: {game}, style: {style}]",
                 cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 20, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
                 items=[record]
             ).build()
-            await ctx.send(utils.format_markdown_code(msg))
+            await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="wrmap")
     async def get_wrmap(self, ctx:Context, *args):
@@ -238,7 +256,7 @@ class MainCog(commands.Cog):
         arguments.page.make_optional(1)
         valid, err = await arguments.evaluate(args, ctx.author.id)
         if not valid:
-            await ctx.send(utils.format_markdown_code(err))
+            await ctx.send(utils.fmt_md_code(err))
             return
         game : Game = arguments.game.value
         style : Style = arguments.style.value
@@ -246,7 +264,7 @@ class MainCog(commands.Cog):
         page : int = arguments.page.value
         records, page_count = await self.strafes.get_map_times(style, map, page)
         if page_count == 0:
-            await ctx.send(utils.format_markdown_code(f"{map.displayname} has not yet been completed in {style}."))
+            await ctx.send(utils.fmt_md_code(f"{map.displayname} has not yet been completed in {style}."))
             return
         else:
             if page > page_count:
@@ -256,87 +274,62 @@ class MainCog(commands.Cog):
                 cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.increment()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
                 items=records
             ).build()
-            await ctx.send(utils.format_markdown_code(msg))
-    # async def get_wrmap(self, ctx:Context, game, style, *args):
-    #     if len(args) == 0:
-    #         await ctx.send(utils.format_markdown_code("Missing map name."))
-    #         return
-    #     elif len(args) > 1 and args[-1].isnumeric():
-    #         page = int(args[-1])
-    #         map_name = " ".join(args[:-1])
-    #     else:
-    #         page = 1
-    #         map_name = " ".join(args)
-    #     if not map_name:
-    #         await ctx.send(utils.format_markdown_code("Missing map name."))
-    #         return
-    #     if page < 1:
-    #         await ctx.send(utils.format_markdown_code("Page number cannot be less than 1."))
-    #         return
-    #     arguments = await self.argument_checker(ctx, game=game, style=style, map_name=map_name)
-    #     if not arguments:
-    #         return
-    #     records, page_count = await self.strafes.get_map_times(arguments.style, arguments.map, page)
-    #     if page_count == 0:
-    #         await ctx.send(utils.format_markdown_code(f"{arguments.map.displayname} has not yet been completed in {arguments.style}."))
-    #         return
-    #     else:
-    #         if page > page_count:
-    #             page = page_count
-    #         incrementer = Incrementer(((page - 1) * 25) + 1)
-    #         msg = MessageBuilder(title=f"Record list for map: {arguments.map.displayname} [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]", 
-    #             cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.increment()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
-    #             items=records
-    #         ).build()
-    #         await ctx.send(utils.format_markdown_code(msg))
+            await ctx.send(utils.fmt_md_code(msg))
 
-    @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
+    @commands.cooldown(6, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
-    async def wr_list(self, ctx:Context, user, *args):
-        valid_sorts = ["", "date", "time", "name"]
+    async def wr_list(self, ctx:Context, *args):
+        valid_sorts = ["date", "time", "name"]
         sort = ""
-        page = 1
-        game = None
-        style = None
-        args = args[:4] if len(args) >= 4 else args
-        for i in args:
-            i = i.lower()
-            if i in valid_sorts:
-                sort = i
-            elif i.isnumeric():
-                page = int(i)
-            elif i == "txt":
-                page = -1
-            elif i == "both":
-                game = "both"
-            elif i == "all":
-                if game:
-                    style = "all"
-                else:
-                    game = "all"
-            elif Game.contains(i) and not game:
-                game = i
-            elif Style.contains(i) and not style:
-                style = i
+        args = list(args)
+        for i, arg in enumerate(args):
+            arg = arg.lower()
+            if arg in valid_sorts:
+                sort = arg
+                break
+        if sort:
+            del args[i]
+        
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_optional()
+        arguments.style.make_optional()
+        arguments.user.make_required()
 
-        #loop through all games or all styles if not specified (or if "both" or "all")
-        arguments = await self.argument_checker(ctx, user=user, game=None if game in [None, "both", "all"] else game, style=None if style in [None, "all"] else style)
-        if not arguments:
+        page = 1
+        for i, arg in enumerate(args):
+            arg = arg.lower()
+            if arg == "txt":
+                page = -1
+                break
+        if page == -1:
+            del args[i]
+        else:
+            arguments.page.make_optional(1)
+        
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        if game in [None, "both", "all"]:
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+        if page != -1:
+            page = arguments.page.value   
+
+        if game is None:
             g = DEFAULT_GAMES
         else:
-            g = [arguments.game]
-        if style in [None, "all"]:
+            g = [game]
+        if style is None:
             s = DEFAULT_STYLES
         else:
-            s = [arguments.style]
+            s = [style]
 
         tasks = []
         for _game in g:
             for _style in s:
                 if not (_game == Game.SURF and _style == Style.SCROLL):
-                    tasks.append(self.strafes.get_user_wrs(arguments.user_data, _game, _style))  
+                    tasks.append(self.strafes.get_user_wrs(user, _game, _style))  
         results = await asyncio.gather(*tasks)
         
         wrs:List[Record] = []
@@ -345,7 +338,7 @@ class MainCog(commands.Cog):
             wrs += result
             count += len(result)
         if count == 0:
-            await ctx.send(utils.format_markdown_code(f"{arguments.user_data.username} has no WRs in the specified game and style."))
+            await ctx.send(utils.fmt_md_code(f"{user.username} has no WRs in the specified game and style."))
             return
         if not sort:
             wrs.sort(key = lambda i: (i.game.name, i.style.name, i.map.displayname))
@@ -359,13 +352,9 @@ class MainCog(commands.Cog):
         if g is DEFAULT_GAMES:
             game = "both"
             cols.append(MessageCol.GAME)
-        else:
-            game = arguments.game
         if s is DEFAULT_STYLES:
             style = "all"
             cols.append(MessageCol.STYLE)
-        else:
-            style = arguments.style
         if sort == "":
             sort = "default"
         if page != -1:
@@ -373,62 +362,56 @@ class MainCog(commands.Cog):
             if page > total_pages:
                 page = total_pages
             msg = MessageBuilder(cols=cols, items=wrs[(page-1)*25:page*25]).build()
-            the_messages = utils.page_messages(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
+            the_messages = utils.page_messages(f"WR list for {user.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
             for m in the_messages:
-                await ctx.send(utils.format_markdown_code(m))
+                await ctx.send(utils.fmt_md_code(m))
         else:
             with StringIO() as f:
                 msg = MessageBuilder(cols=cols, items=wrs).build()
-                f.write(f"WR list for {arguments.user_data.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
+                f.write(f"WR list for {user.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
                 f.seek(0)
-                await ctx.send(file=discord.File(f, filename=f"wrs_{arguments.user_data.username}_{game}_{style}.txt"))
+                await ctx.send(file=discord.File(f, filename=f"wrs_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="map")
     async def map_info(self, ctx:Context, *args):
-        if len(args) == 0:
-            await ctx.send(utils.format_markdown_code("Missing arguments."))
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_optional()
+        arguments.map.make_required()
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        elif not Game.contains(args[-1]):
-            game = None
-            map_name = " ".join(args)
-        else:
-            game = Game(args[-1])
-            map_name = " ".join(args[:-1])
-        if map_name == "":
-            await ctx.send(utils.format_markdown_code("No map specified."))
-            return
-        the_map = await self.strafes.map_from_name(map_name, game)
-        if the_map is None:
-            if map_name.isnumeric():
-                the_map = await self.strafes.map_from_id(int(map_name))
-            if the_map is None or the_map.id == -1:
-                await ctx.send(utils.format_markdown_code(f"\"{map_name}\" is not a valid map."))
-                return
+        map : Map = arguments.map.value
         
         embed = discord.Embed(color=0x7c17ff)
-        url = await self.strafes.get_asset_thumbnail(the_map.id)
+        url = await self.strafes.get_asset_thumbnail(map.id)
         if url:
             embed.set_thumbnail(url=url)
         embed.set_footer(text="Map Info")
-        embed.title = f"\U0001F5FA  {the_map.displayname} ({the_map.game})"
-        embed.add_field(name="Creator", value=the_map.creator)
-        embed.add_field(name="Map ID", value=the_map.id)
-        embed.add_field(name="Server Load Count", value=the_map.playcount)
+        embed.title = f"\U0001F5FA  {map.displayname} ({map.game})"
+        embed.add_field(name="Creator", value=map.creator)
+        embed.add_field(name="Map ID", value=map.id)
+        embed.add_field(name="Server Load Count", value=map.playcount)
         await ctx.send(embed=embed)
 
-    @commands.cooldown(4, 60, commands.cooldowns.BucketType.guild)
+    @commands.cooldown(6, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrcount")
-    async def wr_count(self, ctx:Context, user):
-        arguments = await self.argument_checker(ctx, user=user)
-        if not arguments:
+    async def wr_count(self, ctx:Context, *args):
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.user.make_required()
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
+        user : User = arguments.user.value
+
         count = 0
         the_dict = {
             Game.BHOP: [],
             Game.SURF: []
         }
         async def the_order(game, style):
-            return (game, style, await self.strafes.total_wrs(arguments.user_data, game, style))
+            return (game, style, await self.strafes.total_wrs(user, game, style))
         tasks = []
         for game in DEFAULT_GAMES:
             for style in DEFAULT_STYLES:
@@ -440,14 +423,14 @@ class MainCog(commands.Cog):
                 the_dict[game].append((style, wrs))
                 count += wrs
         embed = discord.Embed(color=0xff94b8)
-        url = await self.strafes.get_user_headshot_url(arguments.user_data.id)
+        url = await self.strafes.get_user_headshot_url(user.id)
         if url:
             embed.set_thumbnail(url=url)
         embed.set_footer(text="WR Count")
-        if arguments.user_data.username != arguments.user_data.displayname:
-            name = f"{arguments.user_data.displayname} ({arguments.user_data.username})"
+        if user.username != user.displayname:
+            name = f"{user.displayname} ({user.username})"
         else:
-            name = arguments.user_data.username
+            name = user.username
         embed.title = f"\U0001F4C4  {name}"
         if count > 0:
             embed.description = f"Total WRs: {count}"
@@ -465,124 +448,120 @@ class MainCog(commands.Cog):
             embed.description = f"Total WRs: 0 \N{crying face}"
         await ctx.send(embed=embed)
 
-    @commands.command(name="fastecheck")
-    async def faste_check(self, ctx:Context, user, game, style):
-        arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
-        if not arguments:
-            return
-        if arguments.style == Style.SCROLL:
-            await ctx.send(utils.format_markdown_code("Scroll is not eligible for faste."))
-            return
-        wrs = await self.strafes.total_wrs(arguments.user_data, arguments.game, arguments.style)
-        if (arguments.style == Style.AUTOHOP and wrs >= 10) or wrs >= 50:
-            await ctx.send(utils.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
-        else:
-            await ctx.send(utils.format_markdown_code(f"WRs: {wrs}\n{arguments.user_data.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
+    # @commands.command(name="fastecheck")
+    # async def faste_check(self, ctx:Context, user, game, style):
+    #     arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
+    #     if not arguments:
+    #         return
+    #     if arguments.style == Style.SCROLL:
+    #         await ctx.send(utils.fmt_md_code("Scroll is not eligible for faste."))
+    #         return
+    #     wrs = await self.strafes.total_wrs(arguments.user_data, arguments.game, arguments.style)
+    #     if (arguments.style == Style.AUTOHOP and wrs >= 10) or wrs >= 50:
+    #         await ctx.send(utils.fmt_md_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
+    #     else:
+    #         await ctx.send(utils.fmt_md_code(f"WRs: {wrs}\n{arguments.user_data.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
 
     @commands.command(name="profile")
-    async def user_rank(self, ctx:Context, user, game, style):
-        arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
-        if not arguments:
+    async def user_rank(self, ctx:Context, *args):
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_required()
+        arguments.style.make_required()
+        arguments.user.make_required()
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+
         tasks = [
-            self.strafes.get_user_rank(arguments.user_data, arguments.game, arguments.style),
-            self.strafes.get_user_completion(arguments.user_data, arguments.game, arguments.style),
-            self.strafes.total_wrs(arguments.user_data, arguments.game, arguments.style)
+            self.strafes.get_user_rank(user, game, style),
+            self.strafes.get_user_completion(user, game, style),
+            self.strafes.total_wrs(user, game, style)
         ]
         results = await asyncio.gather(*tasks)
         rank_data:Rank = results[0]
         if not rank_data or rank_data.placement < 1:
-            await ctx.send(utils.format_markdown_code(f"No data available for {arguments.user_data.username} [game: {arguments.game}, style: {arguments.style}]"))
-            return
+            await ctx.send(utils.fmt_md_code(f"No data available for {user.username} [game: {game}, style: {style}]"))
         else:
             completions, total_maps = results[1]
             wrs = results[2]
-            await ctx.send(embed= await self.make_user_embed(arguments.user_data, rank_data, arguments.game, arguments.style, completions, total_maps, wrs))
+            await ctx.send(embed= await self.make_user_embed(user, rank_data, game, style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
-    async def ranks(self, ctx:Context, game, style, page=1):
-        page = int(page)
-        if page < 1:
-            await ctx.send(utils.format_markdown_code("Page number cannot be less than 1."))
+    async def ranks(self, ctx:Context, *args):
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_required()
+        arguments.style.make_required()
+        arguments.page.make_optional(1)
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        arguments = await self.argument_checker(ctx,game=game, style=style)
-        if not arguments:
-            return
-        ranks, page_count = await self.strafes.get_ranks(arguments.game, arguments.style, page)
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        page : int = arguments.page.value
+
+        ranks, page_count = await self.strafes.get_ranks(game, style, page)
         if page_count == 0:
-            await ctx.send(utils.format_markdown_code(f"No ranks found [game: {arguments.game}, style: {arguments.style}] (???)."))
+            await ctx.send(utils.fmt_md_code(f"No ranks found [game: {game}, style: {style}] (???)."))
             return
         elif page > page_count:
             page = page_count
-        msg = MessageBuilder(title=f"Ranks [game: {arguments.game}, style: {arguments.style}, page: {page}/{page_count}]",
+        msg = MessageBuilder(title=f"Ranks [game: {game}, style: {style}, page: {page}/{page_count}]",
             cols=[MessageCol.PLACEMENT, MessageCol.USERNAME, MessageCol.RANK, MessageCol.SKILL],
             items=ranks
         ).build()
-        await ctx.send(utils.format_markdown_code(msg))
+        await ctx.send(utils.fmt_md_code(msg))
     
     @commands.command(name="times")
-    async def times(self, ctx:Context, user, *args):
-        if len(args) == 0:
-            game = None
-            style = None
-            page = 1
-        elif len(args) == 1:
-            style = None
-            if args[0].isnumeric() or args[0] == "txt":
-                game = None
-                page = args[0]
-            elif args[0] == "all":
-                await ctx.send(utils.format_markdown_code("To create a .txt use 'txt' instead of 'all'"))
-                return
-            else:
-                game = args[0]
-                page = 1
-        elif len(args) == 2:
-            game = args[0]
-            if args[1].isnumeric() or args[1] == "txt":
-                style = None
-                page = args[1]
-            elif args[1] == "all":
-                await ctx.send(utils.format_markdown_code("To create a .txt use 'txt' instead of 'all'"))
-                return
-            else:
-                style = args[1]
-                page = 1
+    async def times(self, ctx:Context, *args):
+        valid_sorts = ["date", "time", "name"]
+        sort = ""
+        args = list(args)
+        for i, arg in enumerate(args):
+            arg = arg.lower()
+            if arg in valid_sorts:
+                sort = arg
+                break
+        if sort:
+            del args[i]
+        
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_optional()
+        arguments.style.make_optional()
+        arguments.user.make_required()
+
+        page = 1
+        for i, arg in enumerate(args):
+            arg = arg.lower()
+            if arg == "txt":
+                page = -1
+                break
+        if page == -1:
+            del args[i]
         else:
-            game = args[0]
-            style = args[1]
-            if args[2].isnumeric() or args[2] == "txt":
-                page = args[2]
-            elif args[2] == "all":
-                await ctx.send(utils.format_markdown_code("To create a .txt use 'txt' instead of 'all'"))
-                return
-            else:
-                page = 1
-        if page != "txt":
-            page = int(page)
-            if page < 1:
-                await ctx.send(utils.format_markdown_code("Page number cannot be less than 1."))
-                return
-        else:
-            page = -1
-        if game in ["all", "both"]:
-            game = None
-        if style == "all":
-            style = None
-        arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
-        if not arguments:
+            arguments.page.make_optional(1)
+        
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        if style:
-            style = arguments.style
-        if game:
-            game = arguments.game
-        record_list, page_count = await self.strafes.get_user_times(arguments.user_data, game, style, page)
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+        if page != -1:
+            page = arguments.page.value  
+
+        record_list, page_count = await self.strafes.get_user_times(user, game, style, page)
         if page_count == 0:
             if not style:
                 style = "all"
             if not game:
                 game = "both"
-            await ctx.send(utils.format_markdown_code(f"No times found for {arguments.user_data.username} [game: {game}, style: {style}]"))
+            await ctx.send(utils.fmt_md_code(f"No times found for {user.username} [game: {game}, style: {style}]"))
             return
         elif page > page_count:
             page = page_count
@@ -594,21 +573,21 @@ class MainCog(commands.Cog):
             style = "all"
             cols.append(MessageCol.STYLE)
         if page == -1:
-            msg = MessageBuilder(title=f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}] (total: {len(record_list)})", 
+            msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}] (total: {len(record_list)})", 
                 cols=cols, 
                 items=record_list
             ).build()
             with StringIO() as f:
                 f.write(msg)
                 f.seek(0)
-                await ctx.send(file=discord.File(f, filename=f"times_{arguments.user_data.username}_{game}_{style}.txt"))
+                await ctx.send(file=discord.File(f, filename=f"times_{user.username}_{game}_{style}.txt"))
                 return
-        msg = MessageBuilder(title=f"Recent times for {arguments.user_data.username} [game: {game}, style: {style}, page: {page}/{page_count}]", 
+        msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, page: {page}/{page_count}]", 
             cols=cols, 
             items=record_list
         ).build()
         for message in utils.page_messages(msg):
-            await ctx.send(utils.format_markdown_code(message))
+            await ctx.send(utils.fmt_md_code(message))
     
     @commands.command(name="mapcount")
     async def map_count(self, ctx:Context):
@@ -632,26 +611,28 @@ class MainCog(commands.Cog):
             elif Style.contains(arg):
                 styles.append(Style(arg))
             else:
-                arguments = await self.argument_checker(ctx, arg)
-                if not arguments:
+                arguments = ArgumentValidator(self.bot, self.strafes)
+                arguments.user.make_required()
+                valid, err = await arguments.set_user(arg, ctx.author.id)
+                if not valid:
+                    await ctx.send(utils.fmt_md_code(err))
+                    return
+                if len(users) > 7:
+                    await ctx.send(utils.fmt_md_code("You can only compare up to 8 users at a time."))
                     return
                 else:
-                    if len(users) > 7:
-                        await ctx.send(utils.format_markdown_code("You can only compare up to 8 users at a time."))
-                        return
-                    else:
-                        users.append(arguments.user_data)
+                    users.append(arguments.user.value)
         if len(users) == 1 and len(styles) > 1:
             user = users[0]
             users = [user for _ in range(len(styles))]
         if game is None:
-            await ctx.send(utils.format_markdown_code("No game specified."))
+            await ctx.send(utils.fmt_md_code("No game specified."))
             return
         elif len(users) < 2:
-            await ctx.send(utils.format_markdown_code("Not enough users specified."))
+            await ctx.send(utils.fmt_md_code("Not enough users specified."))
             return
         elif len(styles) != 1 and len(styles) != len(users):
-            await ctx.send(utils.format_markdown_code("No style specified or the number of styles does not match the number of users."))
+            await ctx.send(utils.fmt_md_code("No style specified or the number of styles does not match the number of users."))
             return
 
         comparables : Dict[ComparableUserStyle, int] = {}
@@ -660,7 +641,7 @@ class MainCog(commands.Cog):
             style = styles[i] if len(styles) > 1 else styles[0]
             comparable = ComparableUserStyle(user, style)
             if comparable in comparables:
-                await ctx.send(utils.format_markdown_code(f"You cannot compare users to themselves with the same style (user: {user}, style: {style})"))
+                await ctx.send(utils.fmt_md_code(f"You cannot compare users to themselves with the same style (user: {user}, style: {style})"))
                 return
             else:
                 comparables[comparable] = i
@@ -810,27 +791,36 @@ class MainCog(commands.Cog):
         return comparables[ComparableUserStyle(record.user, record.style)]
 
     @commands.command(name="mapstatus")
-    async def map_status(self, ctx:Context, user, game, style):
-        args = await self.argument_checker(ctx, user, game, style)
-        if not args:
+    async def map_status(self, ctx:Context, *args):
+        arguments = ArgumentValidator(self.bot, self.strafes)
+        arguments.game.make_required()
+        arguments.style.make_required()
+        arguments.user.make_required()
+        valid, err = await arguments.evaluate(args, ctx.author.id)
+        if not valid:
+            await ctx.send(utils.fmt_md_code(err))
             return
-        records = await self.strafes.get_user_times(args.user_data, args.game, args.style, -1)
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+
+        records = await self.strafes.get_user_times(user, game, style, -1)
         completed_maps = set(i.map.id for i in records[0])
         incompleted_maps = []
-        map_count = await self.strafes.get_map_count(args.game)
+        map_count = await self.strafes.get_map_count(game)
         for id, map in Map.map_lookup.items():
-            if map.game == args.game and id not in completed_maps:
+            if map.game == game and id not in completed_maps:
                 # TODO: binary search insert
                 incompleted_maps.append(map)
         incompleted_maps.sort(key=lambda i: i.displayname)
-        msg = MessageBuilder(title=f"Incomplete maps for {args.user_data.username} [game: {args.game}, style: {args.style}] (total: {len(incompleted_maps)} / {map_count})",
+        msg = MessageBuilder(title=f"Incomplete maps for {user.username} [game: {game}, style: {style}] (total: {len(incompleted_maps)} / {map_count})",
             cols=[MessageCol.Col("Map name", 30, lambda i: i.displayname)],
             items=incompleted_maps
             ).build()
         with StringIO() as f:
             f.write(msg)
             f.seek(0)
-            await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{args.user_data.username}_{args.game}_{args.style}.txt"))
+            await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="maps")
     async def maps(self, ctx:Context, *args):
@@ -848,7 +838,7 @@ class MainCog(commands.Cog):
                 creator = args[0]
         the_maps = await self.strafes.get_maps_by_creator(creator)
         if not the_maps:
-            await ctx.send(utils.format_markdown_code(f"No maps found by '{creator}'."))
+            await ctx.send(utils.fmt_md_code(f"No maps found by '{creator}'."))
             return
         the_maps.sort(key=lambda k: (k.game.name, k.displayname))
         cols = [MessageCol.Col("Map name", 30, lambda m: m.displayname),
@@ -865,13 +855,13 @@ class MainCog(commands.Cog):
                     cols=cols,
                     items=the_maps
                 ).build()
-                await ctx.send(utils.format_markdown_code(msg))
+                await ctx.send(utils.fmt_md_code(msg))
             else:
                 msg = MessageBuilder(title=f"List of all maps [page: {page} / {total_pages}]",
                     cols=cols,
                     items=the_maps
                 ).build()
-                await ctx.send(utils.format_markdown_code(msg))
+                await ctx.send(utils.fmt_md_code(msg))
         else:
             if creator:
                 msg = MessageBuilder(title=f"Search result for maps by '{creator}'",
@@ -895,9 +885,10 @@ class MainCog(commands.Cog):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.user.make_required()
         arguments.user.check_status = False
+        arguments.user.allow_id = True
         valid, err = await arguments.evaluate(args, ctx.author.id)
         if not valid:
-            await ctx.send(utils.format_markdown_code(err))
+            await ctx.send(utils.fmt_md_code(err))
             return
         user : User = arguments.user.value
         embed = discord.Embed(color=0xfcba03)
@@ -921,7 +912,7 @@ class MainCog(commands.Cog):
                 command = commands_json[cmd]
                 embed.add_field(name=f"{self.bot.command_prefix}{cmd} {command['args']}", value=command['blurb'], inline=False)
             else:
-                await ctx.send(utils.format_markdown_code(f"Command '{cmd}' not recognized! Use !help with no command to get a list of valid commands."))
+                await ctx.send(utils.fmt_md_code(f"Command '{cmd}' not recognized! Use !help with no command to get a list of valid commands."))
                 return
         else:
             embed.add_field(name="How to use", value="Do !help {command} to get info on how to use a command.", inline=False)
@@ -944,13 +935,13 @@ class MainCog(commands.Cog):
             msg += f"{name:40}| {members}\n"
         msg = f"Total guilds: {len(self.bot.guilds)}, total members: {member_count}\n" + msg
         for m in utils.page_messages(msg):
-            await ctx.send(utils.format_markdown_code(m))
+            await ctx.send(utils.fmt_md_code(m))
 
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps(self, ctx:Context):
         await self.strafes.update_maps()
-        await ctx.send(utils.format_markdown_code("Maps updated."))
+        await ctx.send(utils.fmt_md_code("Maps updated."))
     
     #checks if user, game, style, and map_name are valid arguments
     #passing None as argument to any of these fields will pass the check for that field
@@ -962,22 +953,22 @@ class MainCog(commands.Cog):
             try:
                 arguments.game = Game(game.lower())
             except KeyError:
-                await ctx.send(utils.format_markdown_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
+                await ctx.send(utils.fmt_md_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
                 return arguments
         if style:
             try:
                 arguments.style = Style(style.lower())
             except KeyError:
-                await ctx.send(utils.format_markdown_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
+                await ctx.send(utils.fmt_md_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
                 return arguments
         if arguments.game == Game.SURF and arguments.style == Style.SCROLL:
-            await ctx.send(utils.format_markdown_code("Surf and scroll cannot be combined."))
+            await ctx.send(utils.fmt_md_code("Surf and scroll cannot be combined."))
             return arguments
         if user:
             if user == "me":
                 roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
                 if not roblox_user:
-                    await ctx.send(utils.format_markdown_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
+                    await ctx.send(utils.fmt_md_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
                     return arguments
                 else:
                     user = roblox_user
@@ -989,28 +980,28 @@ class MainCog(commands.Cog):
                         try:
                             u = await self.bot.fetch_user(int(discord_user_id))
                             if u:
-                                await ctx.send(utils.format_markdown_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
+                                await ctx.send(utils.fmt_md_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
                             else:
-                                await ctx.send(utils.format_markdown_code(f"Invalid username (no user associated with that Discord account.)"))
+                                await ctx.send(utils.fmt_md_code(f"Invalid username (no user associated with that Discord account.)"))
                         except:
-                            await ctx.send(utils.format_markdown_code(f"Invalid discord user ID."))
+                            await ctx.send(utils.fmt_md_code(f"Invalid discord user ID."))
                         return arguments
                     else:
                         user = roblox_user
             try:
                 arguments.user_data = await self.strafes.get_user_data(user)
             except InvalidData:
-                await ctx.send(utils.format_markdown_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
+                await ctx.send(utils.fmt_md_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
                 return arguments
             except TimeoutError:
-                await ctx.send(utils.format_markdown_code(f"Error: User data request timed out."))
+                await ctx.send(utils.fmt_md_code(f"Error: User data request timed out."))
                 return arguments
             if not await self.check_user_status(ctx, arguments.user_data):
                 return arguments
         if map_name:
             arguments.map = await self.strafes.map_from_name(map_name, arguments.game)
             if not arguments.map:
-                await ctx.send(utils.format_markdown_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
+                await ctx.send(utils.fmt_md_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
                 return arguments
         arguments.valid = True
         return arguments
@@ -1019,15 +1010,15 @@ class MainCog(commands.Cog):
     async def check_user_status(self, ctx:Context, user_data:User):
         state = await self.strafes.get_user_state(user_data)
         if not state:
-            await ctx.send(utils.format_markdown_code(f"'{user_data.username}' has not played bhop/surf."))
+            await ctx.send(utils.fmt_md_code(f"'{user_data.username}' has not played bhop/surf."))
             return False
         else:
             user_data.state = state
             if user_data.state == UserState.BLACKLISTED:
-                await ctx.send(utils.format_markdown_code(f"{user_data.username} is blacklisted."))
+                await ctx.send(utils.fmt_md_code(f"{user_data.username} is blacklisted."))
                 return False
             elif user_data.state == UserState.PENDING:
-                await ctx.send(utils.format_markdown_code(f"{user_data.username} is pending moderation."))
+                await ctx.send(utils.fmt_md_code(f"{user_data.username} is pending moderation."))
                 return False
         return True
 

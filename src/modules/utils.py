@@ -1,7 +1,7 @@
 # utils.py
 from typing import List, Optional
 
-def format_markdown_code(s : str) -> str:
+def fmt_md_code(s : str) -> str:
     s = s.replace("`", "") # don't allow the ` character to prevent escaping code blocks
     return f"```\n{s}```"
 
