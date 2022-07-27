@@ -4,7 +4,6 @@ import colorsys
 import discord
 from discord.ext.commands.context import Context
 from dotenv import load_dotenv
-from discord.errors import InvalidData
 from discord.ext import commands, tasks
 from io import BytesIO, StringIO
 import numpy
@@ -15,21 +14,21 @@ import time
 import traceback
 from typing import Callable, Dict, List, Tuple, Union
 
-from modules.strafes import Game, Style, User, UserState, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES, open_json
+from modules.strafes import Game, Style, User, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES, open_json
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
 from modules.arguments import ArgumentValidator
 from modules.strafes_wrapper import Client
 
-class ArgumentChecker:
-    def __init__(self):
-        self.game:Game = None
-        self.style:Style = None
-        self.user_data:User = None
-        self.map:Map = None
-        self.valid = False
-    def __bool__(self):
-        return self.valid
+# class ArgumentChecker:
+#     def __init__(self):
+#         self.game:Game = None
+#         self.style:Style = None
+#         self.user_data:User = None
+#         self.map:Map = None
+#         self.valid = False
+#     def __bool__(self):
+#         return self.valid
 
 # contains some commonly used Cols designed for use with MessageBuilder
 class MessageCol:
@@ -947,80 +946,80 @@ class MainCog(commands.Cog):
     #passing None as argument to any of these fields will pass the check for that field
     #returns an ArgumentChecker object with the properly converted arguments
     #is falsy if the check failed, truthy if it passed
-    async def argument_checker(self, ctx:Context, user:str=None, game:str=None, style:str=None, map_name:str=None) -> ArgumentChecker:
-        arguments = ArgumentChecker()
-        if game:
-            try:
-                arguments.game = Game(game.lower())
-            except KeyError:
-                await ctx.send(utils.fmt_md_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
-                return arguments
-        if style:
-            try:
-                arguments.style = Style(style.lower())
-            except KeyError:
-                await ctx.send(utils.fmt_md_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
-                return arguments
-        if arguments.game == Game.SURF and arguments.style == Style.SCROLL:
-            await ctx.send(utils.fmt_md_code("Surf and scroll cannot be combined."))
-            return arguments
-        if user:
-            if user == "me":
-                roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
-                if not roblox_user:
-                    await ctx.send(utils.fmt_md_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
-                    return arguments
-                else:
-                    user = roblox_user
-            else:
-                discord_user_id = utils.get_discord_user_id(user)
-                if discord_user_id:
-                    roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
-                    if not roblox_user:
-                        try:
-                            u = await self.bot.fetch_user(int(discord_user_id))
-                            if u:
-                                await ctx.send(utils.fmt_md_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
-                            else:
-                                await ctx.send(utils.fmt_md_code(f"Invalid username (no user associated with that Discord account.)"))
-                        except:
-                            await ctx.send(utils.fmt_md_code(f"Invalid discord user ID."))
-                        return arguments
-                    else:
-                        user = roblox_user
-            try:
-                arguments.user_data = await self.strafes.get_user_data(user)
-            except InvalidData:
-                await ctx.send(utils.fmt_md_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
-                return arguments
-            except TimeoutError:
-                await ctx.send(utils.fmt_md_code(f"Error: User data request timed out."))
-                return arguments
-            if not await self.check_user_status(ctx, arguments.user_data):
-                return arguments
-        if map_name:
-            arguments.map = await self.strafes.map_from_name(map_name, arguments.game)
-            if not arguments.map:
-                await ctx.send(utils.fmt_md_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
-                return arguments
-        arguments.valid = True
-        return arguments
+    # async def argument_checker(self, ctx:Context, user:str=None, game:str=None, style:str=None, map_name:str=None) -> ArgumentChecker:
+    #     arguments = ArgumentChecker()
+    #     if game:
+    #         try:
+    #             arguments.game = Game(game.lower())
+    #         except KeyError:
+    #             await ctx.send(utils.fmt_md_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
+    #             return arguments
+    #     if style:
+    #         try:
+    #             arguments.style = Style(style.lower())
+    #         except KeyError:
+    #             await ctx.send(utils.fmt_md_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
+    #             return arguments
+    #     if arguments.game == Game.SURF and arguments.style == Style.SCROLL:
+    #         await ctx.send(utils.fmt_md_code("Surf and scroll cannot be combined."))
+    #         return arguments
+    #     if user:
+    #         if user == "me":
+    #             roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
+    #             if not roblox_user:
+    #                 await ctx.send(utils.fmt_md_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
+    #                 return arguments
+    #             else:
+    #                 user = roblox_user
+    #         else:
+    #             discord_user_id = utils.get_discord_user_id(user)
+    #             if discord_user_id:
+    #                 roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
+    #                 if not roblox_user:
+    #                     try:
+    #                         u = await self.bot.fetch_user(int(discord_user_id))
+    #                         if u:
+    #                             await ctx.send(utils.fmt_md_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
+    #                         else:
+    #                             await ctx.send(utils.fmt_md_code(f"Invalid username (no user associated with that Discord account.)"))
+    #                     except:
+    #                         await ctx.send(utils.fmt_md_code(f"Invalid discord user ID."))
+    #                     return arguments
+    #                 else:
+    #                     user = roblox_user
+    #         try:
+    #             arguments.user_data = await self.strafes.get_user_data(user)
+    #         except InvalidData:
+    #             await ctx.send(utils.fmt_md_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
+    #             return arguments
+    #         except TimeoutError:
+    #             await ctx.send(utils.fmt_md_code(f"Error: User data request timed out."))
+    #             return arguments
+    #         if not await self.check_user_status(ctx, arguments.user_data):
+    #             return arguments
+    #     if map_name:
+    #         arguments.map = await self.strafes.map_from_name(map_name, arguments.game)
+    #         if not arguments.map:
+    #             await ctx.send(utils.fmt_md_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
+    #             return arguments
+    #     arguments.valid = True
+    #     return arguments
     
-    #set the user_id and username of the argument_checker before passing it to this
-    async def check_user_status(self, ctx:Context, user_data:User):
-        state = await self.strafes.get_user_state(user_data)
-        if not state:
-            await ctx.send(utils.fmt_md_code(f"'{user_data.username}' has not played bhop/surf."))
-            return False
-        else:
-            user_data.state = state
-            if user_data.state == UserState.BLACKLISTED:
-                await ctx.send(utils.fmt_md_code(f"{user_data.username} is blacklisted."))
-                return False
-            elif user_data.state == UserState.PENDING:
-                await ctx.send(utils.fmt_md_code(f"{user_data.username} is pending moderation."))
-                return False
-        return True
+    # #set the user_id and username of the argument_checker before passing it to this
+    # async def check_user_status(self, ctx:Context, user_data:User):
+    #     state = await self.strafes.get_user_state(user_data)
+    #     if not state:
+    #         await ctx.send(utils.fmt_md_code(f"'{user_data.username}' has not played bhop/surf."))
+    #         return False
+    #     else:
+    #         user_data.state = state
+    #         if user_data.state == UserState.BLACKLISTED:
+    #             await ctx.send(utils.fmt_md_code(f"{user_data.username} is blacklisted."))
+    #             return False
+    #         elif user_data.state == UserState.PENDING:
+    #             await ctx.send(utils.fmt_md_code(f"{user_data.username} is pending moderation."))
+    #             return False
+    #     return True
 
     def get_ordinal(self, num:int) -> str:
         ordinal = "th"
