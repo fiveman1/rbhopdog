@@ -111,7 +111,7 @@ class Game(Enum):
         return self.name
 
     @staticmethod
-    def contains(obj):
+    def contains(obj) -> bool:
         return obj in Game._value2member_map_ if isinstance(obj, int) else obj in _STR_TO_GAME
 
 setattr(Game, "__new__", lambda cls, value: super(Game, cls).__new__(cls, _STR_TO_GAME[value] if isinstance(value, str) else value))

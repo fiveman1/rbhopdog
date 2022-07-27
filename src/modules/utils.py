@@ -1,5 +1,17 @@
 # utils.py
-from typing import List
+from typing import List, Optional
+
+def format_markdown_code(s : str) -> str:
+    s = s.replace("`", "") # don't allow the ` character to prevent escaping code blocks
+    return f"```\n{s}```"
+
+def get_discord_user_id(s : str) -> Optional[str]:
+    if s[:3] == "<@!" and s[-1] == ">":
+        return s[3:-1]
+    elif s[:2] == "<@" and s[-1] == ">":
+        return s[2:-1]
+    else:
+        return None
 
 # increment(inc=1): returns i then increments it by inc (default i++)
 # get(): returns i
