@@ -6,7 +6,7 @@ from discord.errors import InvalidData
 from enum import Enum
 import json
 import os
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from modules.utils import Incrementer
 
@@ -671,7 +671,7 @@ async def get_user_completion(client:Client, user_data:User, game:Game, style:St
     return len(records), await Map.get_map_count(client, game)
 
 #records is a list of records from a given map
-def sort_map(records:List):
+def sort_map(records:List[Dict[str, Any]]):
     records.sort(key=lambda i: (i["Time"], i["Date"]))
 
 #changes a WR's diff and previous_record in place by comparing first and second place
@@ -765,9 +765,10 @@ async def get_new_wrs(client:Client) -> List[Record]:
 async def get_map_times(client:Client, style:Style, map:Map, page:int) -> Tuple[List[Record], int]:
     page_length = 25
     page_num, start = divmod((int(page) - 1) * page_length, 200)
+    page_num += 1
     params = {
         "style":style.value,
-        "page":page_num + 1
+        "page":page_num
     }
     res = await get_strafes(client, f"time/map/{map.id}", params)
     data = res.json
@@ -783,24 +784,40 @@ async def get_map_times(client:Client, style:Style, map:Map, page:int) -> Tuple[
         else:
             page_count = int(first_page_res.res.headers["Pagination-Count"])
             params["page"] = page_count
-            converted_page_count = await find_max_pages(client, f"time/map/{map.id}", params, page_count, 200, page_length)
-            the_res = await get_strafes(client, f"time/map/{map.id}", params)
+            tasks = [find_max_pages(client, f"time/map/{map.id}", params, page_count, 200, page_length), get_strafes(client, f"time/map/{map.id}", params)]
+            results = await asyncio.gather(*tasks)
+            converted_page_count = results[0]
+            page_num = converted_page_count
+            the_res = results[1]
             data = the_res.json
+
     #add the previous and next page so that we can sort the times across pages properly
-    res2len = 0
-    if page_num > 0:
-        params["page"] = page_num
-        res2 = await get_strafes(client, f"time/map/{map.id}", params)
-        data = res2.json + data
-        res2len = len(res2.json)
-    if page_num + 2 <= converted_page_count:
-        params["page"] = page_num + 2
-        res3 = await get_strafes(client, f"time/map/{map.id}", params)
-        data += res3.json
+    before_len = 0
+    add_before = page_num > 1
+    add_after = page_num + 1 <= converted_page_count
+    tasks = []
+
+    if add_before:
+        copy = params.copy()
+        copy["page"] = page_num - 1
+        tasks.append(get_strafes(client, f"time/map/{map.id}", copy))
+    if add_after:
+        copy = params.copy()
+        copy["page"] = page_num + 1
+        tasks.append(get_strafes(client, f"time/map/{map.id}", copy))
+    
+    if add_before or add_after:
+        results : List[JSONRes] = await asyncio.gather(*tasks)
+        if add_before:
+            before_len = len(results[0].json)
+            data = results[0].json + data
+        if add_after:
+            data += results[-1].json
+
     sort_map(data)
     if page > converted_page_count:
         start = ((int(converted_page_count) - 1) * page_length) % 200
-    start += res2len
+    start += before_len
     end = start + page_length
     return await Record.make_record_list(client, data[start:end], map=map), converted_page_count
 
