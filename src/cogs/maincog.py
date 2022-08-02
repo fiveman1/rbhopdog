@@ -517,7 +517,7 @@ class MainCog(commands.Cog):
     
     @commands.command(name="times")
     async def times(self, ctx:Context, *args):
-        valid_sorts = ["date", "time", "name"]
+        valid_sorts = ["time", "name"]
         sort = ""
         args = list(args)
         for i, arg in enumerate(args):
@@ -552,9 +552,13 @@ class MainCog(commands.Cog):
         style : Style = arguments.style.value
         user : User = arguments.user.value
         if page != -1:
-            page = arguments.page.value  
+            page = arguments.page.value
 
-        record_list, page_count = await self.strafes.get_user_times(user, game, style, page)
+        if sort:
+            record_list, _ = await self.strafes.get_user_times(user, game, style, -1)
+            page_count = ((len(record_list) - 1) // 25) + 1
+        else:
+            record_list, page_count = await self.strafes.get_user_times(user, game, style, page)
         if page_count == 0:
             if not style:
                 style = "all"
@@ -562,8 +566,18 @@ class MainCog(commands.Cog):
                 game = "both"
             await ctx.send(utils.fmt_md_code(f"No times found for {user.username} [game: {game}, style: {style}]"))
             return
-        elif page > page_count:
+        if page > page_count:
             page = page_count
+        if sort:
+            if sort == "time":
+                record_list.sort(key=lambda i : (i.time.millis, i.date.timestamp * -1))
+            elif sort == "name":
+                record_list.sort(key=lambda i : (i.map.displayname, i.date.timestamp * -1))
+            if page != -1:
+                end = page * 25
+                record_list = record_list[end-25:end]
+        else:
+            sort = "date"
         cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
         if game is None:
             game = "both"
@@ -572,7 +586,7 @@ class MainCog(commands.Cog):
             style = "all"
             cols.append(MessageCol.STYLE)
         if page == -1:
-            msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}] (total: {len(record_list)})", 
+            msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, sort: {sort}] (total: {len(record_list)})", 
                 cols=cols, 
                 items=record_list
             ).build()
@@ -581,7 +595,7 @@ class MainCog(commands.Cog):
                 f.seek(0)
                 await ctx.send(file=discord.File(f, filename=f"times_{user.username}_{game}_{style}.txt"))
                 return
-        msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, page: {page}/{page_count}]", 
+        msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{page_count}]", 
             cols=cols, 
             items=record_list
         ).build()

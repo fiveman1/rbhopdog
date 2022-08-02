@@ -153,7 +153,7 @@ class ArgumentValidator:
             found = False
             len_required = 1 if self.map.is_required() else 0
             if len(args) > len_required and args[-1].isnumeric():
-                self.page.value = int(args[-1])
+                self.page.value = max(int(args[-1]), 1)
                 found = True
             if found:
                 del args[-1]
