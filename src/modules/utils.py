@@ -37,6 +37,8 @@ def page_messages(msg:str, max_length=1990) -> List[str]:
     length = 0
     s = StringBuilder()
     for line in msg.split("\n"):
+        if not line:
+            continue
         line_length = len(line) + 1
         length += line_length
         if length > max_length:

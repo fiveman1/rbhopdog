@@ -36,8 +36,8 @@
         "blurb": "Get a user's time on a given map and their placement (ex. 31st / 5690)."
     },
     "times": {
-        "args": "{user} {game=both} {style=all} {page=1}",
-        "blurb": "Get a list of a user's 25 most recent times. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'txt', you will get a .txt with every time."
+        "args": "{user} {game=both} {style=all} {sort=date} {page=1}",
+        "blurb": "Get a list of a user's 25 most recent times. Valid sorts: 'date', 'name', and 'time'. It will try to be smart with the arguments: '!times fiveman1 bhop 2', '!times fiveman1 4', '!times fiveman1', '!times fiveman1 both hsw 7' are all valid. Numbers will be treated as the page number, but they must come after game/style. If the page is set to 'txt', you will get a .txt with every time."
     },
     "user": {
         "args": "{user}",

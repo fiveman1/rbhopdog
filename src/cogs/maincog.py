@@ -517,7 +517,7 @@ class MainCog(commands.Cog):
     
     @commands.command(name="times")
     async def times(self, ctx:Context, *args):
-        valid_sorts = ["time", "name"]
+        valid_sorts = ["date", "time", "name"]
         sort = ""
         args = list(args)
         for i, arg in enumerate(args):
@@ -554,7 +554,7 @@ class MainCog(commands.Cog):
         if page != -1:
             page = arguments.page.value
 
-        if sort:
+        if sort and sort != "date":
             record_list, _ = await self.strafes.get_user_times(user, game, style, -1)
             page_count = ((len(record_list) - 1) // 25) + 1
         else:
@@ -568,7 +568,7 @@ class MainCog(commands.Cog):
             return
         if page > page_count:
             page = page_count
-        if sort:
+        if sort and sort != "date":
             if sort == "time":
                 record_list.sort(key=lambda i : (i.time.millis, i.date.timestamp * -1))
             elif sort == "name":
