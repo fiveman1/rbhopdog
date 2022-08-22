@@ -20,16 +20,6 @@ from modules.utils import Incrementer, StringBuilder
 from modules.arguments import ArgumentValidator
 from modules.strafes_wrapper import Client
 
-# class ArgumentChecker:
-#     def __init__(self):
-#         self.game:Game = None
-#         self.style:Style = None
-#         self.user_data:User = None
-#         self.map:Map = None
-#         self.valid = False
-#     def __bool__(self):
-#         return self.valid
-
 # contains some commonly used Cols designed for use with MessageBuilder
 class MessageCol:
     class Col:
@@ -124,14 +114,13 @@ class MainCog(commands.Cog):
         except:
             pass
 
-    async def create_global_embed(self, record):
+    async def create_global_embed(self, record : Record):
         return (record.game, record.style, await self.make_global_embed(record))
 
     @tasks.loop(minutes=1)
     async def global_announcements(self):
         # this is wrapped in a try-except because if this raises
         # an error the entire task stops and we don't want that :)
-        # yeah this is a bad practice but idk what else to do
         try:
             # when the bot first runs, overwrite globals then stop
             if not self.globals_started:
@@ -446,20 +435,6 @@ class MainCog(commands.Cog):
         else:
             embed.description = f"Total WRs: 0 \N{crying face}"
         await ctx.send(embed=embed)
-
-    # @commands.command(name="fastecheck")
-    # async def faste_check(self, ctx:Context, user, game, style):
-    #     arguments = await self.argument_checker(ctx, user=user, game=game, style=style)
-    #     if not arguments:
-    #         return
-    #     if arguments.style == Style.SCROLL:
-    #         await ctx.send(utils.fmt_md_code("Scroll is not eligible for faste."))
-    #         return
-    #     wrs = await self.strafes.total_wrs(arguments.user_data, arguments.game, arguments.style)
-    #     if (arguments.style == Style.AUTOHOP and wrs >= 10) or wrs >= 50:
-    #         await ctx.send(utils.fmt_md_code(f"WRs: {wrs}\n{arguments.user_data.username} is eligible for faste in {arguments.game} in the style {arguments.style}."))
-    #     else:
-    #         await ctx.send(utils.fmt_md_code(f"WRs: {wrs}\n{arguments.user_data.username} is NOT eligible for faste in {arguments.game} in the style {arguments.style}."))
 
     @commands.command(name="profile")
     async def user_rank(self, ctx:Context, *args):
@@ -955,85 +930,6 @@ class MainCog(commands.Cog):
     async def update_maps(self, ctx:Context):
         await self.strafes.update_maps()
         await ctx.send(utils.fmt_md_code("Maps updated."))
-    
-    #checks if user, game, style, and map_name are valid arguments
-    #passing None as argument to any of these fields will pass the check for that field
-    #returns an ArgumentChecker object with the properly converted arguments
-    #is falsy if the check failed, truthy if it passed
-    # async def argument_checker(self, ctx:Context, user:str=None, game:str=None, style:str=None, map_name:str=None) -> ArgumentChecker:
-    #     arguments = ArgumentChecker()
-    #     if game:
-    #         try:
-    #             arguments.game = Game(game.lower())
-    #         except KeyError:
-    #             await ctx.send(utils.fmt_md_code(f"'{game}' is not a valid game. 'bhop' and 'surf' are valid."))
-    #             return arguments
-    #     if style:
-    #         try:
-    #             arguments.style = Style(style.lower())
-    #         except KeyError:
-    #             await ctx.send(utils.fmt_md_code(f"'{style}' is not a valid style. 'autohop', 'auto', 'aonly', 'hsw' are valid examples."))
-    #             return arguments
-    #     if arguments.game == Game.SURF and arguments.style == Style.SCROLL:
-    #         await ctx.send(utils.fmt_md_code("Surf and scroll cannot be combined."))
-    #         return arguments
-    #     if user:
-    #         if user == "me":
-    #             roblox_user = await self.strafes.get_roblox_user_from_discord(ctx.author.id)
-    #             if not roblox_user:
-    #                 await ctx.send(utils.fmt_md_code("Invalid username (no Roblox username associated with your Discord account. Visit https://verify.eryn.io/)"))
-    #                 return arguments
-    #             else:
-    #                 user = roblox_user
-    #         else:
-    #             discord_user_id = utils.get_discord_user_id(user)
-    #             if discord_user_id:
-    #                 roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
-    #                 if not roblox_user:
-    #                     try:
-    #                         u = await self.bot.fetch_user(int(discord_user_id))
-    #                         if u:
-    #                             await ctx.send(utils.fmt_md_code(f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"))
-    #                         else:
-    #                             await ctx.send(utils.fmt_md_code(f"Invalid username (no user associated with that Discord account.)"))
-    #                     except:
-    #                         await ctx.send(utils.fmt_md_code(f"Invalid discord user ID."))
-    #                     return arguments
-    #                 else:
-    #                     user = roblox_user
-    #         try:
-    #             arguments.user_data = await self.strafes.get_user_data(user)
-    #         except InvalidData:
-    #             await ctx.send(utils.fmt_md_code(f"Invalid username (username '{user}' does not exist on Roblox)."))
-    #             return arguments
-    #         except TimeoutError:
-    #             await ctx.send(utils.fmt_md_code(f"Error: User data request timed out."))
-    #             return arguments
-    #         if not await self.check_user_status(ctx, arguments.user_data):
-    #             return arguments
-    #     if map_name:
-    #         arguments.map = await self.strafes.map_from_name(map_name, arguments.game)
-    #         if not arguments.map:
-    #             await ctx.send(utils.fmt_md_code(f"\"{map_name}\" is not a valid {arguments.game} map."))
-    #             return arguments
-    #     arguments.valid = True
-    #     return arguments
-    
-    # #set the user_id and username of the argument_checker before passing it to this
-    # async def check_user_status(self, ctx:Context, user_data:User):
-    #     state = await self.strafes.get_user_state(user_data)
-    #     if not state:
-    #         await ctx.send(utils.fmt_md_code(f"'{user_data.username}' has not played bhop/surf."))
-    #         return False
-    #     else:
-    #         user_data.state = state
-    #         if user_data.state == UserState.BLACKLISTED:
-    #             await ctx.send(utils.fmt_md_code(f"{user_data.username} is blacklisted."))
-    #             return False
-    #         elif user_data.state == UserState.PENDING:
-    #             await ctx.send(utils.fmt_md_code(f"{user_data.username} is pending moderation."))
-    #             return False
-    #     return True
 
     def get_ordinal(self, num:int) -> str:
         ordinal = "th"
@@ -1054,12 +950,16 @@ class MainCog(commands.Cog):
         if url:
             embed.set_thumbnail(url=url)
         embed.add_field(name="Player", value=record.user.username, inline=True)
+        time = f"{record.time} "
+        info = f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** <t:{record.date.timestamp}:f>\n**Previous WR:** "
         if not record.previous_record:
-            embed.add_field(name="Time", value=f"{record.time} (-n/a s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** n/a", inline=False)
+            time += "(-n/a s)"
+            info += "n/a"
         else:
-            embed.add_field(name="Time", value=f"{record.time} ({record.diff:+.3f} s)", inline=True)
-            embed.add_field(name="Info", value=f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** {record.date}\n**Previous WR:** {record.previous_record.time} ({record.previous_record.user.username})", inline=False)
+            time += f"({record.diff:+.3f} s)"
+            info += f"{record.previous_record.time} ({record.previous_record.user.username})"
+        embed.add_field(name="Time", value=time, inline=True)
+        embed.add_field(name="Info", value=info, inline=False)
         embed.set_footer(text="World Record")
         return embed
     
