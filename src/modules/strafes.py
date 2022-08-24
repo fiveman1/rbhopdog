@@ -836,11 +836,15 @@ async def get_record_placement(client:Client, record:Record) -> Tuple[int, int]:
     first_page_res = await get_strafes(client, f"time/map/{record.map.id}", params)
     page_count = int(first_page_res.res.headers["Pagination-Count"])
     completions = 0
+    tasks = [get_strafes(client, f"time/{record.id}/rank", {})]
     if page_count == 1:
         completions = len(first_page_res.json)
+        res = await asyncio.gather(*tasks)
+        rank = res[0].json["Rank"]
     else:
         params["page"] = page_count
-        last_page_res = await get_strafes(client, f"time/map/{record.map.id}", params)
-        completions = len(last_page_res.json) + (page_count - 1) * 200
-    the_res = await get_strafes(client, f"time/{record.id}/rank", {})
-    return the_res.json["Rank"], completions
+        tasks.append(get_strafes(client, f"time/map/{record.map.id}", params))
+        res = await asyncio.gather(*tasks)
+        rank = res[0].json["Rank"]
+        completions = len(res[1].json) + (page_count - 1) * 200
+    return rank, completions
