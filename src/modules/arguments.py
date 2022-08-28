@@ -168,7 +168,7 @@ class ArgumentValidator:
                 smap = await self.strafes.map_from_name(map_name, self.game.value)
                 if not smap:
                     if self.game.value is not None:
-                        return False, f"\"{map_name}\" is not a {self.game.value} valid map."
+                        return False, f"\"{map_name}\" is not a valid {self.game.value} map."
                     else:
                         return False, f"\"{map_name}\" is not a valid map."
             else:
@@ -187,7 +187,7 @@ class ArgumentValidator:
                             username = args[-1]
                         else:
                             if self.game.value is not None:
-                                return False, f"\"{map_name}\" is not a {self.game.value} valid map."
+                                return False, f"\"{map_name}\" is not a valid {self.game.value} map."
                             else:
                                 return False, f"\"{map_name}\" is not a valid map."
                     valid, err = await self.set_user(username, author_id)

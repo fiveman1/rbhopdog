@@ -14,7 +14,7 @@ import time
 import traceback
 from typing import Callable, Dict, List, Tuple, Union
 
-from modules.strafes import Game, Style, User, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES, open_json
+from modules.strafes import Game, Style, User, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES, open_json, _GAMES, _STYLES
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
 from modules.arguments import ArgumentValidator
@@ -903,11 +903,43 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(f"Command '{cmd}' not recognized! Use !help with no command to get a list of valid commands."))
                 return
         else:
-            embed.add_field(name="How to use", value="Do !help {command} to get info on how to use a command.", inline=False)
+            use_txt = "Do **" + self.bot.command_prefix + "help {command}** to get info on how to use a command. Do **" + self.bot.command_prefix + "aliases** to get a list of all game and style aliases."
+            embed.add_field(name="How to use", value=use_txt, inline=False)
             cmds = [c for c in commands_json.keys()]
             cmds.sort()
             embed.add_field(name="All Commands", value=", ".join(cmds), inline=False)
+            games_txt = ", ".join(sorted([str(i) for i in DEFAULT_GAMES]))
+            embed.add_field(name=f"Games", value=games_txt, inline=False)
+            styles_txt = ", ".join(sorted([str(i) for i in DEFAULT_STYLES]))
+            embed.add_field(name=f"Styles", value=styles_txt, inline=False)
 
+        await ctx.send(embed=embed)
+    
+    @staticmethod
+    def format_aliases(ls):
+        if not ls:
+            return ""
+        elif len(ls) == 1:
+            return f"**{ls[0]}**"
+        else:
+            return f"**{ls[0]}**: " + ", ".join(ls[1:])
+
+    @commands.command(name="aliases")
+    async def aliases(self, ctx:Context):
+        embed = discord.Embed(title="\U00002139  Aliases", color=0xff0055) #\U00002139: information source emoji
+        embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
+        games = [game for game in Game]
+        games.sort(key=str)
+        games_txt = []
+        for game in games:
+            games_txt.append(self.format_aliases(_GAMES[game.value]))
+        embed.add_field(name=f"__Games__", value="\n".join(games_txt), inline=False)
+        styles = [style for style in Style]
+        styles.sort(key=str)
+        styles_txt = []
+        for style in styles:
+            styles_txt.append(self.format_aliases(_STYLES[style.value]))
+        embed.add_field(name=f"__Styles__", value="\n".join(styles_txt), inline=False)
         await ctx.send(embed=embed)
     
     @commands.command(name="guilds")
