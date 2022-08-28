@@ -129,7 +129,7 @@ class ArgumentValidator:
             if found:
                 del args[i]
             elif self.game.is_required():
-                return False, "No valid game found. (try bhop or surf)"
+                return False, f"No valid game found. Use {self.bot.command_prefix}aliases for a list of all games."
         if not self.style.is_not_required():
             if len(args) == 0 and self.style.is_required():
                 return False, "Missing style."
@@ -148,7 +148,7 @@ class ArgumentValidator:
                     else:
                         self.game.value = Game.BHOP
             elif self.style.is_required():
-                return False, "No valid style found. (try autohop/auto/a, aonly/ao, sideways/sw, etc.)"
+                return False, f"No valid style found. Use {self.bot.command_prefix}aliases for a list of all styles."
         if not self.page.is_not_required():
             found = False
             len_required = 1 if self.map.is_required() else 0
