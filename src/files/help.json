@@ -1,4 +1,8 @@
 {
+    "aliases": {
+        "args": "",
+        "blurb": "Get a list of all game and style aliases."
+    },
     "compare": {
         "args": "{users} {game} {styles} OPTIONAL[txt]",
         "blurb": "Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto"

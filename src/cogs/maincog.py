@@ -903,7 +903,7 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(f"Command '{cmd}' not recognized! Use !help with no command to get a list of valid commands."))
                 return
         else:
-            use_txt = "Do **" + self.bot.command_prefix + "help {command}** to get info on how to use a command. Do **" + self.bot.command_prefix + "aliases** to get a list of all game and style aliases."
+            use_txt = "Do **" + self.bot.command_prefix + "help {command}** to get info on how to use a command."
             embed.add_field(name="How to use", value=use_txt, inline=False)
             cmds = [c for c in commands_json.keys()]
             cmds.sort()
