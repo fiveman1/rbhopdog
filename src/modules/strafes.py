@@ -18,12 +18,31 @@ def open_json(path):
         data = file.read()
         return json.loads(data)
 
+class StrafesError(Exception):
+
+    def __init__(self, url, headers, params, status, body, msg="An error occured attempting to use the strafes.net API."):
+        super().__init__(msg)
+        self.url = url
+        self.headers = headers
+        self.params = params
+        self.status = status
+        self.body = body
+    
+    def create_debug_message(self):
+        s = ["strafes.net error debug:", str(self.__class__), f"URL: {self.url}", f"Headers: {self.headers}", f"Params: {self.params}", f"Status: {self.status}", f"Body: {self.body}"]
+        return "\n".join(s)
+
+class StrafesTimeoutError(StrafesError):
+
+    def __init__(self, timeout, url, headers, params):
+        super().__init__(url, headers, params, "n/a", "n/a", f"strafes.net API request timed out after {timeout} seconds.")
+
 # TODO: combine all requests into a single client instance
 # so I don't have to use strafes_wrapper.py
 
 class Client:
     def __init__(self, api_key):
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         self.api_key = api_key
 
     def close(self):
@@ -39,13 +58,23 @@ class JSONRes:
         self.json = json
 
 async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
-    async with client.session.get(f"https://api.strafes.net/v1/{end_of_url}", headers={"api-key":client.api_key}, params=params) as res:
-        try:
-            json = await res.json()
-            return JSONRes(res, json)
-        except aiohttp.ContentTypeError:
-            body = await res.text()
-            raise Exception(body)
+    url = f"https://api.strafes.net/v1/{end_of_url}"
+    headers = {"api-key":client.api_key}
+    try:
+        async with client.session.get(url, headers=headers, params=params) as res:
+            if res.status < 200 or res.status >= 300:
+                try:
+                    body = await res.text()
+                except:
+                    body = "n/a"
+                raise StrafesError(url, headers, params, res.status, body)
+            try:
+                json = await res.json()
+                return JSONRes(res, json)
+            except aiohttp.ContentTypeError:
+                raise StrafesError(url, headers, params, res.status, await res.text())
+    except asyncio.TimeoutError:
+        raise StrafesTimeoutError(client.session.timeout.total, url, headers, params)
         
 
 class Time:

@@ -1,12 +1,14 @@
 # bot.py
 import discord
 from discord.ext import commands
+from discord.ext.commands.context import Context
 from dotenv import load_dotenv
 import os
 import traceback
 import sys
 
 from modules import utils
+from modules.strafes import StrafesError, StrafesTimeoutError
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -21,20 +23,24 @@ async def on_ready():
     await bot.change_presence(status=discord.Status.online, activity=discord.Game(name=f"{COMMAND}help"))
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(ctx : Context, error : Exception):
     ignored = (discord.Forbidden, commands.CommandNotFound)
     if isinstance(error, ignored):
         return
     if isinstance(error, commands.BadArgument):
-        await ctx.send("```Error: Bad argument```")
+        await ctx.send(utils.fmt_md_code("Error: Bad argument"))
     elif isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(f'```This command is on cooldown. Please wait {error.retry_after:.2f}s.```')
+        await ctx.send(utils.fmt_md_code(f'This command is on cooldown. Please wait {error.retry_after:.2f}s.'))
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"```Error: Missing argument(s): {error.param}```")
+        await ctx.send(utils.fmt_md_code(f"Error: Missing argument(s): {error.param}"))
     elif isinstance(error, commands.CommandInvokeError):
         if isinstance(error.original, ignored):
             return
-        await ctx.send(f"```Command invokation error: {error.original}.```")
+        elif isinstance(error.original, StrafesError):
+            print(error.original.create_debug_message())
+            await ctx.send(utils.fmt_md_code(str(error.original)))
+        else:
+            await ctx.send(utils.fmt_md_code(f"Command invokation error: {error.original}."))
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
         await send_traceback(ctx, error)
     else:
@@ -42,7 +48,7 @@ async def on_command_error(ctx, error):
         traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
 
 #formatting taken from https://github.com/drumman22/Bhop-Bot/blob/bhop-bot-v3/cogs/error_handler.py
-async def send_traceback(ctx, error):
+async def send_traceback(ctx : Context, error : Exception):
     tb_channel = bot.get_channel(812768023920115742)
     tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
     await tb_channel.send(
@@ -51,13 +57,13 @@ async def send_traceback(ctx, error):
             f"\n> {ctx.message.jump_url}\n"
         )
     for msg in utils.page_messages(f"{type(error).__name__}: {error}\n" + tb):
-        await tb_channel.send(f"```\n{msg}\n```")
+        await tb_channel.send(utils.fmt_md_code(f"\n{msg}\n"))
 
 #shamelessly adapted from here
 #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot
 @bot.command(name="load", hidden=True)
 @commands.is_owner()
-async def load(ctx, *, module : str):
+async def load(ctx : Context, *, module : str):
     """Loads a module."""
     module = "cogs." + module
     try:
@@ -70,7 +76,7 @@ async def load(ctx, *, module : str):
 
 @bot.command(name="unload", hidden=True)
 @commands.is_owner()
-async def unload(ctx, *, module : str):
+async def unload(ctx : Context, *, module : str):
     """Unloads a module."""
     module = "cogs." + module
     try:
@@ -83,7 +89,7 @@ async def unload(ctx, *, module : str):
 
 @bot.command(name="reload", hidden=True)
 @commands.is_owner()
-async def _reload(ctx, *, module : str):
+async def _reload(ctx : Context, *, module : str):
     """Reloads a module."""
     module = "cogs." + module
     try:
@@ -97,7 +103,7 @@ async def _reload(ctx, *, module : str):
 
 @bot.command(name="shutdown", hidden=True)
 @commands.is_owner()
-async def shutdown(ctx):
+async def shutdown(ctx : Context):
     print("shutting down")
     await ctx.bot.logout()
     print("shut down succesful")
