@@ -37,6 +37,11 @@ class StrafesTimeoutError(StrafesError):
     def __init__(self, timeout, url, headers, params):
         super().__init__(url, headers, params, "n/a", "n/a", f"strafes.net API request timed out after {timeout} seconds.")
 
+class StrafesNotFoundError(Exception):
+
+    def __init__(self):
+        super().__init__("404 Not Found")
+
 # TODO: combine all requests into a single client instance
 # so I don't have to use strafes_wrapper.py
 
@@ -62,7 +67,9 @@ async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
     headers = {"api-key":client.api_key}
     try:
         async with client.session.get(url, headers=headers, params=params) as res:
-            if res.status < 200 or res.status >= 300:
+            if res.status == 404:
+                raise StrafesNotFoundError()
+            elif res.status < 200 or res.status >= 300:
                 try:
                     body = await res.text()
                 except:
@@ -851,10 +858,10 @@ async def get_map_times(client:Client, style:Style, map:Map, page:int) -> Tuple[
     return await Record.make_record_list(client, data[start:end], map=map), converted_page_count
 
 async def get_user_state(client:Client, user_data:User) -> Optional[UserState]:
-    res = await get_strafes(client, f"user/{user_data.id}", {})
     try:
+        res = await get_strafes(client, f"user/{user_data.id}", {})
         return UserState(res.json["State"])
-    except KeyError:
+    except StrafesNotFoundError:
         return None
 
 async def get_record_placement(client:Client, record:Record) -> Tuple[int, int]:
