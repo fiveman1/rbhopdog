@@ -199,14 +199,16 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
-        game : Game = arguments.game.value
-        style : Style = arguments.style.value
 
-        msg = MessageBuilder(title=f"10 Recent WRs [game: {game}, style: {style}]", 
-            cols=[MessageCol.USERNAME, MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
-            items= await self.strafes.get_recent_wrs(game, style)
-        ).build()
-        await ctx.send(utils.fmt_md_code(msg))
+        async with ctx.typing():
+            game : Game = arguments.game.value
+            style : Style = arguments.style.value
+
+            msg = MessageBuilder(title=f"10 Recent WRs [game: {game}, style: {style}]", 
+                cols=[MessageCol.USERNAME, MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE], 
+                items= await self.strafes.get_recent_wrs(game, style)
+            ).build()
+            await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="pb", aliases=["record"])
     async def get_user_pb(self, ctx:Context, *args):
@@ -219,21 +221,23 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
-        game : Game = arguments.game.value
-        style : Style = arguments.style.value
-        user : User = arguments.user.value
-        map : Map = arguments.map.value
+        
+        async with ctx.typing():
+            game : Game = arguments.game.value
+            style : Style = arguments.style.value
+            user : User = arguments.user.value
+            map : Map = arguments.map.value
 
-        record = await self.strafes.get_user_record(user, game, style, map)
-        if record is None:
-            await ctx.send(utils.fmt_md_code(f"No record by {user.username} found on map: {map.displayname} [game: {game}, style: {style}]"))
-        else:
-            placement, total_completions = await self.strafes.get_record_placement(record)
-            msg = MessageBuilder(title=f"{user.username}'s record on {record.map.displayname} [game: {game}, style: {style}]",
-                cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 20, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
-                items=[record]
-            ).build()
-            await ctx.send(utils.fmt_md_code(msg))
+            record = await self.strafes.get_user_record(user, game, style, map)
+            if record is None:
+                await ctx.send(utils.fmt_md_code(f"No record by {user.username} found on map: {map.displayname} [game: {game}, style: {style}]"))
+            else:
+                placement, total_completions = await self.strafes.get_record_placement(record)
+                msg = MessageBuilder(title=f"{user.username}'s record on {record.map.displayname} [game: {game}, style: {style}]",
+                    cols=[MessageCol.TIME, MessageCol.DATE, MessageCol.Col("Placement", 20, lambda _: f"{placement}{self.get_ordinal(placement)} / {total_completions}")],
+                    items=[record]
+                ).build()
+                await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="wrmap")
     async def get_wrmap(self, ctx:Context, *args):
@@ -246,23 +250,25 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
-        game : Game = arguments.game.value
-        style : Style = arguments.style.value
-        map : Map = arguments.map.value
-        page : int = arguments.page.value
-        records, page_count = await self.strafes.get_map_times(style, map, page)
-        if page_count == 0:
-            await ctx.send(utils.fmt_md_code(f"{map.displayname} has not yet been completed in {style}."))
-            return
-        else:
-            if page > page_count:
-                page = page_count
-            incrementer = Incrementer(((page - 1) * 25) + 1)
-            msg = MessageBuilder(title=f"Record list for map: {map.displayname} [game: {game}, style: {style}, page: {page}/{page_count}]", 
-                cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.increment()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
-                items=records
-            ).build()
-            await ctx.send(utils.fmt_md_code(msg))
+
+        async with ctx.typing():
+            game : Game = arguments.game.value
+            style : Style = arguments.style.value
+            map : Map = arguments.map.value
+            page : int = arguments.page.value
+            records, page_count = await self.strafes.get_map_times(style, map, page)
+            if page_count == 0:
+                await ctx.send(utils.fmt_md_code(f"{map.displayname} has not yet been completed in {style}."))
+                return
+            else:
+                if page > page_count:
+                    page = page_count
+                incrementer = Incrementer(((page - 1) * 25) + 1)
+                msg = MessageBuilder(title=f"Record list for map: {map.displayname} [game: {game}, style: {style}, page: {page}/{page_count}]", 
+                    cols=[MessageCol.Col("Placement", 11, lambda _ : incrementer.increment()), MessageCol.USERNAME, MessageCol.TIME, MessageCol.DATE], 
+                    items=records
+                ).build()
+                await ctx.send(utils.fmt_md_code(msg))
 
     @commands.cooldown(6, 60, commands.cooldowns.BucketType.guild)
     @commands.command(name="wrlist")
@@ -304,61 +310,62 @@ class MainCog(commands.Cog):
         if page != -1:
             page = arguments.page.value   
 
-        if game is None:
-            g = DEFAULT_GAMES
-        else:
-            g = [game]
-        if style is None:
-            s = DEFAULT_STYLES
-        else:
-            s = [style]
+        async with ctx.typing():
+            if game is None:
+                g = DEFAULT_GAMES
+            else:
+                g = [game]
+            if style is None:
+                s = DEFAULT_STYLES
+            else:
+                s = [style]
 
-        tasks = []
-        for _game in g:
-            for _style in s:
-                if not (_game == Game.SURF and _style == Style.SCROLL):
-                    tasks.append(self.strafes.get_user_wrs(user, _game, _style))  
-        results = await asyncio.gather(*tasks)
-        
-        wrs:List[Record] = []
-        count = 0
-        for result in results:
-            wrs += result
-            count += len(result)
-        if count == 0:
-            await ctx.send(utils.fmt_md_code(f"{user.username} has no WRs in the specified game and style."))
-            return
-        if not sort:
-            wrs.sort(key = lambda i: (i.game.name, i.style.name, i.map.displayname))
-        elif sort == "name":
-            wrs.sort(key = lambda i: i.map.displayname)
-        elif sort == "date":
-            wrs.sort(key = lambda i: i.date.timestamp, reverse=True)
-        elif sort == "time":
-            wrs.sort(key = lambda i: i.time.millis)
-        cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
-        if g is DEFAULT_GAMES:
-            game = "both"
-            cols.append(MessageCol.GAME)
-        if s is DEFAULT_STYLES:
-            style = "all"
-            cols.append(MessageCol.STYLE)
-        if sort == "":
-            sort = "default"
-        if page != -1:
-            total_pages = ((count - 1) // 25) + 1
-            if page > total_pages:
-                page = total_pages
-            msg = MessageBuilder(cols=cols, items=wrs[(page-1)*25:page*25]).build()
-            the_messages = utils.page_messages(f"WR list for {user.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
-            for m in the_messages:
-                await ctx.send(utils.fmt_md_code(m))
-        else:
-            with StringIO() as f:
-                msg = MessageBuilder(cols=cols, items=wrs).build()
-                f.write(f"WR list for {user.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
-                f.seek(0)
-                await ctx.send(file=discord.File(f, filename=f"wrs_{user.username}_{game}_{style}.txt"))
+            tasks = []
+            for _game in g:
+                for _style in s:
+                    if not (_game == Game.SURF and _style == Style.SCROLL):
+                        tasks.append(self.strafes.get_user_wrs(user, _game, _style))  
+            results = await asyncio.gather(*tasks)
+            
+            wrs:List[Record] = []
+            count = 0
+            for result in results:
+                wrs += result
+                count += len(result)
+            if count == 0:
+                await ctx.send(utils.fmt_md_code(f"{user.username} has no WRs in the specified game and style."))
+                return
+            if not sort:
+                wrs.sort(key = lambda i: (i.game.name, i.style.name, i.map.displayname))
+            elif sort == "name":
+                wrs.sort(key = lambda i: i.map.displayname)
+            elif sort == "date":
+                wrs.sort(key = lambda i: i.date.timestamp, reverse=True)
+            elif sort == "time":
+                wrs.sort(key = lambda i: i.time.millis)
+            cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
+            if g is DEFAULT_GAMES:
+                game = "both"
+                cols.append(MessageCol.GAME)
+            if s is DEFAULT_STYLES:
+                style = "all"
+                cols.append(MessageCol.STYLE)
+            if sort == "":
+                sort = "default"
+            if page != -1:
+                total_pages = ((count - 1) // 25) + 1
+                if page > total_pages:
+                    page = total_pages
+                msg = MessageBuilder(cols=cols, items=wrs[(page-1)*25:page*25]).build()
+                the_messages = utils.page_messages(f"WR list for {user.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{total_pages}] (Records: {count})\n{msg}")
+                for m in the_messages:
+                    await ctx.send(utils.fmt_md_code(m))
+            else:
+                with StringIO() as f:
+                    msg = MessageBuilder(cols=cols, items=wrs).build()
+                    f.write(f"WR list for {user.username} [game: {game}, style: {style}, sort: {sort}] (Records: {count})\n{msg}")
+                    f.seek(0)
+                    await ctx.send(file=discord.File(f, filename=f"wrs_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="map")
     async def map_info(self, ctx:Context, *args):
@@ -393,48 +400,49 @@ class MainCog(commands.Cog):
             return
         user : User = arguments.user.value
 
-        count = 0
-        the_dict = {
-            Game.BHOP: [],
-            Game.SURF: []
-        }
-        async def the_order(game, style):
-            return (game, style, await self.strafes.total_wrs(user, game, style))
-        tasks = []
-        for game in DEFAULT_GAMES:
-            for style in DEFAULT_STYLES:
-                if not (game == Game.SURF and style == Style.SCROLL): #skip surf/scroll
-                    tasks.append(the_order(game, style))        
-        results = await asyncio.gather(*tasks)
-        for game, style, wrs in results:
-            if wrs > 0:
-                the_dict[game].append((style, wrs))
-                count += wrs
-        embed = discord.Embed(color=0xff94b8)
-        url = await self.strafes.get_user_headshot_url(user.id)
-        if url:
-            embed.set_thumbnail(url=url)
-        embed.set_footer(text="WR Count")
-        if user.username != user.displayname:
-            name = f"{user.displayname} ({user.username})"
-        else:
-            name = user.username
-        embed.title = f"\U0001F4C4  {name}"
-        if count > 0:
-            embed.description = f"Total WRs: {count}"
-            if len(the_dict[Game.BHOP]) > 0:
-                body = ""
-                for c in the_dict[Game.BHOP]:
-                    body += f"**{c[0]}:** {c[1]}\n"
-                embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
-            if len(the_dict[Game.SURF]) > 0:
-                body = ""
-                for c in the_dict[Game.SURF]:
-                    body += f"**{c[0]}:** {c[1]}\n"
-                embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
-        else:
-            embed.description = f"Total WRs: 0 \N{crying face}"
-        await ctx.send(embed=embed)
+        async with ctx.typing():
+            count = 0
+            the_dict = {
+                Game.BHOP: [],
+                Game.SURF: []
+            }
+            async def the_order(game, style):
+                return (game, style, await self.strafes.total_wrs(user, game, style))
+            tasks = []
+            for game in DEFAULT_GAMES:
+                for style in DEFAULT_STYLES:
+                    if not (game == Game.SURF and style == Style.SCROLL): #skip surf/scroll
+                        tasks.append(the_order(game, style))        
+            results = await asyncio.gather(*tasks)
+            for game, style, wrs in results:
+                if wrs > 0:
+                    the_dict[game].append((style, wrs))
+                    count += wrs
+            embed = discord.Embed(color=0xff94b8)
+            url = await self.strafes.get_user_headshot_url(user.id)
+            if url:
+                embed.set_thumbnail(url=url)
+            embed.set_footer(text="WR Count")
+            if user.username != user.displayname:
+                name = f"{user.displayname} ({user.username})"
+            else:
+                name = user.username
+            embed.title = f"\U0001F4C4  {name}"
+            if count > 0:
+                embed.description = f"Total WRs: {count}"
+                if len(the_dict[Game.BHOP]) > 0:
+                    body = ""
+                    for c in the_dict[Game.BHOP]:
+                        body += f"**{c[0]}:** {c[1]}\n"
+                    embed.add_field(name=f"__bhop__", value=body[:-1], inline=False)
+                if len(the_dict[Game.SURF]) > 0:
+                    body = ""
+                    for c in the_dict[Game.SURF]:
+                        body += f"**{c[0]}:** {c[1]}\n"
+                    embed.add_field(name=f"__surf__", value=body[:-1], inline=False)
+            else:
+                embed.description = f"Total WRs: 0 \N{crying face}"
+            await ctx.send(embed=embed)
 
     @commands.command(name="profile")
     async def user_rank(self, ctx:Context, *args):
@@ -450,19 +458,20 @@ class MainCog(commands.Cog):
         style : Style = arguments.style.value
         user : User = arguments.user.value
 
-        tasks = [
-            self.strafes.get_user_rank(user, game, style),
-            self.strafes.get_user_completion(user, game, style),
-            self.strafes.total_wrs(user, game, style)
-        ]
-        results = await asyncio.gather(*tasks)
-        rank_data:Rank = results[0]
-        if not rank_data or rank_data.placement < 1:
-            await ctx.send(utils.fmt_md_code(f"No data available for {user.username} [game: {game}, style: {style}]"))
-        else:
-            completions, total_maps = results[1]
-            wrs = results[2]
-            await ctx.send(embed= await self.make_user_embed(user, rank_data, game, style, completions, total_maps, wrs))
+        async with ctx.typing():
+            tasks = [
+                self.strafes.get_user_rank(user, game, style),
+                self.strafes.get_user_completion(user, game, style),
+                self.strafes.total_wrs(user, game, style)
+            ]
+            results = await asyncio.gather(*tasks)
+            rank_data:Rank = results[0]
+            if not rank_data or rank_data.placement < 1:
+                await ctx.send(utils.fmt_md_code(f"No data available for {user.username} [game: {game}, style: {style}]"))
+            else:
+                completions, total_maps = results[1]
+                wrs = results[2]
+                await ctx.send(embed= await self.make_user_embed(user, rank_data, game, style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
     async def ranks(self, ctx:Context, *args):
@@ -478,17 +487,18 @@ class MainCog(commands.Cog):
         style : Style = arguments.style.value
         page : int = arguments.page.value
 
-        ranks, page_count = await self.strafes.get_ranks(game, style, page)
-        if page_count == 0:
-            await ctx.send(utils.fmt_md_code(f"No ranks found [game: {game}, style: {style}] (???)."))
-            return
-        elif page > page_count:
-            page = page_count
-        msg = MessageBuilder(title=f"Ranks [game: {game}, style: {style}, page: {page}/{page_count}]",
-            cols=[MessageCol.PLACEMENT, MessageCol.USERNAME, MessageCol.RANK, MessageCol.SKILL],
-            items=ranks
-        ).build()
-        await ctx.send(utils.fmt_md_code(msg))
+        async with ctx.typing():
+            ranks, page_count = await self.strafes.get_ranks(game, style, page)
+            if page_count == 0:
+                await ctx.send(utils.fmt_md_code(f"No ranks found [game: {game}, style: {style}] (???)."))
+                return
+            elif page > page_count:
+                page = page_count
+            msg = MessageBuilder(title=f"Ranks [game: {game}, style: {style}, page: {page}/{page_count}]",
+                cols=[MessageCol.PLACEMENT, MessageCol.USERNAME, MessageCol.RANK, MessageCol.SKILL],
+                items=ranks
+            ).build()
+            await ctx.send(utils.fmt_md_code(msg))
     
     @commands.command(name="times")
     async def times(self, ctx:Context, *args):
@@ -523,59 +533,61 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
-        game : Game = arguments.game.value
-        style : Style = arguments.style.value
-        user : User = arguments.user.value
-        if page != -1:
-            page = arguments.page.value
 
-        if sort and sort != "date":
-            record_list, _ = await self.strafes.get_user_times(user, game, style, -1)
-            page_count = ((len(record_list) - 1) // 25) + 1
-        else:
-            record_list, page_count = await self.strafes.get_user_times(user, game, style, page)
-        if page_count == 0:
-            if not style:
-                style = "all"
-            if not game:
-                game = "both"
-            await ctx.send(utils.fmt_md_code(f"No times found for {user.username} [game: {game}, style: {style}]"))
-            return
-        if page > page_count:
-            page = page_count
-        if sort and sort != "date":
-            if sort == "time":
-                record_list.sort(key=lambda i : (i.time.millis, i.date.timestamp * -1))
-            elif sort == "name":
-                record_list.sort(key=lambda i : (i.map.displayname, i.date.timestamp * -1))
+        async with ctx.typing():
+            game : Game = arguments.game.value
+            style : Style = arguments.style.value
+            user : User = arguments.user.value
             if page != -1:
-                end = page * 25
-                record_list = record_list[end-25:end]
-        else:
-            sort = "date"
-        cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
-        if game is None:
-            game = "both"
-            cols.append(MessageCol.GAME)
-        if style is None:
-            style = "all"
-            cols.append(MessageCol.STYLE)
-        if page == -1:
-            msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, sort: {sort}] (total: {len(record_list)})", 
+                page = arguments.page.value
+
+            if sort and sort != "date":
+                record_list, _ = await self.strafes.get_user_times(user, game, style, -1)
+                page_count = ((len(record_list) - 1) // 25) + 1
+            else:
+                record_list, page_count = await self.strafes.get_user_times(user, game, style, page)
+            if page_count == 0:
+                if not style:
+                    style = "all"
+                if not game:
+                    game = "both"
+                await ctx.send(utils.fmt_md_code(f"No times found for {user.username} [game: {game}, style: {style}]"))
+                return
+            if page > page_count:
+                page = page_count
+            if sort and sort != "date":
+                if sort == "time":
+                    record_list.sort(key=lambda i : (i.time.millis, i.date.timestamp * -1))
+                elif sort == "name":
+                    record_list.sort(key=lambda i : (i.map.displayname, i.date.timestamp * -1))
+                if page != -1:
+                    end = page * 25
+                    record_list = record_list[end-25:end]
+            else:
+                sort = "date"
+            cols = [MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE]
+            if game is None:
+                game = "both"
+                cols.append(MessageCol.GAME)
+            if style is None:
+                style = "all"
+                cols.append(MessageCol.STYLE)
+            if page == -1:
+                msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, sort: {sort}] (total: {len(record_list)})", 
+                    cols=cols, 
+                    items=record_list
+                ).build()
+                with StringIO() as f:
+                    f.write(msg)
+                    f.seek(0)
+                    await ctx.send(file=discord.File(f, filename=f"times_{user.username}_{game}_{style}.txt"))
+                    return
+            msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{page_count}]", 
                 cols=cols, 
                 items=record_list
             ).build()
-            with StringIO() as f:
-                f.write(msg)
-                f.seek(0)
-                await ctx.send(file=discord.File(f, filename=f"times_{user.username}_{game}_{style}.txt"))
-                return
-        msg = MessageBuilder(title=f"Recent times for {user.username} [game: {game}, style: {style}, sort: {sort}, page: {page}/{page_count}]", 
-            cols=cols, 
-            items=record_list
-        ).build()
-        for message in utils.page_messages(msg):
-            await ctx.send(utils.fmt_md_code(message))
+            for message in utils.page_messages(msg):
+                await ctx.send(utils.fmt_md_code(message))
     
     @commands.command(name="mapcount")
     async def map_count(self, ctx:Context):
@@ -622,154 +634,155 @@ class MainCog(commands.Cog):
         elif len(styles) != 1 and len(styles) != len(users):
             await ctx.send(utils.fmt_md_code("No style specified or the number of styles does not match the number of users."))
             return
-
-        comparables : Dict[ComparableUserStyle, int] = {}
-        comparables_list : List[ComparableUserStyle] = []
-        for i, user in enumerate(users):
-            style = styles[i] if len(styles) > 1 else styles[0]
-            comparable = ComparableUserStyle(user, style)
-            if comparable in comparables:
-                await ctx.send(utils.fmt_md_code(f"You cannot compare users to themselves with the same style (user: {user}, style: {style})"))
-                return
-            else:
-                comparables[comparable] = i
-                comparables_list.append(comparable)
         
-        tasks = []
-        for c in comparables:
-            tasks.append(self.strafes.get_user_times(c.user, game, c.style, -1))
-        times : List[Tuple[List[Record], int]] = await asyncio.gather(*tasks)
-
-        wins : List[List[Record]] = [[] for _ in users]
-        ties : List[Record] = []
-        not_shared : List[List[Record]] = [[] for _ in users]
-        combined : Dict[Map, List[Record]] = {}
-        for records, _ in times:
-            for record in records:
-                if record.map in combined:
-                    combined[record.map].append(record)
+        async with ctx.typing():
+            comparables : Dict[ComparableUserStyle, int] = {}
+            comparables_list : List[ComparableUserStyle] = []
+            for i, user in enumerate(users):
+                style = styles[i] if len(styles) > 1 else styles[0]
+                comparable = ComparableUserStyle(user, style)
+                if comparable in comparables:
+                    await ctx.send(utils.fmt_md_code(f"You cannot compare users to themselves with the same style (user: {user}, style: {style})"))
+                    return
                 else:
-                    combined[record.map] = [record]
-        for records in combined.values():
-            if len(records) == 1:
-                not_shared[self.record_to_idx(records[0], comparables)].append(records[0])
-            else:
-                best = None
-                tie = False
+                    comparables[comparable] = i
+                    comparables_list.append(comparable)
+            
+            tasks = []
+            for c in comparables:
+                tasks.append(self.strafes.get_user_times(c.user, game, c.style, -1))
+            times : List[Tuple[List[Record], int]] = await asyncio.gather(*tasks)
+
+            wins : List[List[Record]] = [[] for _ in users]
+            ties : List[Record] = []
+            not_shared : List[List[Record]] = [[] for _ in users]
+            combined : Dict[Map, List[Record]] = {}
+            for records, _ in times:
                 for record in records:
-                    if best is None:
-                        best = record
-                    elif record.time.millis < best.time.millis:
-                        tie = False
-                        record.previous_record = best
-                        best = record
-                    elif record.time.millis == best.time.millis:
-                        tie = True
-                    elif best.previous_record is None or best.previous_record.time.millis > record.time.millis:
-                        best.previous_record = record
-                if tie:
-                    ties.append(best)
+                    if record.map in combined:
+                        combined[record.map].append(record)
+                    else:
+                        combined[record.map] = [record]
+            for records in combined.values():
+                if len(records) == 1:
+                    not_shared[self.record_to_idx(records[0], comparables)].append(records[0])
                 else:
-                    wins[self.record_to_idx(best, comparables)].append(best)
-        for ls in wins:
-            ls.sort(key=lambda i : i.map.displayname)
-        ties.sort(key=lambda i : i.map.displayname)
-        for ls in not_shared:
-            ls.sort(key=lambda i : i.map.displayname)
+                    best = None
+                    tie = False
+                    for record in records:
+                        if best is None:
+                            best = record
+                        elif record.time.millis < best.time.millis:
+                            tie = False
+                            record.previous_record = best
+                            best = record
+                        elif record.time.millis == best.time.millis:
+                            tie = True
+                        elif best.previous_record is None or best.previous_record.time.millis > record.time.millis:
+                            best.previous_record = record
+                    if tie:
+                        ties.append(best)
+                    else:
+                        wins[self.record_to_idx(best, comparables)].append(best)
+            for ls in wins:
+                ls.sort(key=lambda i : i.map.displayname)
+            ties.sort(key=lambda i : i.map.displayname)
+            for ls in not_shared:
+                ls.sort(key=lambda i : i.map.displayname)
 
-        if len(styles) > 1:
-            title = " vs. ".join([f"{c.user} ({c.style})" for c in comparables_list])
-        else:
-            title = " vs. ".join([user.username for user in users])
-        embed = discord.Embed(title=title, color=0x00ff7f)
-        file = None
-
-        if len(users) == 2:
-            tasks = [self.strafes.get_user_headshot_url(users[0].id), self.strafes.get_user_headshot_url(users[1].id)]
-            urls = await asyncio.gather(*tasks)
-            url1 = urls[0]
-            url2 = urls[1]
+            if len(styles) > 1:
+                title = " vs. ".join([f"{c.user} ({c.style})" for c in comparables_list])
+            else:
+                title = " vs. ".join([user.username for user in users])
+            embed = discord.Embed(title=title, color=0x00ff7f)
             file = None
-            if url1 is not None and url2 is not None:
-                try:
-                    # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
-                    img1 = Image.open(requests.get(url1, stream=True).raw)
-                    img2 = Image.open(requests.get(url2, stream=True).raw)
-                    pixels1 = numpy.asarray(img1)
-                    pixels2 = numpy.asarray(img2)
-                    # Create a new image by drawing a diagonal line between the two images and combining them
-                    new_pixels = [list(range(180)) for _ in range(180)]
-                    for i in range(180):
-                        for j in range(180):
-                            val = i + j
-                            if val < 177:
-                                new_pixels[i][j] = pixels1[i][j]
-                            elif val > 183:
-                                new_pixels[i][j] = pixels2[i][j]
-                            else:
-                                r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
-                                new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
-                    new_image = Image.fromarray(numpy.array(new_pixels))
-                    # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
-                    with BytesIO() as image_binary:
-                        new_image.save(image_binary, "PNG")
-                        image_binary.seek(0)
-                        file = discord.File(fp=image_binary, filename="thumb.png")
-                        embed.set_thumbnail(url="attachment://thumb.png")
-                except:
-                    pass
 
-        msg = []
-        if len(styles) == 1:
-            name = f"Info (game: {game}, style: {styles[0]})"
-            for i, ls in enumerate(wins):
-                c = comparables_list[i]
-                msg.append(f"{c.user} wins: **{len(ls)}**")
-            msg.append(f"Ties: **{len(ties)}**")
-            for i, ls in enumerate(not_shared):
-                c = comparables_list[i]
-                msg.append(f"Only completed by {c.user}: **{len(ls)}**")
-        else:
-            name = f"Info (game: {game})"
-            for i, ls in enumerate(wins):
-                c = comparables_list[i]
-                msg.append(f"{c.user} ({c.style}) wins: **{len(ls)}**")
-            msg.append(f"Ties: **{len(ties)}**")
-            for i, ls in enumerate(not_shared):
-                c = comparables_list[i]
-                msg.append(f"Only completed by {c.user} ({c.style}): **{len(ls)}**")
-        embed.add_field(name=name, value="\n".join(msg))
-        if file is not None:
-            await ctx.send(embed=embed, file=file)
-        else:
-            await ctx.send(embed=embed)
+            if len(users) == 2:
+                tasks = [self.strafes.get_user_headshot_url(users[0].id), self.strafes.get_user_headshot_url(users[1].id)]
+                urls = await asyncio.gather(*tasks)
+                url1 = urls[0]
+                url2 = urls[1]
+                file = None
+                if url1 is not None and url2 is not None:
+                    try:
+                        # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
+                        img1 = Image.open(requests.get(url1, stream=True).raw)
+                        img2 = Image.open(requests.get(url2, stream=True).raw)
+                        pixels1 = numpy.asarray(img1)
+                        pixels2 = numpy.asarray(img2)
+                        # Create a new image by drawing a diagonal line between the two images and combining them
+                        new_pixels = [list(range(180)) for _ in range(180)]
+                        for i in range(180):
+                            for j in range(180):
+                                val = i + j
+                                if val < 177:
+                                    new_pixels[i][j] = pixels1[i][j]
+                                elif val > 183:
+                                    new_pixels[i][j] = pixels2[i][j]
+                                else:
+                                    r, g, b = colorsys.hsv_to_rgb(i / 180, 1, 1)
+                                    new_pixels[i][j] = numpy.asarray([r * 255, g * 255, b * 255, 255], dtype=numpy.uint8)
+                        new_image = Image.fromarray(numpy.array(new_pixels))
+                        # https://stackoverflow.com/questions/63209888/send-pillow-image-on-discord-without-saving-the-image
+                        with BytesIO() as image_binary:
+                            new_image.save(image_binary, "PNG")
+                            image_binary.seek(0)
+                            file = discord.File(fp=image_binary, filename="thumb.png")
+                            embed.set_thumbnail(url="attachment://thumb.png")
+                    except:
+                        pass
 
-        if txt:
-            msgs = [f"Game: {game}"]
-            for i, ls in enumerate(wins):
-                c = comparables_list[i]
-                msgs.append(MessageBuilder(title=f"{c.user} wins (style: {c.style}):",
-                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE, MessageCol.Col(title="Next best", width=30, map=self.compare_formatter)],
-                    items=ls
+            msg = []
+            if len(styles) == 1:
+                name = f"Info (game: {game}, style: {styles[0]})"
+                for i, ls in enumerate(wins):
+                    c = comparables_list[i]
+                    msg.append(f"{c.user} wins: **{len(ls)}**")
+                msg.append(f"Ties: **{len(ties)}**")
+                for i, ls in enumerate(not_shared):
+                    c = comparables_list[i]
+                    msg.append(f"Only completed by {c.user}: **{len(ls)}**")
+            else:
+                name = f"Info (game: {game})"
+                for i, ls in enumerate(wins):
+                    c = comparables_list[i]
+                    msg.append(f"{c.user} ({c.style}) wins: **{len(ls)}**")
+                msg.append(f"Ties: **{len(ties)}**")
+                for i, ls in enumerate(not_shared):
+                    c = comparables_list[i]
+                    msg.append(f"Only completed by {c.user} ({c.style}): **{len(ls)}**")
+            embed.add_field(name=name, value="\n".join(msg))
+            if file is not None:
+                await ctx.send(embed=embed, file=file)
+            else:
+                await ctx.send(embed=embed)
+
+            if txt:
+                msgs = [f"Game: {game}"]
+                for i, ls in enumerate(wins):
+                    c = comparables_list[i]
+                    msgs.append(MessageBuilder(title=f"{c.user} wins (style: {c.style}):",
+                        cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE, MessageCol.Col(title="Next best", width=30, map=self.compare_formatter)],
+                        items=ls
+                    ).build())
+                msgs.append(MessageBuilder(title="Ties:",
+                    cols=[MessageCol.MAP_NAME, MessageCol.TIME],
+                    items=ties
                 ).build())
-            msgs.append(MessageBuilder(title="Ties:",
-                cols=[MessageCol.MAP_NAME, MessageCol.TIME],
-                items=ties
-            ).build())
-            for i, ls in enumerate(not_shared):
-                c = comparables_list[i]
-                msgs.append(MessageBuilder(title=f"Only completed by {c.user} (style: {c.style}):",
-                    cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE],
-                    items=ls
-                ).build())
-            with StringIO() as f:
-                f.write("\n".join(msgs))
-                f.seek(0)
-                fname = "_vs_".join([user.username for user in users]) + f"_{game}"
-                if len(styles) == 1:
-                    fname += f"_{styles[0]}"
-                fname += ".txt"
-                await ctx.send(file=discord.File(f, filename=fname))
+                for i, ls in enumerate(not_shared):
+                    c = comparables_list[i]
+                    msgs.append(MessageBuilder(title=f"Only completed by {c.user} (style: {c.style}):",
+                        cols=[MessageCol.MAP_NAME, MessageCol.TIME, MessageCol.DATE],
+                        items=ls
+                    ).build())
+                with StringIO() as f:
+                    f.write("\n".join(msgs))
+                    f.seek(0)
+                    fname = "_vs_".join([user.username for user in users]) + f"_{game}"
+                    if len(styles) == 1:
+                        fname += f"_{styles[0]}"
+                    fname += ".txt"
+                    await ctx.send(file=discord.File(f, filename=fname))
     
     def compare_formatter(self, record: Record) -> str:
         diff = (record.previous_record.time.millis - record.time.millis) / 1000.0
@@ -792,23 +805,24 @@ class MainCog(commands.Cog):
         style : Style = arguments.style.value
         user : User = arguments.user.value
 
-        records = await self.strafes.get_user_times(user, game, style, -1)
-        completed_maps = set(i.map.id for i in records[0])
-        incompleted_maps = []
-        map_count = await self.strafes.get_map_count(game)
-        for id, map in Map.map_lookup.items():
-            if map.game == game and id not in completed_maps:
-                # TODO: binary search insert
-                incompleted_maps.append(map)
-        incompleted_maps.sort(key=lambda i: i.displayname)
-        msg = MessageBuilder(title=f"Incomplete maps for {user.username} [game: {game}, style: {style}] (total: {len(incompleted_maps)} / {map_count})",
-            cols=[MessageCol.Col("Map name", 30, lambda i: i.displayname)],
-            items=incompleted_maps
-            ).build()
-        with StringIO() as f:
-            f.write(msg)
-            f.seek(0)
-            await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{user.username}_{game}_{style}.txt"))
+        async with ctx.typing():
+            records = await self.strafes.get_user_times(user, game, style, -1)
+            completed_maps = set(i.map.id for i in records[0])
+            incompleted_maps = []
+            map_count = await self.strafes.get_map_count(game)
+            for id, map in Map.map_lookup.items():
+                if map.game == game and id not in completed_maps:
+                    # TODO: binary search insert
+                    incompleted_maps.append(map)
+            incompleted_maps.sort(key=lambda i: i.displayname)
+            msg = MessageBuilder(title=f"Incomplete maps for {user.username} [game: {game}, style: {style}] (total: {len(incompleted_maps)} / {map_count})",
+                cols=[MessageCol.Col("Map name", 30, lambda i: i.displayname)],
+                items=incompleted_maps
+                ).build()
+            with StringIO() as f:
+                f.write(msg)
+                f.seek(0)
+                await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="maps")
     async def maps(self, ctx:Context, *args):
@@ -870,24 +884,25 @@ class MainCog(commands.Cog):
 
     @commands.command(name="user")
     async def user_info(self, ctx:Context, *args):
-        arguments = ArgumentValidator(self.bot, self.strafes)
-        arguments.user.make_required()
-        arguments.user.check_status = False
-        arguments.user.allow_id = True
-        valid, err = await arguments.evaluate(args, ctx.author.id)
-        if not valid:
-            await ctx.send(utils.fmt_md_code(err))
-            return
-        user : User = arguments.user.value
-        embed = discord.Embed(color=0xfcba03)
-        url = await self.strafes.get_user_headshot_url(user.id)
-        if url:
-            embed.set_thumbnail(url=url)
-        embed.add_field(name="Username", value=user.username, inline=True)
-        embed.add_field(name="ID", value=user.id, inline=True)
-        embed.add_field(name="Display name", value=user.displayname, inline=True)
-        embed.set_footer(text="User Info")
-        await ctx.send(embed=embed)
+        async with ctx.typing():
+            arguments = ArgumentValidator(self.bot, self.strafes)
+            arguments.user.make_required()
+            arguments.user.check_status = False
+            arguments.user.allow_id = True
+            valid, err = await arguments.evaluate(args, ctx.author.id)
+            if not valid:
+                await ctx.send(utils.fmt_md_code(err))
+                return
+            user : User = arguments.user.value
+            embed = discord.Embed(color=0xfcba03)
+            url = await self.strafes.get_user_headshot_url(user.id)
+            if url:
+                embed.set_thumbnail(url=url)
+            embed.add_field(name="Username", value=user.username, inline=True)
+            embed.add_field(name="ID", value=user.id, inline=True)
+            embed.add_field(name="Display name", value=user.displayname, inline=True)
+            embed.set_footer(text="User Info")
+            await ctx.send(embed=embed)
 
     @commands.command(name="help")
     async def help(self, ctx:Context, cmd : str = ""):

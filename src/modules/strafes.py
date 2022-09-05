@@ -51,8 +51,16 @@ class Client:
         self.api_key = api_key
 
     def close(self):
-        if self.session:
-            self.session.loop.create_task(self.session.close())
+        if not self.session:
+            return
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.session.close())
+            else:
+                loop.run_until_complete(self.session.close())
+        except Exception:
+            pass
 
     def __del__(self):
         self.close()
