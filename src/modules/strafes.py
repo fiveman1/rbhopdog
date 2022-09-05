@@ -42,6 +42,55 @@ class NotFoundError(Exception):
     def __init__(self):
         super().__init__("404 Not Found")
 
+class SessionHandler:
+
+    def __init__(self, timeout, id):
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout))
+        self.lock = asyncio.Lock()
+        self.active_count : int = 0
+        self.needs_closing : bool = False
+        self.id = id
+
+    def close(self):
+        if not self.session:
+            return
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.session.close())
+            else:
+                loop.run_until_complete(self.session.close())
+        except Exception:
+            pass
+
+    def __del__(self):
+        self.close()
+
+    async def try_close(self):
+        async with self.lock:
+            # print(f"[ID: {self.id}] In try close")
+            self.needs_closing = True
+            if self.active_count == 0:
+                # print(f"[ID: {self.id}] try_close closing")
+                await self.session.close()
+            else:
+                pass
+                # print(f"[ID: {self.id}] Not closing (active: {self.active_count})")
+
+    async def __aenter__(self) -> "SessionHandler":
+        async with self.lock:
+            self.active_count += 1
+            # print(f"[ID: {self.id}] In aenter (active: {self.active_count})")
+            return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        async with self.lock:
+            self.active_count -= 1
+            # print(f"[ID: {self.id}] In aexit (active: {self.active_count})")
+            if self.needs_closing and self.active_count == 0:
+                # print(f"[ID: {self.id}] aexit closing")
+                await self.session.close()
+
 # TODO: combine all requests into a single client instance
 # so I don't have to use strafes_wrapper.py
 
@@ -49,38 +98,29 @@ class Client:
     def __init__(self, api_key):
         self.api_key = api_key
         self.last_session_created : datetime.datetime = None
-        self._session : aiohttp.ClientSession = None
+        self._handler : SessionHandler = None
         self.lock = asyncio.Lock()
 
     def close(self):
-        if not self._session:
-            return
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(self._session.close())
-            else:
-                loop.run_until_complete(self._session.close())
-        except Exception:
-            pass
+        if self._handler:
+            self._handler.close()
 
     def __del__(self):
         self.close()
 
     @property
-    async def session(self) -> aiohttp.ClientSession:
+    async def handler(self) -> SessionHandler:
         async with self.lock:
             if self.last_session_created:
                 time = datetime.datetime.now()
                 if (time - self.last_session_created).total_seconds() > 59:
-                    await self._session.close()
-                    self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+                    await self._handler.try_close()
+                    self._handler = SessionHandler(20, self._handler.id + 1)
                     self.last_session_created = time
             else:
-                self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+                self._handler = SessionHandler(20, 1)
                 self.last_session_created = datetime.datetime.now()
-            return self._session
-
+            return self._handler
 
 class JSONRes:
     def __init__(self, res:aiohttp.ClientResponse, json):
@@ -88,47 +128,49 @@ class JSONRes:
         self.json = json
 
 async def get_request(client:Client, url, api_name, params={}, headers={}) -> JSONRes:
-    session = await client.session
-    try:
-        async with session.get(url, headers=headers, params=params) as res:
-            if res.status == 404:
-                raise NotFoundError()
-            elif res.status < 200 or res.status >= 300:
+    async with await client.handler as handler:
+        session = handler.session
+        try:
+            async with session.get(url, headers=headers, params=params) as res:
+                if res.status == 404:
+                    raise NotFoundError()
+                elif res.status < 200 or res.status >= 300:
+                    try:
+                        body = await res.text()
+                    except:
+                        body = "n/a"
+                    raise APIError(url, headers, params, res.status, body, api_name)
                 try:
-                    body = await res.text()
-                except:
-                    body = "n/a"
-                raise APIError(url, headers, params, res.status, body, api_name)
-            try:
-                json = await res.json()
-                return JSONRes(res, json)
-            except aiohttp.ContentTypeError:
-                raise APIError(url, headers, params, res.status, await res.text(), api_name)
-    except asyncio.TimeoutError:
-        raise TimeoutError(session.timeout.total, url, headers, params, api_name)
+                    json = await res.json()
+                    return JSONRes(res, json)
+                except aiohttp.ContentTypeError:
+                    raise APIError(url, headers, params, res.status, await res.text(), api_name)
+        except asyncio.TimeoutError:
+            raise TimeoutError(session.timeout.total, url, headers, params, api_name)
 
 async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
     return await get_request(client, f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":client.api_key})
 
 async def post_request(client:Client, url, api_name, data={}, headers={}) -> JSONRes:
-    session = await client.session
-    try:
-        async with session.post(url, headers=headers, data=data) as res:
-            if res.status == 404:
-                raise NotFoundError()
-            elif res.status < 200 or res.status >= 300:
+    async with await client.handler as handler:
+        session = handler.session
+        try:
+            async with session.post(url, headers=headers, data=data) as res:
+                if res.status == 404:
+                    raise NotFoundError()
+                elif res.status < 200 or res.status >= 300:
+                    try:
+                        body = await res.text()
+                    except:
+                        body = "n/a"
+                    raise APIError(url, headers, data, res.status, body, api_name)
                 try:
-                    body = await res.text()
-                except:
-                    body = "n/a"
-                raise APIError(url, headers, data, res.status, body, api_name)
-            try:
-                json = await res.json()
-                return JSONRes(res, json)
-            except aiohttp.ContentTypeError:
-                raise APIError(url, headers, data, res.status, await res.text(), api_name)
-    except asyncio.TimeoutError:
-        raise TimeoutError(session.timeout.total, url, headers, data, api_name)
+                    json = await res.json()
+                    return JSONRes(res, json)
+                except aiohttp.ContentTypeError:
+                    raise APIError(url, headers, data, res.status, await res.text(), api_name)
+        except asyncio.TimeoutError:
+            raise TimeoutError(session.timeout.total, url, headers, data, api_name)
 
 class Time:
     def __init__(self, millis:int):
