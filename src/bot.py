@@ -8,7 +8,7 @@ import traceback
 import sys
 
 from modules import utils
-from modules.strafes import StrafesError, StrafesTimeoutError
+from modules.strafes import APIError
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -36,7 +36,7 @@ async def on_command_error(ctx : Context, error : Exception):
     elif isinstance(error, commands.CommandInvokeError):
         if isinstance(error.original, ignored):
             return
-        elif isinstance(error.original, StrafesError):
+        elif isinstance(error.original, APIError):
             print(error.original.create_debug_message())
             await ctx.send(utils.fmt_md_code(str(error.original)))
         else:

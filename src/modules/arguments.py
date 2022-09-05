@@ -1,8 +1,8 @@
 from typing import List, Optional, Tuple
 from modules.strafes_wrapper import Client
-from modules.strafes import Game, Style, User, UserState
+from modules.strafes import Game, NotFoundError, Style, User, UserState
 from discord.ext.commands import Bot
-from discord.errors import InvalidData
+import discord
 
 def get_discord_user_id(s : str) -> Optional[str]:
     if s[:3] == "<@!" and s[-1] == ">":
@@ -70,14 +70,16 @@ class ArgumentValidator:
 
     async def set_user(self, user, author_id) -> Tuple[bool, str]:
         if user == "me" or not user:
-            user = await self.strafes.get_roblox_user_from_discord(author_id)
-            if not user:
+            try:
+                user = await self.strafes.get_roblox_user_from_discord(author_id)
+            except NotFoundError:
                 return False, "Invalid username (no Roblox username associated with your Discord account. Visit https://rover.link/login)"
         elif isinstance(user, str):
             discord_user_id = get_discord_user_id(user)
             if discord_user_id:
-                roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
-                if not roblox_user:
+                try:
+                    roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
+                except NotFoundError:
                     err = ""
                     try:
                         u = await self.bot.fetch_user(int(discord_user_id))
@@ -85,17 +87,14 @@ class ArgumentValidator:
                             err = f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"
                         else:
                             err = "Invalid username (no user associated with that Discord account.)"
-                    except:
+                    except discord.errors.NotFound:
                         err = "Invalid discord user ID."
                     return False, err
-                else:
-                    user = roblox_user
+                user = roblox_user
         try:
             self.user.value = await self.strafes.get_user_data(user)
-        except InvalidData:
+        except NotFoundError:
             return False, f"Invalid username (username '{user}' does not exist on Roblox)."
-        except TimeoutError:
-            return False, "Error: User data request timed out."
         if self.user.check_status:
             valid, err = await self.check_user_status(self.user.value)
             if not valid:

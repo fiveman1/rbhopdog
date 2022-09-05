@@ -2,7 +2,6 @@
 import aiohttp
 import asyncio
 import datetime
-from discord.errors import InvalidData
 from enum import Enum
 import json
 import os
@@ -18,9 +17,11 @@ def open_json(path):
         data = file.read()
         return json.loads(data)
 
-class StrafesError(Exception):
+class APIError(Exception):
 
-    def __init__(self, url, headers, params, status, body, msg="An error occured attempting to use the strafes.net API."):
+    def __init__(self, url, headers, params, status, body, api_name, msg=""):
+        if not msg:
+            msg = f"An error occurred attempting to use the {api_name} API."
         super().__init__(msg)
         self.url = url
         self.headers = headers
@@ -29,15 +30,14 @@ class StrafesError(Exception):
         self.body = body
     
     def create_debug_message(self):
-        s = ["strafes.net error debug:", str(self.__class__), f"URL: {self.url}", f"Headers: {self.headers}", f"Params: {self.params}", f"Status: {self.status}", f"Body: {self.body}"]
+        s = ["API error debug:", str(self.__class__), f"URL: {self.url}", f"Headers: {self.headers}", f"Params: {self.params}", f"Status: {self.status}", f"Body: {self.body}"]
         return "\n".join(s)
 
-class StrafesTimeoutError(StrafesError):
+class TimeoutError(APIError):
+    def __init__(self, timeout, url, headers, params, api_name):
+        super().__init__(url, headers, params, "n/a", "n/a", api_name, f"A timeout occurred attempting to use the {api_name} API after {timeout} seconds.")
 
-    def __init__(self, timeout, url, headers, params):
-        super().__init__(url, headers, params, "n/a", "n/a", f"strafes.net API request timed out after {timeout} seconds.")
-
-class StrafesNotFoundError(Exception):
+class NotFoundError(Exception):
 
     def __init__(self):
         super().__init__("404 Not Found")
@@ -87,28 +87,48 @@ class JSONRes:
         self.res = res
         self.json = json
 
-async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
-    url = f"https://api.strafes.net/v1/{end_of_url}"
-    headers = {"api-key":client.api_key}
+async def get_request(client:Client, url, api_name, params={}, headers={}) -> JSONRes:
     session = await client.session
     try:
         async with session.get(url, headers=headers, params=params) as res:
             if res.status == 404:
-                raise StrafesNotFoundError()
+                raise NotFoundError()
             elif res.status < 200 or res.status >= 300:
                 try:
                     body = await res.text()
                 except:
                     body = "n/a"
-                raise StrafesError(url, headers, params, res.status, body)
+                raise APIError(url, headers, params, res.status, body, api_name)
             try:
                 json = await res.json()
                 return JSONRes(res, json)
             except aiohttp.ContentTypeError:
-                raise StrafesError(url, headers, params, res.status, await res.text())
+                raise APIError(url, headers, params, res.status, await res.text(), api_name)
     except asyncio.TimeoutError:
-        raise StrafesTimeoutError(session.timeout.total, url, headers, params)
-        
+        raise TimeoutError(session.timeout.total, url, headers, params, api_name)
+
+async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
+    return await get_request(client, f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":client.api_key})
+
+async def post_request(client:Client, url, api_name, data={}, headers={}) -> JSONRes:
+    session = await client.session
+    try:
+        async with session.post(url, headers=headers, data=data) as res:
+            if res.status == 404:
+                raise NotFoundError()
+            elif res.status < 200 or res.status >= 300:
+                try:
+                    body = await res.text()
+                except:
+                    body = "n/a"
+                raise APIError(url, headers, data, res.status, body, api_name)
+            try:
+                json = await res.json()
+                return JSONRes(res, json)
+            except aiohttp.ContentTypeError:
+                raise APIError(url, headers, data, res.status, await res.text(), api_name)
+    except asyncio.TimeoutError:
+        raise TimeoutError(session.timeout.total, url, headers, data, api_name)
 
 class Time:
     def __init__(self, millis:int):
@@ -520,38 +540,24 @@ class User:
     @staticmethod
     async def get_user_data(client:Client, user : Union[str, int]) -> "User":
         if type(user) == int:
-            async with (await client.session).get(f"https://users.roblox.com/v1/users/{user}") as res:
-                if res.status == 404:
-                    raise InvalidData("Invalid user ID")
-                try:
-                    data = await res.json()
-                    return User.from_dict(data)
-                except:
-                    raise TimeoutError("Error getting user data")
+            res = await get_request(client, f"https://users.roblox.com/v1/users/{user}", "Roblox Users")
+            return User.from_dict(res.json)
         else:
-            async with (await client.session).post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]}) as res:
-                d = await res.json()
-                if not d:
-                    raise TimeoutError("Error getting user data")
-                else:
-                    data = d["data"]
-                    if len(data) > 0:
-                        return User.from_dict(data[0])
-                    else:
-                        raise InvalidData("Invalid username")
+            res = await post_request(client, "https://users.roblox.com/v1/usernames/users", "Roblox Users", {"usernames":[user]})
+            data = res.json["data"]
+            if len(data) > 0:
+                return User.from_dict(data[0])
+            else:
+                raise NotFoundError()
 
     @staticmethod
     async def get_user_data_from_list(client:Client, users:List[int]) -> Dict[int, "User"]:
-        async with (await client.session).post("https://users.roblox.com/v1/users", data={"userIds":users}) as res:
-            if res:
-                user_lookup = {}
-                data = await res.json()
-                for user_dict in data["data"]:
-                    user = User.from_dict(user_dict)
-                    user_lookup[user_dict["id"]] = user
-                return user_lookup
-            else:
-                raise TimeoutError("Error getting user data")
+        res = await post_request(client, "https://users.roblox.com/v1/users", "Roblox Users", {"userIds":users})
+        user_lookup = {}
+        for user_dict in res.json["data"]:
+            user = User.from_dict(user_dict)
+            user_lookup[user_dict["id"]] = user
+        return user_lookup
 
 class UserState(Enum):
     DEFAULT = 0
@@ -887,7 +893,7 @@ async def get_user_state(client:Client, user_data:User) -> Optional[UserState]:
     try:
         res = await get_strafes(client, f"user/{user_data.id}", {})
         return UserState(res.json["State"])
-    except StrafesNotFoundError:
+    except NotFoundError:
         return None
 
 async def get_record_placement(client:Client, record:Record) -> Tuple[int, int]:
