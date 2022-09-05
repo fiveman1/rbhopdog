@@ -47,23 +47,40 @@ class StrafesNotFoundError(Exception):
 
 class Client:
     def __init__(self, api_key):
-        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         self.api_key = api_key
+        self.last_session_created : datetime.datetime = None
+        self._session : aiohttp.ClientSession = None
+        self.lock = asyncio.Lock()
 
     def close(self):
-        if not self.session:
+        if not self._session:
             return
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                loop.create_task(self.session.close())
+                loop.create_task(self._session.close())
             else:
-                loop.run_until_complete(self.session.close())
+                loop.run_until_complete(self._session.close())
         except Exception:
             pass
 
     def __del__(self):
         self.close()
+
+    @property
+    async def session(self) -> aiohttp.ClientSession:
+        async with self.lock:
+            if self.last_session_created:
+                time = datetime.datetime.now()
+                if (time - self.last_session_created).total_seconds() > 59:
+                    await self._session.close()
+                    self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+                    self.last_session_created = time
+            else:
+                self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+                self.last_session_created = datetime.datetime.now()
+            return self._session
+
 
 class JSONRes:
     def __init__(self, res:aiohttp.ClientResponse, json):
@@ -73,8 +90,9 @@ class JSONRes:
 async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
     url = f"https://api.strafes.net/v1/{end_of_url}"
     headers = {"api-key":client.api_key}
+    session = await client.session
     try:
-        async with client.session.get(url, headers=headers, params=params) as res:
+        async with session.get(url, headers=headers, params=params) as res:
             if res.status == 404:
                 raise StrafesNotFoundError()
             elif res.status < 200 or res.status >= 300:
@@ -89,7 +107,7 @@ async def get_strafes(client:Client, end_of_url, params={}) -> JSONRes:
             except aiohttp.ContentTypeError:
                 raise StrafesError(url, headers, params, res.status, await res.text())
     except asyncio.TimeoutError:
-        raise StrafesTimeoutError(client.session.timeout.total, url, headers, params)
+        raise StrafesTimeoutError(session.timeout.total, url, headers, params)
         
 
 class Time:
@@ -502,7 +520,7 @@ class User:
     @staticmethod
     async def get_user_data(client:Client, user : Union[str, int]) -> "User":
         if type(user) == int:
-            async with client.session.get(f"https://users.roblox.com/v1/users/{user}") as res:
+            async with (await client.session).get(f"https://users.roblox.com/v1/users/{user}") as res:
                 if res.status == 404:
                     raise InvalidData("Invalid user ID")
                 try:
@@ -511,7 +529,7 @@ class User:
                 except:
                     raise TimeoutError("Error getting user data")
         else:
-            async with client.session.post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]}) as res:
+            async with (await client.session).post("https://users.roblox.com/v1/usernames/users", data={"usernames":[user]}) as res:
                 d = await res.json()
                 if not d:
                     raise TimeoutError("Error getting user data")
@@ -524,7 +542,7 @@ class User:
 
     @staticmethod
     async def get_user_data_from_list(client:Client, users:List[int]) -> Dict[int, "User"]:
-        async with client.session.post("https://users.roblox.com/v1/users", data={"userIds":users}) as res:
+        async with (await client.session).post("https://users.roblox.com/v1/users", data={"userIds":users}) as res:
             if res:
                 user_lookup = {}
                 data = await res.json()

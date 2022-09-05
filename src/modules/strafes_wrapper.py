@@ -73,7 +73,7 @@ class Client(strafes.Client):
     # this doesn't cache values that return None
     @cached(ttl=24*60*60)
     async def get_roblox_user_from_discord(self, discord_user_id:int) -> int:
-        async with await self.session.get(f"https://verify.eryn.io/api/user/{discord_user_id}") as res:
+        async with await (await self.session).get(f"https://verify.eryn.io/api/user/{discord_user_id}") as res:
             if res.status >= 200 and res.status < 300:
                 data = await res.json()
                 return data["robloxId"]
@@ -82,7 +82,7 @@ class Client(strafes.Client):
 
     @cached(ttl=60*60)
     async def get_user_headshot_url(self, user_id:int) -> str:
-        async with await self.session.get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false") as res:
+        async with await (await self.session).get(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false") as res:
             data = await res.json()
             if data['data'][0]['imageUrl']:
                 return f"{data['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
@@ -91,7 +91,7 @@ class Client(strafes.Client):
 
     @cached()
     async def get_asset_thumbnail(self, asset_id:int) -> str:
-        async with await self.session.get(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size=250x250&format=Png&isCircular=false") as res:
+        async with await (await self.session).get(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size=250x250&format=Png&isCircular=false") as res:
             data = await res.json()
             if data["data"][0]["imageUrl"]:
                 return data["data"][0]["imageUrl"]
