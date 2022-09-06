@@ -108,9 +108,6 @@ class StrafesClient:
         # hash table for id -> displayname because each id is unique
         self.map_lookup : Dict[int, Map] = {}
         self.maps_loaded : bool = False
-        asyncio.get_event_loop().run_until_complete(self.create_rw_lock())
-
-    async def create_rw_lock(self):
         self.map_lock = RWLock()
 
     def close(self):
