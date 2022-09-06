@@ -18,4 +18,5 @@ jobs:
           script: |
             cd rbhopdog
             git pull
+            pip install -r requirements.txt
             pm2 restart src/bot.py

@@ -12,7 +12,7 @@ from PIL import Image
 import requests
 import time
 import traceback
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Coroutine, Dict, List, Tuple, Union
 
 from modules.strafes_base import *
 from modules.strafes import StrafesClient
@@ -99,14 +99,46 @@ class MainCog(commands.Cog):
         self.bot.remove_command("help")
         load_dotenv()
         self.strafes = StrafesClient(os.getenv("API_KEY"))
+        print("Loading maps")
+        start = time.time()
+        asyncio.get_event_loop().run_until_complete(self.strafes.load_maps())
+        end = time.time()
+        print(f"Done loading maps ({end-start:.3f}s)")
+        self.maps_started = False
+        self.update_maps.start()
         self.globals_started = False
         self.global_announcements.start()
-        print("maincog loaded")
+        print("Maincog loaded")
     
     def cog_unload(self):
-        print("unloading maincog")
+        print("Unloading maincog")
         self.global_announcements.cancel()
+        self.update_maps.cancel()
         self.strafes.close()
+
+    async def task_wrapper(self, task : Coroutine[Any, Any, None], task_name : str):
+        # this is wrapped in a try-except because if this raises
+        # an error the entire task stops and we don't want that :)
+        try:
+            await task
+        except Exception as error:
+            try:
+                tb_channel = self.bot.get_channel(812768023920115742)
+                tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+                for msg in utils.page_messages(f"Error in {task_name}!\n{type(error).__name__}: {error}\n" + tb):
+                    await tb_channel.send(f"```\n{msg}\n```")
+            except:
+                pass
+
+    async def update_maps_task(self):
+        if not self.maps_started:
+            self.maps_started = True
+        else:
+            await self.strafes.load_maps()
+
+    @tasks.loop(minutes=60)
+    async def update_maps(self):
+        await self.task_wrapper(self.update_maps_task(), "update_maps")
 
     async def try_except(self, coroutine):
         try:
@@ -117,76 +149,68 @@ class MainCog(commands.Cog):
     async def create_global_embed(self, record : Record):
         return (record.game, record.style, await self.make_global_embed(record))
 
+    async def globals_task(self):
+        # when the bot first runs, overwrite globals then stop
+        if not self.globals_started:
+            await self.strafes.write_wrs()
+            self.globals_started = True
+            return
+        start = time.time()
+        records = await self.strafes.get_new_wrs()
+        if len(records) > 0:
+            end = time.time()
+            print(f"get new wrs: {end-start}s")
+            start = time.time()
+            embed_tasks = []
+            for record in records:
+                print(f"New global:\n{record}")
+                embed_tasks.append(self.create_global_embed(record))
+            all_embeds = await asyncio.gather(*embed_tasks)
+            end = time.time()
+            print(f"embeds created: {end-start}s")
+            start = time.time()
+            bhop_auto = []
+            bhop_style = []
+            surf_auto = []
+            surf_style = []
+            for game, style, embed in all_embeds:
+                if game == Game.BHOP and style == Style.AUTOHOP:
+                    bhop_auto.append(embed)
+                elif game == Game.BHOP and style != Style.AUTOHOP:
+                    bhop_style.append(embed)
+                elif game == Game.SURF and style == Style.AUTOHOP:
+                    surf_auto.append(embed)
+                elif game == Game.SURF and style != Style.AUTOHOP:
+                    surf_style.append(embed)
+            tasks = []
+            for guild in self.bot.guilds:
+                for ch in guild.text_channels:
+                    if ch.name == "globals":
+                        for _,_,embed in all_embeds:
+                            tasks.append(self.try_except(ch.send(embed=embed)))
+                    elif ch.name == "bhop-auto-globals":
+                        for embed in bhop_auto:
+                            tasks.append(self.try_except(ch.send(embed=embed)))
+                    elif ch.name == "bhop-styles-globals":
+                        for embed in bhop_style:
+                            tasks.append(self.try_except(ch.send(embed=embed)))
+                    elif ch.name == "surf-auto-globals":
+                        for embed in surf_auto:
+                            tasks.append(self.try_except(ch.send(embed=embed)))
+                    elif ch.name == "surf-styles-globals":
+                        for embed in surf_style:
+                            tasks.append(self.try_except(ch.send(embed=embed)))
+            await asyncio.gather(*tasks)
+            end = time.time()
+            print(f"embeds posted: {end-start}s")
+
     @tasks.loop(minutes=1)
     async def global_announcements(self):
-        # this is wrapped in a try-except because if this raises
-        # an error the entire task stops and we don't want that :)
-        try:
-            # when the bot first runs, overwrite globals then stop
-            if not self.globals_started:
-                await self.strafes.write_wrs()
-                self.globals_started = True
-                return
-            start = time.time()
-            records = await self.strafes.get_new_wrs()
-            if len(records) > 0:
-                end = time.time()
-                print(f"get new wrs: {end-start}s")
-                start = time.time()
-                embed_tasks = []
-                for record in records:
-                    print(f"New global:\n{record}")
-                    embed_tasks.append(self.create_global_embed(record))
-                all_embeds = await asyncio.gather(*embed_tasks)
-                end = time.time()
-                print(f"embeds created: {end-start}s")
-                start = time.time()
-                bhop_auto = []
-                bhop_style = []
-                surf_auto = []
-                surf_style = []
-                for game, style, embed in all_embeds:
-                    if game == Game.BHOP and style == Style.AUTOHOP:
-                        bhop_auto.append(embed)
-                    elif game == Game.BHOP and style != Style.AUTOHOP:
-                        bhop_style.append(embed)
-                    elif game == Game.SURF and style == Style.AUTOHOP:
-                        surf_auto.append(embed)
-                    elif game == Game.SURF and style != Style.AUTOHOP:
-                        surf_style.append(embed)
-                tasks = []
-                for guild in self.bot.guilds:
-                    for ch in guild.text_channels:
-                        if ch.name == "globals":
-                            for _,_,embed in all_embeds:
-                                tasks.append(self.try_except(ch.send(embed=embed)))
-                        elif ch.name == "bhop-auto-globals":
-                            for embed in bhop_auto:
-                                tasks.append(self.try_except(ch.send(embed=embed)))
-                        elif ch.name == "bhop-styles-globals":
-                            for embed in bhop_style:
-                                tasks.append(self.try_except(ch.send(embed=embed)))
-                        elif ch.name == "surf-auto-globals":
-                            for embed in surf_auto:
-                                tasks.append(self.try_except(ch.send(embed=embed)))
-                        elif ch.name == "surf-styles-globals":
-                            for embed in surf_style:
-                                tasks.append(self.try_except(ch.send(embed=embed)))
-                await asyncio.gather(*tasks)
-                end = time.time()
-                print(f"embeds posted: {end-start}s")
-        except Exception as error:
-            try:
-                tb_channel = self.bot.get_channel(812768023920115742)
-                tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-                for msg in utils.page_messages(f"Error in globals!\n{type(error).__name__}: {error}\n" + tb):
-                    await tb_channel.send(f"```\n{msg}\n```")
-            except:
-                pass
+        await self.task_wrapper(self.globals_task(), "globals_announcements")
             
     @global_announcements.before_loop
     async def before_global_announcements(self):
-        print("waiting for ready")
+        print("Waiting for ready")
         #we have to wait for the bot to on_ready() or we won't be able to find channels/guilds
         await self.bot.wait_until_ready()
 
@@ -806,12 +830,13 @@ class MainCog(commands.Cog):
         user : User = arguments.user.value
 
         async with ctx.typing():
-            records = await self.strafes.get_user_times(user, game, style, -1)
-            completed_maps = set(i.map.id for i in records[0])
+            records, _ = await self.strafes.get_user_times(user, game, style, -1)
+            completed_maps = set(i.map for i in records)
             incompleted_maps = []
             map_count = await self.strafes.get_map_count(game)
-            for id, map in Map.map_lookup.items():
-                if map.game == game and id not in completed_maps:
+            maps = await self.strafes.get_all_maps()
+            for map in maps:
+                if map.game == game and map not in completed_maps:
                     # TODO: binary search insert
                     incompleted_maps.append(map)
             incompleted_maps.sort(key=lambda i: i.displayname)
@@ -974,7 +999,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="updatemaps")
     @commands.is_owner()
-    async def update_maps(self, ctx:Context):
+    async def update_maps_cmd(self, ctx:Context):
         await self.strafes.update_maps()
         await ctx.send(utils.fmt_md_code("Maps updated."))
 
@@ -1028,5 +1053,5 @@ class MainCog(commands.Cog):
         return embed
 
 def setup(bot):
-    print("loading maincog")
+    print("Loading maincog")
     bot.add_cog(MainCog(bot))

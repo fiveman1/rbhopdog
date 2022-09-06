@@ -1,6 +1,7 @@
 # strafes.py
 from aiocache import cached
 import aiohttp
+from aiorwlock import RWLock
 import asyncio
 import datetime
 import json
@@ -34,6 +35,11 @@ class NotFoundError(Exception):
 
     def __init__(self):
         super().__init__("404 Not Found")
+
+class MapsNotLoadedError(Exception):
+
+    def __init__(self):
+        super().__init__("Tried to access maps before loading them! Call await client.load_maps() first!")
 
 class SessionHandler:
 
@@ -102,7 +108,10 @@ class StrafesClient:
         # hash table for id -> displayname because each id is unique
         self.map_lookup : Dict[int, Map] = {}
         self.maps_loaded : bool = False
-        self.map_lock = asyncio.Lock()
+        asyncio.get_event_loop().run_until_complete(self.create_rw_lock())
+
+    async def create_rw_lock(self):
+        self.map_lock = RWLock()
 
     def close(self):
         if self._handler:
@@ -177,7 +186,7 @@ class StrafesClient:
         })
         return game, await res
 
-    async def write_maps(self):
+    async def load_maps(self):
         first_bhop = self.get_strafes("map", {
             "game":Game.BHOP.value,
             "page":1
@@ -188,8 +197,8 @@ class StrafesClient:
         })
         tasks = [first_bhop, first_surf]
         data : List[JSONRes] = await asyncio.gather(*tasks)
-        bhop_data = data[0].json
-        surf_data = data[1].json
+        bhop_maps = data[0].json
+        surf_maps = data[1].json
         bhop_pages = int(data[0].res.headers["Pagination-Count"])
         surf_pages = int(data[1].res.headers["Pagination-Count"])
 
@@ -203,47 +212,30 @@ class StrafesClient:
         responses : List[Tuple[Game, JSONRes]] = await asyncio.gather(*tasks)
         for game, res in responses:
             if game == Game.BHOP:
-                bhop_data += res.json
+                bhop_maps += res.json
             elif game == Game.SURF:
-                surf_data += res.json
-        with open(fix_path("files/bhop_maps.json"), "w") as file:
-            json.dump(bhop_data, file)
-        with open(fix_path("files/surf_maps.json"), "w") as file:
-            json.dump(surf_data, file)
+                surf_maps += res.json
+        
+        async with self.map_lock.writer_lock:
+            self.bhop_map_count = len(bhop_maps)
+            self.surf_map_count = len(surf_maps)
 
-    async def setup_maps(self):
-        try:
-            bhop_maps = open_json("files/bhop_maps.json")
-            surf_maps = open_json("files/surf_maps.json")
-        except FileNotFoundError:
-            await self.write_maps()
-            bhop_maps = open_json("files/bhop_maps.json")
-            surf_maps = open_json("files/surf_maps.json")
+            self.bhop_map_pairs.clear()
+            self.surf_map_pairs.clear()
+            self.map_lookup.clear()
 
-        self.bhop_map_count = len(bhop_maps)
-        self.surf_map_count = len(surf_maps)
+            for m in bhop_maps:
+                map = Map.from_dict(m)
+                self.bhop_map_pairs.append((map.displayname.lower(), map))
+                self.map_lookup[map.id] = map
+            self.bhop_map_pairs.sort(key=lambda i: i[0])
 
-        self.bhop_map_pairs.clear()
-        self.surf_map_pairs.clear()
-        self.map_lookup.clear()
-
-        for m in bhop_maps:
-            map = Map.from_dict(m)
-            self.bhop_map_pairs.append((map.displayname.lower(), map))
-            self.map_lookup[map.id] = map
-        self.bhop_map_pairs.sort(key=lambda i: i[0])
-
-        for m in surf_maps:
-            map = Map.from_dict(m)
-            self.surf_map_pairs.append((map.displayname.lower(), map))
-            self.map_lookup[map.id] = map
-        self.surf_map_pairs.sort(key=lambda i: i[0])
-        self.maps_loaded = True
-
-    async def update_maps(self):
-        async with self.map_lock:
-            await self.write_maps()
-            await self.setup_maps()
+            for m in surf_maps:
+                map = Map.from_dict(m)
+                self.surf_map_pairs.append((map.displayname.lower(), map))
+                self.map_lookup[map.id] = map
+            self.surf_map_pairs.sort(key=lambda i: i[0])
+            self.maps_loaded = True
 
     # ls should be sorted
     # performs an iterative binary search
@@ -293,9 +285,9 @@ class StrafesClient:
             return the_map
 
     async def map_from_name(self, map_name : str, game : Optional[Game]) -> Optional[Map]:
-        async with self.map_lock:
+        async with self.map_lock.reader_lock:
             if not self.maps_loaded:
-                await self.setup_maps()
+                raise MapsNotLoadedError()
             if game == Game.BHOP:
                 return self._map_from_name(map_name, self.bhop_map_pairs)
             elif game == Game.SURF:
@@ -308,18 +300,18 @@ class StrafesClient:
             return None
 
     async def map_from_id(self, map_id:int) -> Map:
-        async with self.map_lock:
+        async with self.map_lock.reader_lock:
             if not self.maps_loaded:
-                await self.setup_maps()
+                raise MapsNotLoadedError()
             try:
                 return self.map_lookup[map_id]
             except KeyError:
                 return Map(-1, "Missing map", "", Game.BHOP, -1, -1)
 
     async def get_map_count(self, game : Game) -> int:
-        async with self.map_lock:
+        async with self.map_lock.reader_lock:
             if not self.maps_loaded:
-                await self.setup_maps()
+                raise MapsNotLoadedError()
             if game == Game.BHOP:
                 return self.bhop_map_count
             elif game == Game.SURF:
@@ -327,10 +319,10 @@ class StrafesClient:
             else:
                 return 1
 
-    async def get_maps_by_creator(self, creator : str) -> List[Map]:
-        async with self.map_lock:
+    async def get_maps_by_creator(self, creator : Optional[str]) -> List[Map]:
+        async with self.map_lock.reader_lock:
             if not self.maps_loaded:
-                await self.setup_maps()
+                raise MapsNotLoadedError()
             if not creator:
                 return list(self.map_lookup.values())
             creator = creator.lower()
@@ -339,6 +331,12 @@ class StrafesClient:
                 if creator in map.creator.lower():
                     matches.append(map)
             return matches
+
+    async def get_all_maps(self) -> List[Map]:
+         async with self.map_lock.reader_lock:
+            if not self.maps_loaded:
+                raise MapsNotLoadedError()
+            return list(self.map_lookup.values())
 
     @cached(ttl=60*60)
     async def get_user_data(self, user : Union[str, int]) -> User:
