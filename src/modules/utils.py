@@ -1,5 +1,15 @@
 # utils.py
+import json
+import os
 from typing import List, Optional
+
+def fix_path(path):
+    return os.path.abspath(os.path.expanduser(path))
+
+def open_json(path):
+    with open(fix_path(path)) as file:
+        data = file.read()
+        return json.loads(data)
 
 def fmt_md_code(s : str) -> str:
     s = s.replace("`", "") # don't allow the ` character to prevent escaping code blocks

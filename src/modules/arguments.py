@@ -1,6 +1,7 @@
+# arguments.py
 from typing import List, Optional, Tuple
-from modules.strafes_wrapper import Client
-from modules.strafes import Game, NotFoundError, Style, User, UserState
+from modules.strafes_base import Game, Style, User, UserState
+from modules.strafes import StrafesClient, NotFoundError
 from discord.ext.commands import Bot
 import discord
 
@@ -59,7 +60,7 @@ class UserValue(ArgumentValue):
 
 class ArgumentValidator:
 
-    def __init__(self, bot : Bot, strafes : Client):
+    def __init__(self, bot : Bot, strafes : StrafesClient):
         self.bot = bot
         self.strafes = strafes
         self.game = ArgumentValue()

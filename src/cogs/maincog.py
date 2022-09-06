@@ -14,11 +14,11 @@ import time
 import traceback
 from typing import Callable, Dict, List, Tuple, Union
 
-from modules.strafes import Game, Style, User, Map, Record, Rank, DEFAULT_GAMES, DEFAULT_STYLES, open_json, _GAMES, _STYLES
+from modules.strafes_base import *
+from modules.strafes import StrafesClient
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
 from modules.arguments import ArgumentValidator
-from modules.strafes_wrapper import Client
 
 # contains some commonly used Cols designed for use with MessageBuilder
 class MessageCol:
@@ -98,7 +98,7 @@ class MainCog(commands.Cog):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
         load_dotenv()
-        self.strafes = Client(os.getenv("API_KEY"))
+        self.strafes = StrafesClient(os.getenv("API_KEY"))
         self.globals_started = False
         self.global_announcements.start()
         print("maincog loaded")
@@ -909,7 +909,7 @@ class MainCog(commands.Cog):
         cmd = cmd.lower()
         embed = discord.Embed(title="\U00002753  Help", color=0xe32f22) #\U00002753: red question mark
         embed.set_thumbnail(url="https://i.imgur.com/ief5VmF.png")
-        commands_json = open_json("files/help.json")
+        commands_json = utils.open_json("files/help.json")
         if cmd:
             if cmd in commands_json:
                 command = commands_json[cmd]
@@ -947,13 +947,13 @@ class MainCog(commands.Cog):
         games.sort(key=str)
         games_txt = []
         for game in games:
-            games_txt.append(self.format_aliases(_GAMES[game.value]))
+            games_txt.append(self.format_aliases(GAME_ENUM[game.value]))
         embed.add_field(name=f"__Games__", value="\n".join(games_txt), inline=False)
         styles = [style for style in Style]
         styles.sort(key=str)
         styles_txt = []
         for style in styles:
-            styles_txt.append(self.format_aliases(_STYLES[style.value]))
+            styles_txt.append(self.format_aliases(STYLE_ENUM[style.value]))
         embed.add_field(name=f"__Styles__", value="\n".join(styles_txt), inline=False)
         await ctx.send(embed=embed)
     
