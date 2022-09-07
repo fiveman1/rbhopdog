@@ -14,10 +14,6 @@ from modules.strafes import APIError, StrafesClient
 
 class StrafesBot(commands.Bot):
 
-    def __init__(self, strafes, command_prefix, intents):
-        super().__init__(command_prefix=command_prefix, intents=intents)
-        self.strafes = strafes
-
     async def on_ready(self):
         print(f"{self.user} has connected to Discord!")
         await self.change_presence(status=discord.Status.online, activity=discord.Game(name=f"{self.command_prefix}help"))
@@ -49,20 +45,12 @@ class StrafesBot(commands.Bot):
 async def main():
 
     load_dotenv()
-    strafes = StrafesClient(os.getenv("API_KEY"))
-
-    print("Loading maps")
-    start = time.time()
-    await strafes.load_maps()
-    end = time.time()
-    print(f"Done loading maps ({end-start:.3f}s)")
-
     TOKEN = os.getenv("DISCORD_TOKEN")
     COMMAND = os.getenv("COMMAND")
 
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = StrafesBot(strafes, COMMAND, intents)
+    bot = StrafesBot(command_prefix=COMMAND, intents=intents)
     
     async with bot:
         await bot.load_extension("cogs.maincog")

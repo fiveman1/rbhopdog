@@ -95,11 +95,11 @@ class ComparableUserStyle:
 # TODO: why do i have one cog for everything
 class MainCog(commands.Cog):
 
-    def __init__(self, bot):
+    def __init__(self, bot, strafes):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
         load_dotenv()
-        self.strafes : StrafesClient = bot.strafes
+        self.strafes : StrafesClient = strafes
         self.maps_started = False
         self.update_maps.start()
         self.globals_started = False
@@ -1103,4 +1103,13 @@ class MainCog(commands.Cog):
 
 async def setup(bot : commands.Bot):
     print("Loading maincog")
-    await bot.add_cog(MainCog(bot))
+
+    load_dotenv()
+    strafes = StrafesClient(os.getenv("API_KEY"))
+
+    print("Loading maps")
+    start = time.time()
+    await strafes.load_maps()
+    end = time.time()
+    print(f"Done loading maps ({end-start:.3f}s)")
+    await bot.add_cog(MainCog(bot, strafes))
