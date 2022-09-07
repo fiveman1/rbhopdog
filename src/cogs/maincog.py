@@ -1049,7 +1049,7 @@ class MainCog(commands.Cog):
     
     #formatting taken from https://github.com/drumman22/Bhop-Bot/blob/bhop-bot-v3/cogs/error_handler.py
     async def send_traceback(self, ctx : Context, error : Exception):
-        tb_channel = self.get_channel(812768023920115742)
+        tb_channel = self.bot.get_channel(812768023920115742)
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         await tb_channel.send(
                 f"An error occured while executing `{''.join(ctx.prefix)}{ctx.command}` command by "
