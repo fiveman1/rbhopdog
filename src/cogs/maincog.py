@@ -95,21 +95,31 @@ class ComparableUserStyle:
 # TODO: why do i have one cog for everything
 class MainCog(commands.Cog):
 
-    def __init__(self, bot, strafes):
+    def __init__(self, bot):
         self.bot:commands.Bot = bot
         self.bot.remove_command("help")
-        load_dotenv()
-        self.strafes : StrafesClient = strafes
+        self.strafes : StrafesClient = None
         self.maps_started = False
-        self.update_maps.start()
         self.globals_started = False
+
+    async def cog_load(self):
+        print("Loading maincog")
+        load_dotenv()
+        self.strafes = StrafesClient(os.getenv("API_KEY"))
+        print("Loading maps")
+        start = time.time()
+        await self.strafes.load_maps()
+        end = time.time()
+        print(f"Done loading maps ({end-start:.3f}s)")
+        self.update_maps.start()
         self.global_announcements.start()
         print("Maincog loaded")
     
-    def cog_unload(self):
+    async def cog_unload(self):
         print("Unloading maincog")
         self.global_announcements.cancel()
         self.update_maps.cancel()
+        self.strafes.close()
 
     async def task_wrapper(self, task : Coroutine[Any, Any, None], task_name : str):
         # this is wrapped in a try-except because if this raises
@@ -995,7 +1005,7 @@ class MainCog(commands.Cog):
     @commands.command(name="updatemaps")
     @commands.is_owner()
     async def update_maps_cmd(self, ctx:Context):
-        await self.strafes.update_maps()
+        await self.strafes.load_maps()
         await ctx.send(utils.fmt_md_code("Maps updated."))
 
     def get_ordinal(self, num:int) -> str:
@@ -1102,14 +1112,4 @@ class MainCog(commands.Cog):
             await ctx.send('\N{OK HAND SIGN}')
 
 async def setup(bot : commands.Bot):
-    print("Loading maincog")
-
-    load_dotenv()
-    strafes = StrafesClient(os.getenv("API_KEY"))
-
-    print("Loading maps")
-    start = time.time()
-    await strafes.load_maps()
-    end = time.time()
-    print(f"Done loading maps ({end-start:.3f}s)")
-    await bot.add_cog(MainCog(bot, strafes))
+    await bot.add_cog(MainCog(bot))
