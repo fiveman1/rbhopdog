@@ -130,8 +130,8 @@ class MainCog(commands.Cog):
             try:
                 tb_channel = self.bot.get_channel(812768023920115742)
                 tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-                for msg in utils.page_messages(f"Error in {task_name}!\n{type(error).__name__}: {error}\n" + tb):
-                    await tb_channel.send(f"```\n{msg}\n```")
+                for msg in utils.page_messages(f"Error in {task_name}!\n{tb}"):
+                    await tb_channel.send(utils.fmt_md_code(msg))
             except:
                 pass
 
