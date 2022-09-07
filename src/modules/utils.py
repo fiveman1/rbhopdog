@@ -3,6 +3,8 @@ import json
 import os
 from typing import List, Optional
 
+TRACEBACK_CHANNEL = 812768023920115742
+
 def fix_path(path):
     return os.path.abspath(os.path.expanduser(path))
 

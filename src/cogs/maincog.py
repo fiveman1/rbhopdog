@@ -128,7 +128,8 @@ class MainCog(commands.Cog):
             await task
         except Exception as error:
             try:
-                tb_channel = self.bot.get_channel(812768023920115742)
+                await self.bot.wait_until_ready()
+                tb_channel = self.bot.get_channel(utils.TRACEBACK_CHANNEL)
                 tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
                 for msg in utils.page_messages(f"Error in {task_name}!\n{tb}"):
                     await tb_channel.send(utils.fmt_md_code(msg))
@@ -1056,60 +1057,6 @@ class MainCog(commands.Cog):
         embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Moderation status:** {user.state}")
         embed.set_footer(text="User Profile")
         return embed
-    
-    #formatting taken from https://github.com/drumman22/Bhop-Bot/blob/bhop-bot-v3/cogs/error_handler.py
-    async def send_traceback(self, ctx : Context, error : Exception):
-        tb_channel = self.bot.get_channel(812768023920115742)
-        tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-        await tb_channel.send(
-                f"An error occured while executing `{''.join(ctx.prefix)}{ctx.command}` command by "
-                f"{ctx.author.name}#{ctx.author.discriminator}@{ctx.guild.name} in {ctx.channel.mention}."
-                f"\n> {ctx.message.jump_url}\n"
-            )
-        for msg in utils.page_messages(f"{type(error).__name__}: {error}\n" + tb):
-            await tb_channel.send(utils.fmt_md_code(f"\n{msg}\n"))
-
-    #shamelessly adapted from here
-    #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot
-    @commands.command(name="load", hidden=True)
-    @commands.is_owner()
-    async def load(self, ctx : Context, *, module : str):
-        """Loads a module."""
-        module = "cogs." + module
-        try:
-            await self.bot.load_extension(module)
-        except Exception as e:
-            await ctx.send('\N{PISTOL}')
-            await ctx.send('{}: {}'.format(type(e).__name__, e))
-        else:
-            await ctx.send('\N{OK HAND SIGN}')
-
-    @commands.command(name="unload", hidden=True)
-    @commands.is_owner()
-    async def unload(self, ctx : Context, *, module : str):
-        """Unloads a module."""
-        module = "cogs." + module
-        try:
-            await self.bot.unload_extension(module)
-        except Exception as e:
-            await ctx.send('\N{PISTOL}')
-            await ctx.send('{}: {}'.format(type(e).__name__, e))
-        else:
-            await ctx.send('\N{OK HAND SIGN}')
-
-    @commands.command(name="reload", hidden=True)
-    @commands.is_owner()
-    async def _reload(self, ctx : Context, *, module : str):
-        """Reloads a module."""
-        module = "cogs." + module
-        try:
-            await self.bot.unload_extension(module)
-            await self.bot.load_extension(module)
-        except Exception as e:
-            await ctx.send('\N{PISTOL}')
-            await ctx.send('{}: {}'.format(type(e).__name__, e))
-        else:
-            await ctx.send('\N{OK HAND SIGN}')
 
 async def setup(bot : commands.Bot):
     await bot.add_cog(MainCog(bot))

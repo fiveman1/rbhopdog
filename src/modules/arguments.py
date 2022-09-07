@@ -200,7 +200,7 @@ class ArgumentValidator:
             if len(args) < 1:
                 valid, err = await self.set_user(None, author_id)
                 if not valid:
-                    return False, "No user specified and no Roblox username associated with your Discord account. Visit https://rover.link/login"
+                    return False, err
             else:
                 username = " ".join(args)
                 if self.user.allow_id and username.isnumeric():
