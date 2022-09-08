@@ -28,8 +28,10 @@ class APIError(Exception):
         return "\n".join(s)
 
 class TimeoutError(APIError):
-    def __init__(self, timeout, url, headers, params, api_name):
-        super().__init__(url, headers, params, "n/a", "n/a", api_name, f"A timeout occurred attempting to use the {api_name} API after {timeout} seconds.")
+    def __init__(self, timeout, url, headers, params, api_name, msg=""):
+        if not msg:
+            msg = f"A timeout occurred attempting to use the {api_name} API after {timeout} seconds."
+        super().__init__(url, headers, params, "n/a", "n/a", api_name, msg)
 
 class NotFoundError(Exception):
 
@@ -175,6 +177,23 @@ class StrafesClient:
 
     async def get_strafes(self, end_of_url, params={}) -> JSONRes:
         return await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self.api_key})
+
+    async def get_bytes(self, url):
+        async with await self.handler as handler:
+            session = handler.session
+            try:
+                async with session.get(url) as res:
+                    if res.status == 404:
+                        raise NotFoundError()
+                    elif res.status < 200 or res.status >= 300:
+                        try:
+                            body = await res.text()
+                        except:
+                            body = "n/a"
+                        raise APIError(url, {}, {}, res.status, body, None, f"Error occurred attempting to download {url}")
+                    return await res.read()
+            except asyncio.TimeoutError:
+                raise TimeoutError(session.timeout.total, url, {}, {}, None, f"Timeout occurred attempting to download {url}")
 
     async def _map_mapper(self, game : Game, page : int):
         res = self.get_strafes("map", {

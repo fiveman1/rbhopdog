@@ -9,7 +9,7 @@ from io import BytesIO, StringIO
 import numpy
 import os
 from PIL import Image
-import requests
+import sys
 import time
 import traceback
 from typing import Callable, Coroutine, Dict, List, Tuple, Union
@@ -735,9 +735,10 @@ class MainCog(commands.Cog):
                 file = None
                 if url1 is not None and url2 is not None:
                     try:
-                        # https://stackoverflow.com/questions/7391945/how-do-i-read-image-data-from-a-url-in-python
-                        img1 = Image.open(requests.get(url1, stream=True).raw)
-                        img2 = Image.open(requests.get(url2, stream=True).raw)
+                        tasks = [self.strafes.get_bytes(url1), self.strafes.get_bytes(url2)]
+                        images = await asyncio.gather(*tasks)
+                        img1 = Image.open(BytesIO(images[0]))
+                        img2 = Image.open(BytesIO(images[1]))
                         pixels1 = numpy.asarray(img1)
                         pixels2 = numpy.asarray(img2)
                         # Create a new image by drawing a diagonal line between the two images and combining them
