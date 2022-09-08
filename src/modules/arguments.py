@@ -6,9 +6,9 @@ from discord.ext.commands import Bot
 import discord
 
 def get_discord_user_id(s : str) -> Optional[str]:
-    if s[:3] == "<@!" and s[-1] == ">":
+    if s[:3] == "<@!" and s[-1] == ">" and s[3:-1].isnumeric():
         return s[3:-1]
-    elif s[:2] == "<@" and s[-1] == ">":
+    elif s[:2] == "<@" and s[-1] == ">" and s[2:-1].isnumeric():
         return s[2:-1]
     else:
         return None

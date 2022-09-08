@@ -1,7 +1,7 @@
 # utils.py
 import json
 import os
-from typing import List, Optional
+from typing import List
 
 TRACEBACK_CHANNEL = 812768023920115742
 
@@ -16,14 +16,6 @@ def open_json(path):
 def fmt_md_code(s : str) -> str:
     s = s.replace("`", "") # don't allow the ` character to prevent escaping code blocks
     return f"```\n{s}```"
-
-def get_discord_user_id(s : str) -> Optional[str]:
-    if s[:3] == "<@!" and s[-1] == ">":
-        return s[3:-1]
-    elif s[:2] == "<@" and s[-1] == ">":
-        return s[2:-1]
-    else:
-        return None
 
 # increment(inc=1): returns i then increments it by inc (default i++)
 # get(): returns i
