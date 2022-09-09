@@ -119,7 +119,7 @@ class MainCog(commands.Cog):
         print("Unloading maincog")
         self.global_announcements.cancel()
         self.update_maps.cancel()
-        self.strafes.close()
+        await self.strafes.close()
 
     async def task_wrapper(self, task : Coroutine[Any, Any, None], task_name : str):
         # this is wrapped in a try-except because if this raises

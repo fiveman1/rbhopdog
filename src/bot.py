@@ -31,7 +31,7 @@ class StrafesBot(commands.Bot):
             if isinstance(error.original, ignored):
                 return
             elif isinstance(error.original, APIError):
-                print(error.original.create_debug_message())
+                print(error.original.create_debug_message(), file=sys.stderr)
                 await ctx.send(utils.fmt_md_code(str(error.original)))
             else:
                 await ctx.send(utils.fmt_md_code(f"Command invokation error: {error.original}."))
@@ -42,8 +42,14 @@ class StrafesBot(commands.Bot):
             traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
     
     #formatting taken from https://github.com/drumman22/Bhop-Bot/blob/bhop-bot-v3/cogs/error_handler.py
-    async def send_traceback(self, ctx : Context, error : Exception):
+    async def send_traceback(self, ctx : Context, error : commands.CommandInvokeError):
         tb_channel = self.get_channel(utils.TRACEBACK_CHANNEL)
+        if isinstance(error.original, APIError):
+            for msg in utils.page_messages(error.original.create_debug_message()):
+                try:
+                    await tb_channel.send(utils.fmt_md_code(msg))
+                except discord.errors.HTTPException:
+                    pass
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         await tb_channel.send(
                 f"An error occured while executing `{''.join(ctx.prefix)}{ctx.command}` command by "
