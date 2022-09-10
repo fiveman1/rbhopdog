@@ -664,8 +664,6 @@ class MainCog(commands.Cog):
     @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
     @before_strafes(22)
     async def compare(self, ctx:Context, *args):
-        remaining, _ = await self.strafes.get_ratelimit_info()
-        print(f"remaining before: {remaining}")
         game : Game = None
         txt : bool = False
         styles : List[Style] = []
@@ -851,9 +849,6 @@ class MainCog(commands.Cog):
                         fname += f"_{styles[0]}"
                     fname += ".txt"
                     await ctx.send(file=discord.File(f, filename=fname))
-        
-        remaining, _ = await self.strafes.get_ratelimit_info()
-        print(f"remaining after: {remaining}")
     
     def compare_formatter(self, record: Record) -> str:
         diff = (record.previous_record.time.millis - record.time.millis) / 1000.0

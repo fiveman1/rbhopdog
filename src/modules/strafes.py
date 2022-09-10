@@ -114,10 +114,8 @@ class StrafesClient:
     async def get_strafes(self, end_of_url, params={}) -> JSONRes:
         data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self.api_key})
         remaining = int(data.res.headers["RateLimit-Remaining"])
-        print(f"https://api.strafes.net/v1/{end_of_url} | params:{params}, remaining:{remaining}")
         reset = int(data.res.headers["RateLimit-Reset"])
         now = datetime.datetime.now()
-        
         async with self._ratelimit_lock:
             if self._last_strafes_response is not None and (now - self._last_strafes_response).total_seconds() > 0.5 or remaining < self._ratelimit_remaining or abs(self._ratelimit_remaining - remaining) > 30.0:
                 self._ratelimit_remaining = remaining
