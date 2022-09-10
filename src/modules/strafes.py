@@ -59,6 +59,10 @@ class StrafesClient:
         self.map_lookup : Dict[int, Map] = {}
         self.maps_loaded : bool = False
         self.map_lock = RWLock()
+        self._ratelimit_lock = asyncio.Lock()
+        self._ratelimit_remaining : int = 100
+        self._ratelimit_reset : int = 60
+        self._last_strafes_response : datetime.datetime = None
 
     async def close(self):
         await self.session.close()
@@ -68,6 +72,12 @@ class StrafesClient:
             async with self.session.get(url, headers=headers, params=params) as res:
                 if res.status == 404:
                     raise NotFoundError()
+                elif res.status == 429:
+                    try:
+                        body = await res.text()
+                    except:
+                        body = "n/a"
+                    raise APIError(url, headers, params, res.status, body, api_name, f"Rate limit exceeded using the {api_name} API")
                 elif res.status < 200 or res.status >= 300:
                     try:
                         body = await res.text()
@@ -102,7 +112,30 @@ class StrafesClient:
             raise TimeoutError(self.session.timeout.total, url, headers, data, api_name)
 
     async def get_strafes(self, end_of_url, params={}) -> JSONRes:
-        return await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self.api_key})
+        data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self.api_key})
+        remaining = int(data.res.headers["RateLimit-Remaining"])
+        print(f"https://api.strafes.net/v1/{end_of_url} | params:{params}, remaining:{remaining}")
+        reset = int(data.res.headers["RateLimit-Reset"])
+        now = datetime.datetime.now()
+        
+        async with self._ratelimit_lock:
+            if self._last_strafes_response is not None and (now - self._last_strafes_response).total_seconds() > 0.5 or remaining < self._ratelimit_remaining or abs(self._ratelimit_remaining - remaining) > 30.0:
+                self._ratelimit_remaining = remaining
+                self._ratelimit_reset = reset
+                self._last_strafes_response = now
+        return data
+
+    async def get_ratelimit_info(self) -> Tuple[int, int]:
+        now = datetime.datetime.now()
+        async with self._ratelimit_lock:
+            if self._last_strafes_response is None:
+                return self._ratelimit_remaining, self._ratelimit_reset
+            diff = int((now - self._last_strafes_response).total_seconds())
+            if diff > self._ratelimit_reset:
+                self._ratelimit_remaining = 100
+                self._ratelimit_reset = 60
+                self._last_strafes_response = now
+            return self._ratelimit_remaining, self._ratelimit_reset - diff
 
     async def get_bytes(self, url):
         try:
@@ -403,9 +436,11 @@ class StrafesClient:
                 return [], 0
             else:
                 page_count = int(first_page_res.res.headers["Pagination-Count"])
-                converted_page_count = await self.find_max_pages("rank", params, page_count, 50, page_length)
                 params["page"] = page_count
-                the_res = await self.get_strafes("rank", params)
+                tasks = [self.find_max_pages("rank", params, page_count, 50, page_length), self.get_strafes("rank", params)]
+                results = await asyncio.gather(*tasks)
+                converted_page_count = results[0]
+                the_res = results[1]
                 data = the_res.json
                 page = converted_page_count
         ls = []

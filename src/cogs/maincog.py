@@ -3,13 +3,13 @@ import asyncio
 import colorsys
 import discord
 from discord.ext.commands.context import Context
+from discord.ext.commands.errors import CommandError
 from dotenv import load_dotenv
 from discord.ext import commands, tasks
 from io import BytesIO, StringIO
 import numpy
 import os
 from PIL import Image
-import sys
 import time
 import traceback
 from typing import Callable, Coroutine, Dict, List, Tuple, Union
@@ -92,11 +92,25 @@ class ComparableUserStyle:
     def __eq__(self, o: object) -> bool:
         return self.user == o.user and self.style == o.style
 
+def before_strafes(max_calls : int):
+    async def before(ctx : Context):
+        strafes : StrafesClient = ctx.cog.strafes
+        remaining, reset = await strafes.get_ratelimit_info()
+        if remaining - max_calls < 25:
+            if reset != 1:
+                msg = f"Please wait at least {reset} seconds before using this command."
+            else:
+                msg = "Please wait at least 1 second before using this command."
+            await ctx.send(utils.fmt_md_code(msg))
+            return False
+        return True
+    return commands.check(before)
+
 # TODO: why do i have one cog for everything
 class MainCog(commands.Cog):
 
     def __init__(self, bot):
-        self.bot:commands.Bot = bot
+        self.bot : commands.Bot = bot
         self.bot.remove_command("help")
         self.strafes : StrafesClient = None
         self.maps_started = False
@@ -107,9 +121,9 @@ class MainCog(commands.Cog):
         load_dotenv()
         self.strafes = StrafesClient(os.getenv("API_KEY"))
         print("Loading maps")
-        start = time.time()
+        start = time.monotonic()
         await self.strafes.load_maps()
-        end = time.time()
+        end = time.monotonic()
         print(f"Done loading maps ({end-start:.3f}s)")
         self.update_maps.start()
         self.global_announcements.start()
@@ -220,7 +234,19 @@ class MainCog(commands.Cog):
         #we have to wait for the bot to on_ready() or we won't be able to find channels/guilds
         await self.bot.wait_until_ready()
 
+    # def strafes_command(self, expected_calls):
+    #     def decorator_strafes_command(func):
+    #         def wrapper(func):
+    #             @functools.wraps(func)
+    #             async def wrapped(*args, **kwargs):
+                    
+    #                 return await func(*args, **kwargs)
+    #             return wrapped
+    #         return wrapper
+    #     return decorator_strafes_command
+
     @commands.command(name="recentwrs")
+    @before_strafes(1)
     async def get_recent_wrs(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -241,6 +267,7 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="pb", aliases=["record"])
+    @before_strafes(5)
     async def get_user_pb(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
@@ -270,6 +297,7 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="wrmap")
+    @before_strafes(6)
     async def get_wrmap(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
@@ -300,8 +328,9 @@ class MainCog(commands.Cog):
                 ).build()
                 await ctx.send(utils.fmt_md_code(msg))
 
-    @commands.cooldown(6, 60, commands.cooldowns.BucketType.guild)
+    @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
     @commands.command(name="wrlist")
+    @before_strafes(14)
     async def wr_list(self, ctx:Context, *args):
         valid_sorts = ["date", "time", "name"]
         sort = ""
@@ -419,8 +448,9 @@ class MainCog(commands.Cog):
         embed.add_field(name="Server Load Count", value=map.playcount)
         await ctx.send(embed=embed)
 
-    @commands.cooldown(6, 60, commands.cooldowns.BucketType.guild)
+    @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
     @commands.command(name="wrcount")
+    @before_strafes(14)
     async def wr_count(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.user.make_required()
@@ -475,6 +505,7 @@ class MainCog(commands.Cog):
             await ctx.send(embed=embed)
 
     @commands.command(name="profile")
+    @before_strafes(4)
     async def user_rank(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -504,6 +535,7 @@ class MainCog(commands.Cog):
                 await ctx.send(embed= await self.make_user_embed(user, rank_data, game, style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
+    @before_strafes(4)
     async def ranks(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -531,6 +563,7 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(msg))
     
     @commands.command(name="times")
+    @before_strafes(20)
     async def times(self, ctx:Context, *args):
         valid_sorts = ["date", "time", "name"]
         sort = ""
@@ -628,7 +661,11 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="compare")
+    @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
+    @before_strafes(22)
     async def compare(self, ctx:Context, *args):
+        remaining, _ = await self.strafes.get_ratelimit_info()
+        print(f"remaining before: {remaining}")
         game : Game = None
         txt : bool = False
         styles : List[Style] = []
@@ -814,6 +851,9 @@ class MainCog(commands.Cog):
                         fname += f"_{styles[0]}"
                     fname += ".txt"
                     await ctx.send(file=discord.File(f, filename=fname))
+        
+        remaining, _ = await self.strafes.get_ratelimit_info()
+        print(f"remaining after: {remaining}")
     
     def compare_formatter(self, record: Record) -> str:
         diff = (record.previous_record.time.millis - record.time.millis) / 1000.0
@@ -823,6 +863,7 @@ class MainCog(commands.Cog):
         return comparables[ComparableUserStyle(record.user, record.style)]
 
     @commands.command(name="mapstatus")
+    @before_strafes(4)
     async def map_status(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()

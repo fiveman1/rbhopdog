@@ -3,6 +3,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from discord.ext.commands.context import Context
+from discord.ext.commands.errors import CheckFailure
 from dotenv import load_dotenv
 import os
 import traceback
@@ -18,7 +19,7 @@ class StrafesBot(commands.Bot):
         await self.change_presence(status=discord.Status.online, activity=discord.Game(name=f"{self.command_prefix}help"))
 
     async def on_command_error(self, ctx : Context, error : Exception):
-        ignored = (discord.Forbidden, commands.CommandNotFound)
+        ignored = (discord.Forbidden, commands.CommandNotFound, CheckFailure)
         if isinstance(error, ignored):
             return
         if isinstance(error, commands.BadArgument):
