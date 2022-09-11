@@ -141,8 +141,8 @@ class MainCog(commands.Cog):
         await self.strafes.load_maps()
         end = time.monotonic()
         print(f"Done loading maps ({end-start:.3f}s)")
-        # self.update_maps.start()
-        # self.global_announcements.start()
+        self.update_maps.start()
+        self.global_announcements.start()
         print("Maincog loaded")
     
     async def cog_unload(self):
