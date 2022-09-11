@@ -12,7 +12,7 @@ from modules.utils import Incrementer, fix_path, open_json
 
 class APIError(Exception):
 
-    def __init__(self, url, headers, params, status, body, api_name, msg="", res=None):
+    def __init__(self, url, headers, params, status, body, api_name, msg="", res : aiohttp.ClientResponse = None):
         if not msg:
             msg = f"An error occurred attempting to use the {api_name} API."
         super().__init__(msg)
@@ -21,9 +21,9 @@ class APIError(Exception):
         self.params = params
         self.status = status
         self.body = body
-        self.res : aiohttp.ClientResponse = res
+        self.res = res
     
-    def create_debug_message(self):
+    def create_debug_message(self) -> str:
         s = ["API error debug:", str(self.__class__), f"URL: {self.url}", f"Headers: {self.headers}", f"Params: {self.params}", f"Status: {self.status}", f"Body: {self.body}"]
         return "\n".join(s)
 
@@ -42,8 +42,9 @@ class RateLimitError(APIError):
 
 class NotFoundError(Exception):
 
-    def __init__(self):
+    def __init__(self, res : aiohttp.ClientResponse = None):
         super().__init__("404 Not Found")
+        self.res : aiohttp.ClientResponse = res
 
 class MapsNotLoadedError(Exception):
 
@@ -51,7 +52,7 @@ class MapsNotLoadedError(Exception):
         super().__init__("Tried to access maps before loading them! Call await client.load_maps() first!")
 
 class JSONRes:
-    def __init__(self, res : aiohttp.ClientResponse, json : Dict):
+    def __init__(self, res : aiohttp.ClientResponse, json : Dict[str, Any]):
         self.res = res
         self.json = json
 
@@ -79,7 +80,7 @@ class StrafesClient:
             async with self._session.get(url, headers=headers, params=params) as res:
                 err = None
                 if res.status == 404:
-                    raise NotFoundError()
+                    raise NotFoundError(res)
                 elif res.status == 429:
                     err = RateLimitError
                 elif res.status < 200 or res.status >= 300:
@@ -137,16 +138,8 @@ class StrafesClient:
         except asyncio.TimeoutError:
             raise TimeoutError(self._session.timeout.total, url, {}, {}, None, f"Timeout occurred attempting to download {url}")
 
-    async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
-        try:
-            reset = None
-            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._api_key})
-        except APIError as err:
-            reset = int(err.res.headers["RateLimit-Reset"])
-            raise
-        finally:
-            if not reset:
-                reset = int(data.res.headers["RateLimit-Reset"])
+    async def update_ratelimit_info(self, res : aiohttp.ClientResponse):
+            reset = int(res.headers["RateLimit-Reset"])
             now = datetime.datetime.now()
             async with self._ratelimit_lock:
                 if self._last_strafes_response is None or int((now - self._last_strafes_response).total_seconds()) > self._ratelimit_reset:
@@ -155,6 +148,17 @@ class StrafesClient:
                     self._ratelimit_remaining = max(0, self._ratelimit_remaining - 1)
                 self._ratelimit_reset = reset
                 self._last_strafes_response = now
+
+    async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
+        try:
+            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._api_key})
+            await self.update_ratelimit_info(data.res)
+        except APIError as err:
+            await self.update_ratelimit_info(err.res)
+            raise
+        except NotFoundError as err:
+            await self.update_ratelimit_info(err.res)
+            raise
         return data
 
     async def get_strafes(self, end_of_url, params={}) -> JSONRes:
