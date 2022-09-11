@@ -96,7 +96,7 @@ def before_strafes(max_calls : int):
     async def before(ctx : Context):
         strafes : StrafesClient = ctx.cog.strafes
         remaining, reset = await strafes.get_ratelimit_info()
-        if remaining - max_calls < 25:
+        if remaining - max_calls < 10:
             if reset != 1:
                 msg = f"Please wait at least {reset} seconds before using this command."
             else:
