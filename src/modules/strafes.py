@@ -78,8 +78,6 @@ class StrafesClient:
         try:
             async with self._session.get(url, headers=headers, params=params) as res:
                 err = None
-                if "rank" in url:
-                    err = RateLimitError
                 if res.status == 404:
                     raise NotFoundError()
                 elif res.status == 429:
