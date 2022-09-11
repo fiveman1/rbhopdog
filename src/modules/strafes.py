@@ -12,7 +12,7 @@ from modules.utils import Incrementer, fix_path, open_json
 
 class APIError(Exception):
 
-    def __init__(self, url, headers, params, status, body, api_name, msg=""):
+    def __init__(self, url, headers, params, status, body, api_name, msg="", res=None):
         if not msg:
             msg = f"An error occurred attempting to use the {api_name} API."
         super().__init__(msg)
@@ -21,6 +21,7 @@ class APIError(Exception):
         self.params = params
         self.status = status
         self.body = body
+        self.res : aiohttp.ClientResponse = res
     
     def create_debug_message(self):
         s = ["API error debug:", str(self.__class__), f"URL: {self.url}", f"Headers: {self.headers}", f"Params: {self.params}", f"Status: {self.status}", f"Body: {self.body}"]
@@ -31,6 +32,13 @@ class TimeoutError(APIError):
         if not msg:
             msg = f"A timeout occurred attempting to use the {api_name} API after {timeout} seconds."
         super().__init__(url, headers, params, "n/a", "n/a", api_name, msg)
+
+class RateLimitError(APIError):
+
+    def __init__(self, url, headers, params, status, body, api_name, msg="", res=None):
+        if not msg:
+            msg = f"Rate limit exceeded using the {api_name} API, please wait."
+        super().__init__(url, headers, params, status, body, api_name, msg, res)
 
 class NotFoundError(Exception):
 
@@ -49,52 +57,76 @@ class JSONRes:
 
 class StrafesClient:
     def __init__(self, api_key):
-        self.api_key = api_key
-        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
-        self.bhop_map_pairs : List[Tuple[str, Map]] = []
-        self.surf_map_pairs : List[Tuple[str, Map]] = []
-        self.bhop_map_count : int = 0
-        self.surf_map_count : int = 0
-        # hash table for id -> displayname because each id is unique
-        self.map_lookup : Dict[int, Map] = {}
-        self.maps_loaded : bool = False
-        self.map_lock = RWLock()
+        self._api_key = api_key
+        self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+        self._bhop_map_pairs : List[Tuple[str, Map]] = []
+        self._surf_map_pairs : List[Tuple[str, Map]] = []
+        self._bhop_map_count : int = 0
+        self._surf_map_count : int = 0
+        self._map_lookup : Dict[int, Map] = {}
+        self._maps_loaded : bool = False
+        self._map_lock = RWLock()
         self._ratelimit_lock = asyncio.Lock()
         self._ratelimit_remaining : int = 100
         self._ratelimit_reset : int = 60
         self._last_strafes_response : datetime.datetime = None
 
     async def close(self):
-        await self.session.close()
+        await self._session.close()
 
     async def get_request(self, url : str, api_name : str, params={}, headers={}) -> JSONRes:
         try:
-            async with self.session.get(url, headers=headers, params=params) as res:
+            async with self._session.get(url, headers=headers, params=params) as res:
+                err = None
+                if "rank" in url:
+                    err = RateLimitError
                 if res.status == 404:
                     raise NotFoundError()
                 elif res.status == 429:
-                    try:
-                        body = await res.text()
-                    except:
-                        body = "n/a"
-                    raise APIError(url, headers, params, res.status, body, api_name, f"Rate limit exceeded using the {api_name} API")
+                    err = RateLimitError
                 elif res.status < 200 or res.status >= 300:
+                    err = APIError
+                if err is not None:
                     try:
                         body = await res.text()
                     except:
                         body = "n/a"
-                    raise APIError(url, headers, params, res.status, body, api_name)
+                    raise err(url, headers, params, res.status, body, api_name, res=res)
                 try:
                     json = await res.json()
                     return JSONRes(res, json)
                 except aiohttp.ContentTypeError:
                     raise APIError(url, headers, params, res.status, await res.text(), api_name)
         except asyncio.TimeoutError:
-            raise TimeoutError(self.session.timeout.total, url, headers, params, api_name)
+            raise TimeoutError(self._session.timeout.total, url, headers, params, api_name)
 
     async def post_request(self, url, api_name, data={}, headers={}) -> JSONRes:
         try:
-            async with self.session.post(url, headers=headers, data=data) as res:
+            async with self._session.post(url, headers=headers, data=data) as res:
+                err = None
+                if res.status == 404:
+                    raise NotFoundError()
+                elif res.status == 429:
+                    err = RateLimitError
+                elif res.status < 200 or res.status >= 300:
+                    err = APIError
+                if err is not None:
+                    try:
+                        body = await res.text()
+                    except:
+                        body = "n/a"
+                    raise err(url, headers, data, res.status, body, api_name, res=res)
+                try:
+                    json = await res.json()
+                    return JSONRes(res, json)
+                except aiohttp.ContentTypeError:
+                    raise APIError(url, headers, data, res.status, await res.text(), api_name)
+        except asyncio.TimeoutError:
+            raise TimeoutError(self._session.timeout.total, url, headers, data, api_name)
+
+    async def get_bytes(self, url):
+        try:
+            async with self._session.get(url) as res:
                 if res.status == 404:
                     raise NotFoundError()
                 elif res.status < 200 or res.status >= 300:
@@ -102,26 +134,38 @@ class StrafesClient:
                         body = await res.text()
                     except:
                         body = "n/a"
-                    raise APIError(url, headers, data, res.status, body, api_name)
-                try:
-                    json = await res.json()
-                    return JSONRes(res, json)
-                except aiohttp.ContentTypeError:
-                    raise APIError(url, headers, data, res.status, await res.text(), api_name)
+                    raise APIError(url, {}, {}, res.status, body, None, f"Error occurred attempting to download {url}")
+                return await res.read()
         except asyncio.TimeoutError:
-            raise TimeoutError(self.session.timeout.total, url, headers, data, api_name)
+            raise TimeoutError(self._session.timeout.total, url, {}, {}, None, f"Timeout occurred attempting to download {url}")
+
+    async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
+        try:
+            reset = None
+            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._api_key})
+        except APIError as err:
+            reset = int(err.res.headers["RateLimit-Reset"])
+            raise
+        finally:
+            if not reset:
+                reset = int(data.res.headers["RateLimit-Reset"])
+            now = datetime.datetime.now()
+            async with self._ratelimit_lock:
+                if self._last_strafes_response is None or int((now - self._last_strafes_response).total_seconds()) > self._ratelimit_reset:
+                    self._ratelimit_remaining = 99
+                else:
+                    self._ratelimit_remaining = max(0, self._ratelimit_remaining - 1)
+                self._ratelimit_reset = reset
+                self._last_strafes_response = now
+        return data
 
     async def get_strafes(self, end_of_url, params={}) -> JSONRes:
-        data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self.api_key})
-        reset = int(data.res.headers["RateLimit-Reset"])
-        now = datetime.datetime.now()
-        async with self._ratelimit_lock:
-            if self._last_strafes_response is None or int((now - self._last_strafes_response).total_seconds()) > self._ratelimit_reset:
-                self._ratelimit_remaining = 99
-            else:
-                self._ratelimit_remaining -= 1
-            self._ratelimit_reset = reset
-            self._last_strafes_response = now
+        try:
+            data = await self._get_strafes(end_of_url, params)
+        except RateLimitError as err:
+            async with self._ratelimit_lock:
+                reset = self._ratelimit_reset
+            raise RateLimitError(err.url, err.headers, err.params, err.status, err.body, "strafes.net", f"Rate limit exceeded using the strafes.net API, please wait {reset} seconds.")
         return data
 
     async def get_ratelimit_info(self) -> Tuple[int, int]:
@@ -135,21 +179,6 @@ class StrafesClient:
                 self._ratelimit_reset = 60
                 self._last_strafes_response = now
             return self._ratelimit_remaining, self._ratelimit_reset - diff
-
-    async def get_bytes(self, url):
-        try:
-            async with self.session.get(url) as res:
-                if res.status == 404:
-                    raise NotFoundError()
-                elif res.status < 200 or res.status >= 300:
-                    try:
-                        body = await res.text()
-                    except:
-                        body = "n/a"
-                    raise APIError(url, {}, {}, res.status, body, None, f"Error occurred attempting to download {url}")
-                return await res.read()
-        except asyncio.TimeoutError:
-            raise TimeoutError(self.session.timeout.total, url, {}, {}, None, f"Timeout occurred attempting to download {url}")
 
     async def _map_mapper(self, game : Game, page : int):
         res = self.get_strafes("map", {
@@ -188,26 +217,26 @@ class StrafesClient:
             elif game == Game.SURF:
                 surf_maps += res.json
         
-        async with self.map_lock.writer_lock:
-            self.bhop_map_count = len(bhop_maps)
-            self.surf_map_count = len(surf_maps)
+        async with self._map_lock.writer_lock:
+            self._bhop_map_count = len(bhop_maps)
+            self._surf_map_count = len(surf_maps)
 
-            self.bhop_map_pairs.clear()
-            self.surf_map_pairs.clear()
-            self.map_lookup.clear()
+            self._bhop_map_pairs.clear()
+            self._surf_map_pairs.clear()
+            self._map_lookup.clear()
 
             for m in bhop_maps:
                 map = Map.from_dict(m)
-                self.bhop_map_pairs.append((map.displayname.lower(), map))
-                self.map_lookup[map.id] = map
-            self.bhop_map_pairs.sort(key=lambda i: i[0])
+                self._bhop_map_pairs.append((map.displayname.lower(), map))
+                self._map_lookup[map.id] = map
+            self._bhop_map_pairs.sort(key=lambda i: i[0])
 
             for m in surf_maps:
                 map = Map.from_dict(m)
-                self.surf_map_pairs.append((map.displayname.lower(), map))
-                self.map_lookup[map.id] = map
-            self.surf_map_pairs.sort(key=lambda i: i[0])
-            self.maps_loaded = True
+                self._surf_map_pairs.append((map.displayname.lower(), map))
+                self._map_lookup[map.id] = map
+            self._surf_map_pairs.sort(key=lambda i: i[0])
+            self._maps_loaded = True
 
     # ls should be sorted
     # performs an iterative binary search
@@ -257,58 +286,58 @@ class StrafesClient:
             return the_map
 
     async def map_from_name(self, map_name : str, game : Optional[Game]) -> Optional[Map]:
-        async with self.map_lock.reader_lock:
-            if not self.maps_loaded:
+        async with self._map_lock.reader_lock:
+            if not self._maps_loaded:
                 raise MapsNotLoadedError()
             if game == Game.BHOP:
-                return self._map_from_name(map_name, self.bhop_map_pairs)
+                return self._map_from_name(map_name, self._bhop_map_pairs)
             elif game == Game.SURF:
-                return self._map_from_name(map_name, self.surf_map_pairs)
+                return self._map_from_name(map_name, self._surf_map_pairs)
             elif game is None:
-                res = self._map_from_name(map_name, self.bhop_map_pairs)
+                res = self._map_from_name(map_name, self._bhop_map_pairs)
                 if res is None:
-                    res = self._map_from_name(map_name, self.surf_map_pairs)
+                    res = self._map_from_name(map_name, self._surf_map_pairs)
                 return res
             return None
 
     async def map_from_id(self, map_id:int) -> Map:
-        async with self.map_lock.reader_lock:
-            if not self.maps_loaded:
+        async with self._map_lock.reader_lock:
+            if not self._maps_loaded:
                 raise MapsNotLoadedError()
             try:
-                return self.map_lookup[map_id]
+                return self._map_lookup[map_id]
             except KeyError:
                 return Map(-1, "Missing map", "", Game.BHOP, -1, -1)
 
     async def get_map_count(self, game : Game) -> int:
-        async with self.map_lock.reader_lock:
-            if not self.maps_loaded:
+        async with self._map_lock.reader_lock:
+            if not self._maps_loaded:
                 raise MapsNotLoadedError()
             if game == Game.BHOP:
-                return self.bhop_map_count
+                return self._bhop_map_count
             elif game == Game.SURF:
-                return self.surf_map_count
+                return self._surf_map_count
             else:
                 return 1
 
     async def get_maps_by_creator(self, creator : Optional[str]) -> List[Map]:
-        async with self.map_lock.reader_lock:
-            if not self.maps_loaded:
+        async with self._map_lock.reader_lock:
+            if not self._maps_loaded:
                 raise MapsNotLoadedError()
             if not creator:
-                return list(self.map_lookup.values())
+                return list(self._map_lookup.values())
             creator = creator.lower()
             matches = []
-            for map in self.map_lookup.values():
+            for map in self._map_lookup.values():
                 if creator in map.creator.lower():
                     matches.append(map)
             return matches
 
     async def get_all_maps(self) -> List[Map]:
-         async with self.map_lock.reader_lock:
-            if not self.maps_loaded:
+         async with self._map_lock.reader_lock:
+            if not self._maps_loaded:
                 raise MapsNotLoadedError()
-            return list(self.map_lookup.values())
+            return list(self._map_lookup.values())
 
     @cached(ttl=60*60)
     async def get_user_data(self, user : Union[str, int]) -> User:

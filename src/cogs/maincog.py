@@ -3,7 +3,7 @@ import asyncio
 import colorsys
 import discord
 from discord.ext.commands.context import Context
-from discord.ext.commands.errors import CommandError
+from discord.ext.commands import Command
 from dotenv import load_dotenv
 from discord.ext import commands, tasks
 from io import BytesIO, StringIO
@@ -92,18 +92,31 @@ class ComparableUserStyle:
     def __eq__(self, o: object) -> bool:
         return self.user == o.user and self.style == o.style
 
-def before_strafes(max_calls : int):
+def before_strafes(max_allowed_per_user=1, max_allowed_global=8):
     async def before(ctx : Context):
-        strafes : StrafesClient = ctx.cog.strafes
-        remaining, reset = await strafes.get_ratelimit_info()
-        if remaining - max_calls < 10:
-            if reset != 1:
-                msg = f"Please wait at least {reset} seconds before using this command."
+        cog : "MainCog" = ctx.cog
+        user = ctx.author.id
+        success = True
+        reason = ""
+        async with cog.lock:
+            if cog.active_command_count >= max_allowed_global:
+                success = False
+                reason = "There are too many pending commands, wait for one to finish before you can use another command."
             else:
-                msg = "Please wait at least 1 second before using this command."
-            await ctx.send(utils.fmt_md_code(msg))
-            return False
-        return True
+                if user in cog.active_commands:
+                    if cog.active_commands[user] >= max_allowed_per_user:
+                        success = False
+                        reason = "You have too many active commands! You must wait for them to finish before you can use another command."
+                    else:
+                        cog.active_commands[user] += 1
+                        cog.active_command_count += 1
+                else:
+                    cog.active_commands[user] = 1
+                    cog.active_command_count += 1
+        if not success:
+            await ctx.send(utils.fmt_md_code(reason))
+        ctx.reset_strafes = success
+        return success
     return commands.check(before)
 
 # TODO: why do i have one cog for everything
@@ -115,6 +128,9 @@ class MainCog(commands.Cog):
         self.strafes : StrafesClient = None
         self.maps_started = False
         self.globals_started = False
+        self.lock = asyncio.Lock()
+        self.active_commands : Dict[int, int] = {}
+        self.active_command_count : int = 0
 
     async def cog_load(self):
         print("Loading maincog")
@@ -125,8 +141,8 @@ class MainCog(commands.Cog):
         await self.strafes.load_maps()
         end = time.monotonic()
         print(f"Done loading maps ({end-start:.3f}s)")
-        self.update_maps.start()
-        self.global_announcements.start()
+        # self.update_maps.start()
+        # self.global_announcements.start()
         print("Maincog loaded")
     
     async def cog_unload(self):
@@ -234,19 +250,18 @@ class MainCog(commands.Cog):
         #we have to wait for the bot to on_ready() or we won't be able to find channels/guilds
         await self.bot.wait_until_ready()
 
-    # def strafes_command(self, expected_calls):
-    #     def decorator_strafes_command(func):
-    #         def wrapper(func):
-    #             @functools.wraps(func)
-    #             async def wrapped(*args, **kwargs):
-                    
-    #                 return await func(*args, **kwargs)
-    #             return wrapped
-    #         return wrapper
-    #     return decorator_strafes_command
+    async def cog_after_invoke(self, ctx : Context):
+        try:
+            if ctx.reset_strafes:
+                user = ctx.author.id
+                async with self.lock:
+                    self.active_commands[user] -= 1
+                    self.active_command_count -= 1
+        except AttributeError:
+            pass
 
     @commands.command(name="recentwrs")
-    @before_strafes(1)
+    @before_strafes()
     async def get_recent_wrs(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -267,7 +282,7 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="pb", aliases=["record"])
-    @before_strafes(5)
+    @before_strafes()
     async def get_user_pb(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
@@ -297,7 +312,7 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="wrmap")
-    @before_strafes(6)
+    @before_strafes()
     async def get_wrmap(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
@@ -328,9 +343,8 @@ class MainCog(commands.Cog):
                 ).build()
                 await ctx.send(utils.fmt_md_code(msg))
 
-    @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
     @commands.command(name="wrlist")
-    @before_strafes(14)
+    @before_strafes()
     async def wr_list(self, ctx:Context, *args):
         valid_sorts = ["date", "time", "name"]
         sort = ""
@@ -448,9 +462,8 @@ class MainCog(commands.Cog):
         embed.add_field(name="Server Load Count", value=map.playcount)
         await ctx.send(embed=embed)
 
-    @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
     @commands.command(name="wrcount")
-    @before_strafes(14)
+    @before_strafes()
     async def wr_count(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.user.make_required()
@@ -505,7 +518,7 @@ class MainCog(commands.Cog):
             await ctx.send(embed=embed)
 
     @commands.command(name="profile")
-    @before_strafes(4)
+    @before_strafes()
     async def user_rank(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -535,7 +548,7 @@ class MainCog(commands.Cog):
                 await ctx.send(embed= await self.make_user_embed(user, rank_data, game, style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
-    @before_strafes(4)
+    @before_strafes()
     async def ranks(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -563,7 +576,7 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(msg))
     
     @commands.command(name="times")
-    @before_strafes(20)
+    @before_strafes()
     async def times(self, ctx:Context, *args):
         valid_sorts = ["date", "time", "name"]
         sort = ""
@@ -661,8 +674,7 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="compare")
-    @commands.cooldown(1, 3, commands.cooldowns.BucketType.user)
-    @before_strafes(22)
+    @before_strafes()
     async def compare(self, ctx:Context, *args):
         game : Game = None
         txt : bool = False
@@ -858,7 +870,7 @@ class MainCog(commands.Cog):
         return comparables[ComparableUserStyle(record.user, record.style)]
 
     @commands.command(name="mapstatus")
-    @before_strafes(4)
+    @before_strafes()
     async def map_status(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()

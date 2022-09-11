@@ -52,13 +52,14 @@ class StrafesBot(commands.Bot):
                 except discord.errors.HTTPException:
                     pass
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        args = " ".join([str(arg) for arg in ctx.args[2:]])
         await tb_channel.send(
-                f"An error occured while executing `{''.join(ctx.prefix)}{ctx.command}` command by "
+                f"An error occured while executing `{ctx.bot.command_prefix}{ctx.invoked_with} {args}` command by "
                 f"{ctx.author.name}#{ctx.author.discriminator}@{ctx.guild.name} in {ctx.channel.mention}."
                 f"\n> {ctx.message.jump_url}\n"
             )
         for msg in utils.page_messages(f"{type(error).__name__}: {error}\n" + tb):
-            await tb_channel.send(utils.fmt_md_code(f"\n{msg}\n"))
+            await tb_channel.send(utils.fmt_md_code(msg))
 
 async def main():
 
