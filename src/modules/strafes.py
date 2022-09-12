@@ -153,6 +153,8 @@ class StrafesClient:
         try:
             data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._api_key})
             await self.update_ratelimit_info(data.res)
+        except TimeoutError:
+            raise
         except APIError as err:
             await self.update_ratelimit_info(err.res)
             raise
