@@ -5,6 +5,7 @@ from aiorwlock import RWLock
 import asyncio
 import json
 import random
+import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from modules.strafes_base import *
@@ -70,7 +71,7 @@ class StrafesClient:
         self._ratelimit_lock = asyncio.Lock()
         self._ratelimit_remaining : int = 100
         self._ratelimit_reset : int = 60
-        self._last_strafes_response : datetime.datetime = None
+        self._last_strafes_response : float = None
 
     async def close(self):
         await self._session.close()
@@ -139,15 +140,15 @@ class StrafesClient:
             raise TimeoutError(self._session.timeout.total, url, {}, {}, None, f"Timeout occurred attempting to download {url}")
 
     async def update_ratelimit_info(self, res : aiohttp.ClientResponse):
-            reset = int(res.headers["RateLimit-Reset"])
-            now = datetime.datetime.now()
-            async with self._ratelimit_lock:
-                if self._last_strafes_response is None or int((now - self._last_strafes_response).total_seconds()) > self._ratelimit_reset:
-                    self._ratelimit_remaining = 99
-                else:
-                    self._ratelimit_remaining = max(0, self._ratelimit_remaining - 1)
-                self._ratelimit_reset = reset
-                self._last_strafes_response = now
+        reset = int(res.headers["RateLimit-Reset"])
+        now = time.monotonic()
+        async with self._ratelimit_lock:
+            if self._last_strafes_response is None or now - self._last_strafes_response > self._ratelimit_reset:
+                self._ratelimit_remaining = 99
+            else:
+                self._ratelimit_remaining = max(0, self._ratelimit_remaining - 1)
+            self._ratelimit_reset = reset
+            self._last_strafes_response = now
 
     async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
         try:
@@ -173,16 +174,16 @@ class StrafesClient:
         return data
 
     async def get_ratelimit_info(self) -> Tuple[int, int]:
-        now = datetime.datetime.now()
+        now = time.monotonic()
         async with self._ratelimit_lock:
             if self._last_strafes_response is None:
                 return self._ratelimit_remaining, self._ratelimit_reset
-            diff = int((now - self._last_strafes_response).total_seconds())
+            diff = now - self._last_strafes_response
             if diff > self._ratelimit_reset:
                 self._ratelimit_remaining = 100
                 self._ratelimit_reset = 60
                 self._last_strafes_response = now
-            return self._ratelimit_remaining, self._ratelimit_reset - diff
+            return self._ratelimit_remaining, self._ratelimit_reset - int(diff)
 
     async def _map_mapper(self, game : Game, page : int):
         res = self.get_strafes("map", {

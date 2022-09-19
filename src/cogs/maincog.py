@@ -92,29 +92,45 @@ class ComparableUserStyle:
     def __eq__(self, o: object) -> bool:
         return self.user == o.user and self.style == o.style
 
-def before_strafes(max_allowed_per_user=1, max_allowed_global=8):
+class UserActiveCommandManager:
+
+    def __init__(self):
+        self.active : int = 0
+        self.last_active : float = None
+
+    def try_use_command(self, max_active=1, timeout=30.0) -> bool:
+        now = time.monotonic()
+        if self.active >= max_active:
+            if now - self.last_active > timeout:
+                self.complete_command()
+                self.last_active = now
+                return True
+            else:
+                return False
+        else:
+            self.active += 1
+            self.last_active = now
+            return True
+
+    def complete_command(self):
+        self.active -= 1
+        if self.active < 0:
+            self.active = 0
+
+def before_strafes(max_allowed_per_user=1):
     async def before(ctx : Context):
         cog : "MainCog" = ctx.cog
         user = ctx.author.id
         success = True
-        reason = ""
         async with cog.lock:
-            if cog.active_command_count >= max_allowed_global:
-                success = False
-                reason = "There are too many pending commands, wait for one to finish before you can use another command."
+            if user in cog.active_commands:
+                success = cog.active_commands[user].try_use_command(max_allowed_per_user)
             else:
-                if user in cog.active_commands:
-                    if cog.active_commands[user] >= max_allowed_per_user:
-                        success = False
-                        reason = "You have too many active commands! You must wait for them to finish before you can use another command."
-                    else:
-                        cog.active_commands[user] += 1
-                        cog.active_command_count += 1
-                else:
-                    cog.active_commands[user] = 1
-                    cog.active_command_count += 1
+                manager = UserActiveCommandManager()
+                manager.try_use_command()
+                cog.active_commands[user] = manager
         if not success:
-            await ctx.send(utils.fmt_md_code(reason))
+            await ctx.send(utils.fmt_md_code("You have too many active commands! You must wait for them to finish before you can use another command."))
         ctx.reset_strafes = success
         return success
     return commands.check(before)
@@ -129,8 +145,7 @@ class MainCog(commands.Cog):
         self.maps_started = False
         self.globals_started = False
         self.lock = asyncio.Lock()
-        self.active_commands : Dict[int, int] = {}
-        self.active_command_count : int = 0
+        self.active_commands : Dict[int, UserActiveCommandManager] = {}
 
     async def cog_load(self):
         print("Loading maincog")
@@ -255,8 +270,7 @@ class MainCog(commands.Cog):
             if ctx.reset_strafes:
                 user = ctx.author.id
                 async with self.lock:
-                    self.active_commands[user] -= 1
-                    self.active_command_count -= 1
+                    self.active_commands[user].complete_command()
         except AttributeError:
             pass
 
