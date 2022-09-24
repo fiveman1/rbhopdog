@@ -15,7 +15,7 @@ import traceback
 from typing import Callable, Coroutine, Dict, List, Tuple, Union
 
 from modules.strafes_base import *
-from modules.strafes import StrafesClient
+from modules.strafes import APIError, StrafesClient
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
 from modules.arguments import ArgumentValidator
@@ -466,7 +466,7 @@ class MainCog(commands.Cog):
         map : Map = arguments.map.value
         
         embed = discord.Embed(color=0x7c17ff)
-        url = await self.strafes.get_asset_thumbnail(map.id)
+        url = await self.safe_get_asset_thumbnail(map.id)
         if url:
             embed.set_thumbnail(url=url)
         embed.set_footer(text="Map Info")
@@ -506,7 +506,7 @@ class MainCog(commands.Cog):
                     the_dict[game].append((style, wrs))
                     count += wrs
             embed = discord.Embed(color=0xff94b8)
-            url = await self.strafes.get_user_headshot_url(user.id)
+            url = await self.safe_get_user_headshot_url(user.id)
             if url:
                 embed.set_thumbnail(url=url)
             embed.set_footer(text="WR Count")
@@ -789,7 +789,7 @@ class MainCog(commands.Cog):
             file = None
 
             if len(users) == 2:
-                tasks = [self.strafes.get_user_headshot_url(users[0].id), self.strafes.get_user_headshot_url(users[1].id)]
+                tasks = [self.safe_get_user_headshot_url(users[0].id), self.safe_get_user_headshot_url(users[1].id)]
                 urls = await asyncio.gather(*tasks)
                 url1 = urls[0]
                 url2 = urls[1]
@@ -989,7 +989,7 @@ class MainCog(commands.Cog):
                 return
             user : User = arguments.user.value
             embed = discord.Embed(color=0xfcba03)
-            url = await self.strafes.get_user_headshot_url(user.id)
+            url = await self.safe_get_user_headshot_url(user.id)
             if url:
                 embed.set_thumbnail(url=url)
             embed.add_field(name="Username", value=user.username, inline=True)
@@ -1087,7 +1087,7 @@ class MainCog(commands.Cog):
     async def make_global_embed(self, record:Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        url = await self.strafes.get_user_headshot_url(record.user.id)
+        url = await self.safe_get_user_headshot_url(record.user.id)
         if url:
             embed.set_thumbnail(url=url)
         embed.add_field(name="Player", value=record.user.username, inline=True)
@@ -1111,7 +1111,7 @@ class MainCog(commands.Cog):
         else:
             name = user.username
         embed = discord.Embed(title=f"\N{NEWSPAPER}  {name}", color=0x1dbde0)
-        url = await self.strafes.get_user_headshot_url(user.id)
+        url = await self.safe_get_user_headshot_url(user.id)
         if url:
             embed.set_thumbnail(url=url)
         embed.add_field(name="Rank", value=f"{rank_data} ({rank_data.rank})", inline=True)
@@ -1120,6 +1120,18 @@ class MainCog(commands.Cog):
         embed.add_field(name="Info", value=f"**Game:** {game}\n**Style:** {style}\n**WRs:** {wrs}\n**Completion:** {100 * completions / total_maps:.2f}% ({completions}/{total_maps})\n**Moderation status:** {user.state}")
         embed.set_footer(text="User Profile")
         return embed
+
+    async def safe_get_user_headshot_url(self, user_id : int) -> Optional[str]:
+        try:
+            return await self.strafes.get_user_headshot_url(user_id)
+        except APIError:
+            return None
+
+    async def safe_get_asset_thumbnail(self, asset_id : int) -> Optional[str]:
+        try:
+            return await self.strafes.get_asset_thumbnail(asset_id)
+        except APIError:
+            return None
 
 async def setup(bot : commands.Bot):
     await bot.add_cog(MainCog(bot))
