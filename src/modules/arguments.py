@@ -13,6 +13,14 @@ def get_discord_user_id(s : str) -> Optional[str]:
     else:
         return None
 
+def clamp(lo, val, hi):
+    if val <= lo:
+        return lo
+    elif val >= hi:
+        return hi
+    else:
+        return val
+
 class ArgumentValue:
 
     NOT_REQUIRED = 0
@@ -153,7 +161,7 @@ class ArgumentValidator:
             found = False
             len_required = 1 if self.map.is_required() else 0
             if len(args) > len_required and args[-1].isnumeric():
-                self.page.value = max(int(args[-1]), 1)
+                self.page.value = clamp(1, int(args[-1]), 999999)
                 found = True
             if found:
                 del args[-1]
