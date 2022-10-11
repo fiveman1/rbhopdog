@@ -53,11 +53,24 @@ class StrafesBot(commands.Bot):
                     pass
         tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         args = " ".join([str(arg) for arg in ctx.args[2:]])
+        command = f"{ctx.bot.command_prefix}{ctx.invoked_with}"
+        if args:
+            command += f" {args}"
+        author = ctx.author
+        name = f"{author.name}#{author.discriminator}"
         await tb_channel.send(
-                f"An error occured while executing `{ctx.bot.command_prefix}{ctx.invoked_with} {args}` command by "
-                f"{ctx.author.name}#{ctx.author.discriminator}@{ctx.guild.name} in {ctx.channel.mention}."
+                f"An error occured while executing `{command}` command by "
+                f"{name}@{ctx.guild.name} in {ctx.channel.mention}."
                 f"\n> {ctx.message.jump_url}\n"
             )
+
+        embed = discord.Embed(color=discord.Colour.from_rgb(48, 97, 230))
+        embed.set_author(name=name, icon_url=author.avatar.url)
+        embed.description = ctx.message.content
+        date = ctx.message.created_at.strftime("%B %d, %Y %-I:%M %p")
+        embed.set_footer(text=f"#{ctx.message.channel.name} ({ctx.guild.name}) | {date}")
+        await tb_channel.send(embed=embed)
+
         for msg in utils.page_messages(f"{type(error).__name__}: {error}\n" + tb):
             await tb_channel.send(utils.fmt_md_code(msg))
 
