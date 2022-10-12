@@ -5,11 +5,11 @@ from modules.strafes import StrafesClient, NotFoundError
 from discord.ext.commands import Bot
 import discord
 
-def get_discord_user_id(s : str) -> Optional[str]:
+def get_discord_user_id(s : str) -> Optional[int]:
     if s[:3] == "<@!" and s[-1] == ">" and s[3:-1].isnumeric():
-        return s[3:-1]
+        return int(s[3:-1])
     elif s[:2] == "<@" and s[-1] == ">" and s[2:-1].isnumeric():
-        return s[2:-1]
+        return int(s[2:-1])
     else:
         return None
 
