@@ -149,7 +149,7 @@ class MainCog(commands.Cog):
 
     async def cog_load(self):
         print("Loading maincog")
-        self.strafes = StrafesClient(self.bot.strafes_key, self.bot.bloxlink_key, self.bot.db_user, self.bot.db_pass)
+        self.strafes = StrafesClient(self.bot.strafes_key, self.bot.db_user, self.bot.db_pass)
         self.verifier = AccountVerifier(self.strafes)
         print("Loading maps")
         start = time.monotonic()

@@ -59,9 +59,8 @@ class JSONRes:
         self.json = json
 
 class StrafesClient:
-    def __init__(self, strafes_key : str, bloxlink_key : str, db_user : str, db_pass : str):
+    def __init__(self, strafes_key : str, db_user : str, db_pass : str):
         self._strafes_key = strafes_key
-        self._bloxlink_key = bloxlink_key
         self._db_user = db_user
         self._db_pass = db_pass
         self._db_pool = None
