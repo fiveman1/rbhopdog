@@ -1,5 +1,5 @@
 # arguments.py
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from modules.strafes_base import Game, Style, User, UserState
 from modules.strafes import StrafesClient, NotFoundError
 from discord.ext.commands import Bot
@@ -65,6 +65,7 @@ class UserValue(ArgumentValue):
         super().__init__()
         self.check_status = True
         self.allow_id = False
+        self.allow_discord = True
 
 class ArgumentValidator:
 
@@ -77,29 +78,28 @@ class ArgumentValidator:
         self.map = ArgumentValue()
         self.page = ArgumentValue()
 
-    async def set_user(self, user, author_id) -> Tuple[bool, str]:
-        if user == "me" or not user:
-            try:
+    async def set_user(self, user : Union[str, int], author_id : int) -> Tuple[bool, str]:
+        if self.user.allow_discord:
+            if user == "me" or not user:
                 user = await self.strafes.get_roblox_user_from_discord(author_id)
-            except NotFoundError:
-                return False, "Invalid username (no Roblox username associated with your Discord account. Visit https://rover.link/login)"
-        elif isinstance(user, str):
-            discord_user_id = get_discord_user_id(user)
-            if discord_user_id:
-                try:
+                if not user:
+                    return False, f"Invalid username (no Roblox account associated with your Discord account). Linking accounts has changed, use {self.bot.command_prefix}link {{username}} to link your account."
+            elif isinstance(user, str):
+                discord_user_id = get_discord_user_id(user)
+                if discord_user_id:
                     roblox_user = await self.strafes.get_roblox_user_from_discord(discord_user_id)
-                except NotFoundError:
-                    err = ""
-                    try:
-                        u = await self.bot.fetch_user(int(discord_user_id))
-                        if u:
-                            err = f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.)"
-                        else:
-                            err = "Invalid username (no user associated with that Discord account.)"
-                    except discord.errors.NotFound:
-                        err = "Invalid discord user ID."
-                    return False, err
-                user = roblox_user
+                    if not roblox_user:
+                        err = ""
+                        try:
+                            u = await self.bot.fetch_user(int(discord_user_id))
+                            if u:
+                                err = f"Invalid username ('{u.name}' does not have a Roblox account associated with their Discord account.) Linking accounts has changed, use {self.bot.command_prefix}help link for more info."
+                            else:
+                                err = "Invalid username (no user associated with that Discord account.)"
+                        except discord.errors.NotFound:
+                            err = "Invalid discord user ID."
+                        return False, err
+                    user = roblox_user
         try:
             self.user.value = await self.strafes.get_user_data(user)
         except NotFoundError:

@@ -155,10 +155,11 @@ class UserState(Enum):
         return self.name
 
 class User:
-    def __init__(self):
-        self.id = -1
-        self.username = ""
-        self.displayname = ""
+    def __init__(self, id : int, username : str, displayname : str, description: Optional[str]):
+        self.id = id
+        self.username = username
+        self.displayname = displayname
+        self.description = description
         self.state = UserState.DEFAULT
 
     def __str__(self):
@@ -171,12 +172,8 @@ class User:
         return self.id == other.id
 
     @staticmethod
-    def from_dict(d) -> "User":
-        user = User()
-        user.id = d["id"]
-        user.username = d["name"]
-        user.displayname = d["displayName"]
-        return user
+    def from_dict(d : Dict[str, Any]) -> "User":
+        return User(d["id"], d["name"], d["displayName"], d.get("description"))
 
 class Rank:
     __ranks__ = ("New","Newb","Bad","Okay","Not Bad","Decent","Getting There","Advanced","Good","Great","Superb","Amazing","Sick","Master","Insane","Majestic","Baby Jesus","Jesus","Half God","God")

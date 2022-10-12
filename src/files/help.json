@@ -7,6 +7,10 @@
         "args": "{users} {game} {styles} OPTIONAL[txt]",
         "blurb": "Compares users times across a game and styles. ex. !compare fiveman1 auto theinos sw bhop txt; !compare mionrs st0tty cowole surf auto"
     },
+    "link": {
+        "args": "OPTIONAL[username]",
+        "blurb": "Link your Roblox account to your Discord account. Include username to link a new account. Then, omit username to verify the account after linking it. Ex: !link fiveman1, !link. Use !unlink to remove a linked account."
+    },
     "map": {
         "args": "{map_name} OPTIONAL[game]",
         "blurb": "Gives info about the given map such as the creator, total play count, and the map's asset ID."
@@ -45,7 +49,7 @@
     },
     "user": {
         "args": "{user}",
-        "blurb": "Gets the username, user ID, and profile picture of a given user. Can be used with discord accounts that have been verified via the RoVer API."
+        "blurb": "Gets the username, user ID, and profile picture of a given user. Works with IDs."
     },
     "wrcount": {
         "args": "{user}",

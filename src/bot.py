@@ -4,8 +4,7 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.context import Context
 from discord.ext.commands.errors import CheckFailure
-from dotenv import load_dotenv
-import os
+import json
 import traceback
 import sys
 
@@ -13,6 +12,13 @@ from modules import utils
 from modules.strafes import APIError
 
 class StrafesBot(commands.Bot):
+
+    def __init__(self, strafes_key : str, bloxlink_key : str, db_user : str, db_pass : str, **kwargs):
+        super().__init__(**kwargs)
+        self.strafes_key = strafes_key
+        self.bloxlink_key = bloxlink_key
+        self.db_user = db_user
+        self.db_pass = db_pass
 
     async def on_ready(self):
         print(f"{self.user} has connected to Discord!")
@@ -64,25 +70,33 @@ class StrafesBot(commands.Bot):
                 f"\n> {ctx.message.jump_url}\n"
             )
 
-        embed = discord.Embed(color=discord.Colour.from_rgb(48, 97, 230))
-        embed.set_author(name=name, icon_url=author.avatar.url)
-        embed.description = ctx.message.content
-        date = ctx.message.created_at.strftime("%B %d, %Y %-I:%M %p")
-        embed.set_footer(text=f"#{ctx.message.channel.name} ({ctx.guild.name}) | {date}")
-        await tb_channel.send(embed=embed)
+        try:
+            embed = discord.Embed(color=discord.Colour.from_rgb(48, 97, 230))
+            embed.set_author(name=name, icon_url=author.avatar.url)
+            embed.description = ctx.message.content
+            date = ctx.message.created_at.strftime("%B %d, %Y %-I:%M %p")
+            embed.set_footer(text=f"#{ctx.message.channel.name} ({ctx.guild.name}) | {date}")
+            await tb_channel.send(embed=embed)
+        except:
+            pass
 
         for msg in utils.page_messages(f"{type(error).__name__}: {error}\n" + tb):
             await tb_channel.send(utils.fmt_md_code(msg))
 
 async def main():
 
-    load_dotenv()
-    TOKEN = os.getenv("DISCORD_TOKEN")
-    COMMAND = os.getenv("COMMAND")
+    with open("config.json") as file:
+        config = json.load(file)
+    TOKEN = config["DISCORD_TOKEN"]
+    COMMAND = config["COMMAND"]
+    STRAFES = config["STRAFES_KEY"]
+    BLOXLINK = config["BLOXLINK_KEY"]
+    SQL_USER = config["SQL_USER"]
+    SQL_PASS = config["SQL_PASS"]
 
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = StrafesBot(command_prefix=COMMAND, intents=intents)
+    bot = StrafesBot(STRAFES, BLOXLINK, SQL_USER, SQL_PASS, command_prefix=COMMAND, intents=intents)
 
     #shamelessly adapted from here
     #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot

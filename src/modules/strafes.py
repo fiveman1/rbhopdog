@@ -1,12 +1,13 @@
 # strafes.py
-from aiocache import cached
+from aiocache import cached, SimpleMemoryCache
 import aiohttp
+import aiomysql
 from aiorwlock import RWLock
 import asyncio
 import json
 import random
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
 from modules.strafes_base import *
 from modules.utils import Incrementer, fix_path, open_json
@@ -58,8 +59,13 @@ class JSONRes:
         self.json = json
 
 class StrafesClient:
-    def __init__(self, api_key):
-        self._api_key = api_key
+    def __init__(self, strafes_key : str, bloxlink_key : str, db_user : str, db_pass : str):
+        self._strafes_key = strafes_key
+        self._bloxlink_key = bloxlink_key
+        self._db_user = db_user
+        self._db_pass = db_pass
+        self._db_pool = None
+        self._db_pool_lock = asyncio.Lock()
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         self._bhop_map_pairs : List[Tuple[str, Map]] = []
         self._surf_map_pairs : List[Tuple[str, Map]] = []
@@ -72,9 +78,24 @@ class StrafesClient:
         self._ratelimit_remaining : int = 100
         self._ratelimit_reset : int = 60
         self._last_strafes_response : float = None
+        self._discord_user_cache = SimpleMemoryCache()
 
     async def close(self):
         await self._session.close()
+        pool = await self.db_pool
+        if pool:
+            pool.close()
+            await pool.wait_closed()
+
+    @property
+    async def db_pool(self) -> aiomysql.Pool:
+        async with self._db_pool_lock:
+            if self._db_pool is None:
+                self._db_pool = await aiomysql.create_pool(
+                        host="127.0.0.1", port=3306, user=self._db_user, 
+                        password=self._db_pass, db="discord_to_roblox", autocommit=True
+                    )
+            return self._db_pool
 
     async def get_request(self, url : str, api_name : str, params={}, headers={}) -> JSONRes:
         try:
@@ -152,7 +173,7 @@ class StrafesClient:
 
     async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
         try:
-            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._api_key})
+            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._strafes_key})
             await self.update_ratelimit_info(data.res)
         except TimeoutError:
             raise
@@ -344,8 +365,7 @@ class StrafesClient:
                 raise MapsNotLoadedError()
             return list(self._map_lookup.values())
 
-    @cached(ttl=60*60)
-    async def get_user_data(self, user : Union[str, int]) -> User:
+    async def get_user_data_no_cache(self, user : Union[str, int]) -> User:
         if type(user) == int:
             res = await self.get_request(f"https://users.roblox.com/v1/users/{user}", "Roblox Users")
             return User.from_dict(res.json)
@@ -355,7 +375,11 @@ class StrafesClient:
             if len(data) > 0:
                 return User.from_dict(data[0])
             else:
-                raise NotFoundError()
+                raise NotFoundError
+
+    @cached(ttl=60*60)
+    async def get_user_data(self, user : Union[str, int]) -> User:
+        return await self.get_user_data_no_cache(user)
 
     async def get_user_data_from_list(self, users : List[int]) -> Dict[int, User]:
         res = await self.post_request("https://users.roblox.com/v1/users", "Roblox Users", {"userIds":users})
@@ -738,11 +762,47 @@ class StrafesClient:
             completions = len(res[1].json) + (page_count - 1) * 200
         return rank, completions
 
-    # this doesn't cache values that return None
-    @cached(ttl=24*60*60)
-    async def get_roblox_user_from_discord(self, discord_user_id : int) -> int:
-        res = await self.get_request(f"https://verify.eryn.io/api/user/{discord_user_id}", "eryn.io")
-        return res.json["robloxId"]
+    async def connect_and_execute(self, callback : Callable[[aiomysql.Cursor], Awaitable[Any]]) -> Any:
+        pool = await self.db_pool
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                return await callback(cur)
+
+    async def add_discord_to_roblox(self, discord_id : int, roblox_id : int) -> bool:
+        if type(discord_id) != int or type(roblox_id) != int:
+            return False
+        async def callback(cur : aiomysql.Cursor):
+            rows = await cur.execute(f"insert into discord_lookup (discord_id, roblox_id) values ({discord_id}, {roblox_id}) on duplicate key update roblox_id={roblox_id}")
+            return rows > 0
+        return await self.connect_and_execute(callback)
+
+    async def remove_discord_to_roblox(self, discord_id : int) -> bool:
+        if type(discord_id) != int:
+            return False
+        async def callback(cur : aiomysql.Cursor):
+            rows = await cur.execute(f"delete from discord_lookup where discord_id={discord_id}")
+            await self._discord_user_cache.delete(discord_id)
+            return rows > 0
+        return await self.connect_and_execute(callback)
+
+    async def get_roblox_from_discord_non_cached(self, discord_id : int) -> Optional[int]:
+        if type(discord_id) != int:
+            return None
+        async def callback(cur : aiomysql.Cursor):
+            rows = await cur.execute(f"select roblox_id from discord_lookup where discord_id={discord_id}")
+            if rows <= 0:
+                return None
+            (roblox_id, ) = await cur.fetchone()
+            await self._discord_user_cache.set(discord_id, roblox_id, ttl=60*60)
+            return roblox_id
+        return await self.connect_and_execute(callback)
+
+    async def get_roblox_user_from_discord(self, discord_id : int) -> Optional[int]:
+        user = await self._discord_user_cache.get(discord_id)
+        if user:
+            return user
+        else:
+            return await self.get_roblox_from_discord_non_cached(discord_id)
 
     @cached(ttl=60*60)
     async def get_user_headshot_url(self, user_id : int) -> str:
