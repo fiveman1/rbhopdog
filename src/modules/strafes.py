@@ -1,16 +1,18 @@
 # strafes.py
 from aiocache import cached, SimpleMemoryCache
 import aiohttp
-import aiomysql
 from aiorwlock import RWLock
 import asyncio
 import json
+from enum import IntEnum
 import random
 import time
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union, TypeVar
 
 from modules.strafes_base import *
-from modules.utils import Incrementer, fix_path, open_json
+from modules.utils import Incrementer, fix_path, open_json, between
+
+T = TypeVar("T")
 
 class APIError(Exception):
 
@@ -54,17 +56,61 @@ class MapsNotLoadedError(Exception):
         super().__init__("Tried to access maps before loading them! Call await client.load_maps() first!")
 
 class JSONRes:
+    
     def __init__(self, res : aiohttp.ClientResponse, json : Dict[str, Any]):
         self.res = res
         self.json = json
 
+class ErrorCode(IntEnum):
+    NONE = 0
+    DEFAULT = 1
+    ALREADY_VERIFIED = 2
+    PHRASE_NOT_FOUND = 3
+    VERIFICATION_NOT_ACTIVE = 4
+
+class VerifyRes:
+
+    def __init__(self, res : aiohttp.ClientResponse, error_code : ErrorCode, messages : List[str], result : Dict[str, Any]):
+        self.res = res
+        self.error_code = error_code
+        self.messages = messages
+        self.result = result
+
+    def __bool__(self) -> bool:
+        return self.error_code.value == ErrorCode.NONE
+
+    @staticmethod
+    async def from_response(res : aiohttp.ClientResponse):
+        data = await res.json()
+        error_code = ErrorCode(data["errorCode"])
+        messages = data["messages"]
+        result = data["result"]
+        return VerifyRes(res, error_code, messages, result)
+
+async def response_handler(res : aiohttp.ClientResponse, url : str, api_name : str, params, headers) -> JSONRes:
+    err = None
+    if res.status == 404:
+        raise NotFoundError(res)
+    elif res.status == 429:
+        err = RateLimitError
+    elif res.status < 200 or res.status >= 300:
+        err = APIError
+    if err is not None:
+        try:
+            body = await res.text()
+        except:
+            body = "n/a"
+        raise err(url, headers, params, res.status, body, api_name, res=res)
+    try:
+        json = await res.json()
+        return JSONRes(res, json)
+    except aiohttp.ContentTypeError:
+        raise APIError(url, headers, params, res.status, await res.text(), api_name)
+
 class StrafesClient:
-    def __init__(self, strafes_key : str, db_user : str, db_pass : str):
-        self._strafes_key = strafes_key
-        self._db_user = db_user
-        self._db_pass = db_pass
-        self._db_pool = None
-        self._db_pool_lock = asyncio.Lock()
+    def __init__(self, strafes_key : str, verify_key : str):
+        self._strafes_headers = {"api-key" : strafes_key}
+        self._verify_headers = {"api-key": verify_key}
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         self._bhop_map_pairs : List[Tuple[str, Map]] = []
         self._surf_map_pairs : List[Tuple[str, Map]] = []
@@ -81,68 +127,30 @@ class StrafesClient:
 
     async def close(self):
         await self._session.close()
-        pool = await self.db_pool
-        if pool:
-            pool.close()
-            await pool.wait_closed()
 
-    @property
-    async def db_pool(self) -> aiomysql.Pool:
-        async with self._db_pool_lock:
-            if self._db_pool is None:
-                self._db_pool = await aiomysql.create_pool(
-                        host="127.0.0.1", port=3306, user=self._db_user, 
-                        password=self._db_pass, db="discord_to_roblox", autocommit=True
-                    )
-            return self._db_pool
-
-    async def get_request(self, url : str, api_name : str, params={}, headers={}) -> JSONRes:
+    async def get_request(self, url : str, api_name : str, params={}, headers={}, 
+            callback : Callable[[aiohttp.ClientResponse, str, str, Any, Any], Awaitable[T]] = response_handler) -> T:
         try:
             async with self._session.get(url, headers=headers, params=params) as res:
-                err = None
-                if res.status == 404:
-                    raise NotFoundError(res)
-                elif res.status == 429:
-                    err = RateLimitError
-                elif res.status < 200 or res.status >= 300:
-                    err = APIError
-                if err is not None:
-                    try:
-                        body = await res.text()
-                    except:
-                        body = "n/a"
-                    raise err(url, headers, params, res.status, body, api_name, res=res)
-                try:
-                    json = await res.json()
-                    return JSONRes(res, json)
-                except aiohttp.ContentTypeError:
-                    raise APIError(url, headers, params, res.status, await res.text(), api_name)
+                return await callback(res, url, api_name, params, headers)
         except asyncio.TimeoutError:
             raise TimeoutError(self._session.timeout.total, url, headers, params, api_name)
 
-    async def post_request(self, url, api_name, data={}, headers={}) -> JSONRes:
+    async def post_request(self, url : str, api_name : str, data={}, headers={}, 
+            callback : Callable[[aiohttp.ClientResponse, str, str, Any, Any], Awaitable[T]] = response_handler) -> T:
         try:
             async with self._session.post(url, headers=headers, data=data) as res:
-                err = None
-                if res.status == 404:
-                    raise NotFoundError()
-                elif res.status == 429:
-                    err = RateLimitError
-                elif res.status < 200 or res.status >= 300:
-                    err = APIError
-                if err is not None:
-                    try:
-                        body = await res.text()
-                    except:
-                        body = "n/a"
-                    raise err(url, headers, data, res.status, body, api_name, res=res)
-                try:
-                    json = await res.json()
-                    return JSONRes(res, json)
-                except aiohttp.ContentTypeError:
-                    raise APIError(url, headers, data, res.status, await res.text(), api_name)
+                return await callback(res, url, api_name, data, headers)
         except asyncio.TimeoutError:
             raise TimeoutError(self._session.timeout.total, url, headers, data, api_name)
+    
+    async def delete_request(self, url : str, api_name : str, headers={}, 
+            callback : Callable[[aiohttp.ClientResponse, str, str, Any, Any], Awaitable[T]] = response_handler) -> T:
+        try:
+            async with self._session.delete(url, headers=headers) as res:
+                return await callback(res, url, api_name, {}, headers)
+        except asyncio.TimeoutError:
+            raise TimeoutError(self._session.timeout.total, url, headers, {}, api_name)
 
     async def get_bytes(self, url):
         try:
@@ -172,7 +180,7 @@ class StrafesClient:
 
     async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
         try:
-            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, {"api-key":self._strafes_key})
+            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, self._strafes_headers)
             await self.update_ratelimit_info(data.res)
         except TimeoutError:
             raise
@@ -761,40 +769,53 @@ class StrafesClient:
             completions = len(res[1].json) + (page_count - 1) * 200
         return rank, completions
 
-    async def connect_and_execute(self, callback : Callable[[aiomysql.Cursor], Awaitable[Any]]) -> Any:
-        pool = await self.db_pool
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                return await callback(cur)
+    async def verify_response_handler(self, res : aiohttp.ClientResponse, url : str, api_name : str, params={}, headers={}) -> VerifyRes:
+        err = None
+        verify_res = None
+        if res.status == 429:
+            err = RateLimitError
+        elif res.status < 200 or between(300, res.status, 399) or res.status >= 500 or res.status == 403:
+            err = APIError
+        elif res.status == 400:
+            verify_res = await VerifyRes.from_response(res)
+            if verify_res.error_code == ErrorCode.DEFAULT:
+                err = APIError
+        if err:
+            try:
+                body = await res.text()
+            except:
+                body = "n/a"
+            raise err(url, headers, params, res.status, body, api_name, res=res)
+        
+        if verify_res is None:
+            verify_res = await VerifyRes.from_response(res)
+        return verify_res
 
-    async def add_discord_to_roblox(self, discord_id : int, roblox_id : int) -> bool:
-        if type(discord_id) != int or type(roblox_id) != int:
-            return False
-        async def callback(cur : aiomysql.Cursor):
-            rows = await cur.execute(f"insert into discord_lookup (discord_id, roblox_id) values ({discord_id}, {roblox_id}) on duplicate key update roblox_id={roblox_id}")
-            return rows > 0
-        return await self.connect_and_execute(callback)
+    async def begin_verify_user(self, discord_id : int, roblox_user : User) -> VerifyRes:
+        return await self.get_request(f"https://api.fiveman1.net/v1/verify/users/{discord_id}", "Verification", params = {"robloxId": roblox_user.id}, 
+            headers=self._verify_headers, callback=self.verify_response_handler)
 
-    async def remove_discord_to_roblox(self, discord_id : int) -> bool:
-        if type(discord_id) != int:
-            return False
-        async def callback(cur : aiomysql.Cursor):
-            rows = await cur.execute(f"delete from discord_lookup where discord_id={discord_id}")
-            await self._discord_user_cache.delete(discord_id)
-            return rows > 0
-        return await self.connect_and_execute(callback)
+    async def try_verify_user(self, discord_id : int) -> VerifyRes:
+        return await self.post_request(f"https://api.fiveman1.net/v1/verify/users/{discord_id}", "Verification", 
+            headers=self._verify_headers, callback=self.verify_response_handler)
+
+    async def remove_discord_to_roblox(self, discord_id : int) -> Optional[User]:
+        res = await self.delete_request(f"https://api.fiveman1.net/v1/verify/users/{discord_id}", "Verification", 
+            headers=self._verify_headers, callback=self.verify_response_handler)
+        if res:
+            await self._discord_user_cache.delete(discord_id) 
+            return User(res.result["robloxId"], res.result["robloxUsername"])
+        else:
+            return None
 
     async def get_roblox_from_discord_non_cached(self, discord_id : int) -> Optional[int]:
-        if type(discord_id) != int:
-            return None
-        async def callback(cur : aiomysql.Cursor):
-            rows = await cur.execute(f"select roblox_id from discord_lookup where discord_id={discord_id}")
-            if rows <= 0:
-                return None
-            (roblox_id, ) = await cur.fetchone()
-            await self._discord_user_cache.set(discord_id, roblox_id, ttl=60*60)
+        res = await self.get_request(f"https://api.fiveman1.net/v1/users/{discord_id}", "Verification", callback=self.verify_response_handler)
+        if res:
+            roblox_id = res.result["robloxId"]
+            await self._discord_user_cache.set(discord_id, roblox_id, ttl=24*60*60)
             return roblox_id
-        return await self.connect_and_execute(callback)
+        else:
+            return None
 
     async def get_roblox_user_from_discord(self, discord_id : int) -> Optional[int]:
         user = await self._discord_user_cache.get(discord_id)

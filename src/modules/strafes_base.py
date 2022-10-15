@@ -155,7 +155,7 @@ class UserState(Enum):
         return self.name
 
 class User:
-    def __init__(self, id : int, username : str, displayname : str, description: Optional[str]):
+    def __init__(self, id : int, username : str, displayname : Optional[str] = None, description: Optional[str] = None):
         self.id = id
         self.username = username
         self.displayname = displayname

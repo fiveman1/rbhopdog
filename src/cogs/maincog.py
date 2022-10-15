@@ -13,11 +13,10 @@ from typing import Callable, Coroutine, Dict, List, Tuple, Union
 
 from bot import StrafesBot
 from modules.strafes_base import *
-from modules.strafes import APIError, StrafesClient
+from modules.strafes import APIError, StrafesClient, ErrorCode
 from modules import utils
 from modules.utils import Incrementer, StringBuilder
 from modules.arguments import ArgumentValidator
-from modules.verifier import AccountVerifier
 
 # contains some commonly used Cols designed for use with MessageBuilder
 class MessageCol:
@@ -141,7 +140,6 @@ class MainCog(commands.Cog):
         self.bot = bot
         self.bot.remove_command("help")
         self.strafes : StrafesClient = None
-        self.verifier : AccountVerifier = None
         self.maps_started = False
         self.globals_started = False
         self.lock = asyncio.Lock()
@@ -149,8 +147,7 @@ class MainCog(commands.Cog):
 
     async def cog_load(self):
         print("Loading maincog")
-        self.strafes = StrafesClient(self.bot.strafes_key, self.bot.db_user, self.bot.db_pass)
-        self.verifier = AccountVerifier(self.strafes)
+        self.strafes = StrafesClient(self.bot.strafes_key, self.bot.verify_key)
         print("Loading maps")
         start = time.monotonic()
         await self.strafes.load_maps()
@@ -1054,68 +1051,65 @@ class MainCog(commands.Cog):
 
     @commands.command(name="link")
     async def link(self, ctx : Context, *args):
-        author = ctx.author
-        if len(args) > 0:
-            if await self.strafes.get_roblox_user_from_discord(author.id) is not None:
-                await ctx.send(utils.fmt_md_code(f"You already have an account linked to your Discord! Use '{self.bot.command_prefix}unlink' to unlink your account first."))
-                return
-            
-            arguments = ArgumentValidator(self.bot, self.strafes)
-            arguments.user.make_required()
-            arguments.user.check_status = False
-            arguments.user.allow_id = True
-            arguments.user.allow_discord = False
-            valid, err = await arguments.evaluate(args)
-            if not valid:
-                await ctx.send(utils.fmt_md_code(err))
-                return
-            user : User = arguments.user.value
-            
-            phrase = self.verifier.create_user_phrase(author.id, user)
-            try:
-                embed = discord.Embed(title="\U0001F517  Link Roblox To Discord", color=discord.Colour.from_rgb(111, 141, 222)) #\U0001F517: chain link emoji
-                embed.add_field(name="__Phrase__", value=phrase, inline=False)
-                msg =   f"""
-                        1. Copy the phrase above.
-                        2. Paste the entire phrase into your About section on Roblox.
-                        3. Do '{self.bot.command_prefix}link'.
-                        4. If the phrase is in your description then you will be linked. That's it!
-                        Note: the phrase expires after ***15 minutes***. You will need to use this command again to generate a new one if you wait too long.
-                        """
-                embed.add_field(name="__How to link your Roblox account__", value=msg, inline=False)
-                embed.set_footer(text=f"Linking username {user.username} ({user.id})")
-                await author.send(embed=embed)
-                await ctx.send(utils.fmt_md_code("DM sent."))
-            except discord.Forbidden:
-                await ctx.send(utils.fmt_md_code("I could not DM you instructions. Please check that you are allowing DMs (Settings -> Privacy & Saftery -> Allow direct messages from server members)."))
-        else:
-            discord_id = author.id
-            if await self.strafes.get_roblox_user_from_discord(discord_id) is not None:
-                await ctx.send(utils.fmt_md_code(f"You already have an account linked to your Discord! Use '{self.bot.command_prefix}help link' for more info."))
-            elif self.verifier.get_user_phrase(discord_id):
-                success, user = await self.verifier.verify_user(discord_id)
-                if success:
-                    if await self.strafes.add_discord_to_roblox(discord_id, user.id):
-                        await ctx.send(utils.fmt_md_code(f"Successfully verified user '{user.username}'. Your account is now linked."))
-                    else:
-                        await ctx.send(utils.fmt_md_code(f"Failed adding user to database. This should not happen."))
+        async with ctx.typing():
+            if len(args) > 0:
+                arguments = ArgumentValidator(self.bot, self.strafes)
+                arguments.user.make_required()
+                arguments.user.check_status = False
+                arguments.user.allow_id = True
+                arguments.user.allow_discord = False
+                valid, err = await arguments.evaluate(args)
+                if not valid:
+                    await ctx.send(utils.fmt_md_code(err))
+                    return
+                user : User = arguments.user.value
+
+                res = await self.strafes.begin_verify_user(ctx.author.id, user)
+                if res:
+                    phrase = res.result["phrase"]
+                    try:
+                        embed = discord.Embed(title="\U0001F517  Link Roblox To Discord", color=discord.Colour.from_rgb(111, 141, 222)) #\U0001F517: chain link emoji
+                        embed.add_field(name="__Phrase__", value=phrase, inline=False)
+                        msg =   f"""
+                                1. Copy the phrase above.
+                                2. Paste the entire phrase into your About section on Roblox.
+                                3. Do '{self.bot.command_prefix}link'.
+                                4. If the phrase is in your description then you will be linked. That's it!
+                                Note: the phrase expires after ***15 minutes***. You will need to use this command again to generate a new one if you wait too long.
+                                """
+                        embed.add_field(name="__How to link your Roblox account__", value=msg, inline=False)
+                        embed.set_footer(text=f"Linking username {user.username} ({user.id})")
+                        await ctx.author.send(embed=embed)
+                        await ctx.send(utils.fmt_md_code("DM sent."))
+                    except discord.Forbidden:
+                        await ctx.send(utils.fmt_md_code("I could not DM you instructions. Please check that you are allowing DMs (Settings -> Privacy & Saftery -> Allow direct messages from server members)."))
+                elif res.error_code == ErrorCode.ALREADY_VERIFIED:
+                    await ctx.send(utils.fmt_md_code(f"You already have an account linked to your Discord! Use '{self.bot.command_prefix}unlink' to unlink your account first."))
                 else:
-                    await ctx.send(utils.fmt_md_code(f"Could not verify user '{user.username}'. Are you sure you pasted the phrase into your description? Is the username correct?"))
+                    await ctx.send(utils.fmt_md_code("An unexpected error occurred."))
             else:
-                await ctx.send(utils.fmt_md_code(f"To link an account, do '{self.bot.command_prefix}link {{username}}'. If you already have but it has been longer than 15 minutes, you need to generate a new phrase."))
+                res = await self.strafes.try_verify_user(ctx.author.id)
+                if res:
+                    username = res.result["robloxUsername"]
+                    await ctx.send(utils.fmt_md_code(f"Successfully verified user '{username}'. Your account is now linked."))
+                elif res.error_code == ErrorCode.ALREADY_VERIFIED:
+                    await ctx.send(utils.fmt_md_code(f"You already have an account linked to your Discord! Use '{self.bot.command_prefix}help link' for more info."))
+                elif res.error_code == ErrorCode.PHRASE_NOT_FOUND:
+                    username = res.result["robloxUsername"]
+                    await ctx.send(utils.fmt_md_code(f"Could not verify user '{username}'. Are you sure you pasted the phrase into your description? Is the username correct?"))
+                elif res.error_code == ErrorCode.VERIFICATION_NOT_ACTIVE:
+                    await ctx.send(utils.fmt_md_code(f"To link an account, do '{self.bot.command_prefix}link {{username}}'. If you already have but it has been longer than 15 minutes, you need to generate a new phrase."))
+                else:
+                    await ctx.send(utils.fmt_md_code("An unexpected error occurred."))
 
     @commands.command(name="unlink")
     async def unlink(self, ctx : Context):
-        discord_id = ctx.author.id
-        roblox_id = await self.strafes.get_roblox_from_discord_non_cached(discord_id)
-        if roblox_id:
-            user = await self.strafes.get_user_data(roblox_id)
-            if await self.strafes.remove_discord_to_roblox(discord_id):
+        async with ctx.typing():
+            user = await self.strafes.remove_discord_to_roblox(ctx.author.id)
+            if user:
                 await ctx.send(utils.fmt_md_code(f"Successfully unlinked user '{user.username}'."))
             else:
-                await ctx.send(utils.fmt_md_code(f"Failed unlinking user '{user.username}'. This should not happen."))
-        else:
-            await ctx.send(utils.fmt_md_code("You don't have an account linked!"))
+                await ctx.send(utils.fmt_md_code("You don't have an account linked!"))
     
     @commands.command(name="guilds")
     @commands.is_owner()
@@ -1137,18 +1131,6 @@ class MainCog(commands.Cog):
     async def update_maps_cmd(self, ctx:Context):
         await self.strafes.load_maps()
         await ctx.send(utils.fmt_md_code("Maps updated."))
-
-    @commands.command(name="add")
-    @commands.is_owner()
-    async def add_user(self, ctx : Context, member : discord.Member, roblox_id : int):
-        success = await self.strafes.add_discord_to_roblox(member.id, roblox_id)
-        await ctx.send(utils.fmt_md_code("Success!" if success else "Failure"))
-
-    @commands.command(name="remove")
-    @commands.is_owner()
-    async def remove_user(self, ctx : Context, member : discord.Member):
-        success = await self.strafes.remove_discord_to_roblox(member.id)
-        await ctx.send(utils.fmt_md_code("Success!" if success else "Failure"))
 
     def get_ordinal(self, num:int) -> str:
         ordinal = "th"

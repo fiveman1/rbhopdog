@@ -13,11 +13,10 @@ from modules.strafes import APIError
 
 class StrafesBot(commands.Bot):
 
-    def __init__(self, strafes_key : str, db_user : str, db_pass : str, **kwargs):
+    def __init__(self, strafes_key : str, verify_key : str, **kwargs):
         super().__init__(**kwargs)
         self.strafes_key = strafes_key
-        self.db_user = db_user
-        self.db_pass = db_pass
+        self.verify_key = verify_key
 
     async def on_ready(self):
         print(f"{self.user} has connected to Discord!")
@@ -89,12 +88,11 @@ async def main():
     TOKEN = config["DISCORD_TOKEN"]
     COMMAND = config["COMMAND"]
     STRAFES = config["STRAFES_KEY"]
-    SQL_USER = config["SQL_USER"]
-    SQL_PASS = config["SQL_PASS"]
+    VERIFY = config["VERIFY_KEY"]
 
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = StrafesBot(STRAFES, SQL_USER, SQL_PASS, command_prefix=COMMAND, intents=intents)
+    bot = StrafesBot(STRAFES, VERIFY, command_prefix=COMMAND, intents=intents)
 
     #shamelessly adapted from here
     #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot
