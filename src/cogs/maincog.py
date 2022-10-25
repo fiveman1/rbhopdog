@@ -1067,18 +1067,18 @@ class MainCog(commands.Cog):
                 res = await self.strafes.begin_verify_user(ctx.author.id, user)
                 if res:
                     phrase = res.result["phrase"]
+                    embed = discord.Embed(title="\U0001F517  Link Roblox To Discord", color=discord.Colour.from_rgb(111, 141, 222)) #\U0001F517: chain link emoji
+                    embed.add_field(name="__Phrase__", value=phrase, inline=False)
+                    msg =   f"""
+                            1. Copy the phrase above.
+                            2. Paste the entire phrase into your About section on Roblox.
+                            3. Do '{self.bot.command_prefix}link'.
+                            4. If the phrase is in your description then you will be linked. That's it!
+                            Note: the phrase expires after ***15 minutes***. You will need to use this command again to generate a new one if you wait too long.
+                            """
+                    embed.add_field(name="__How to link your Roblox account__", value=msg, inline=False)
+                    embed.set_footer(text=f"Linking username {user.username} ({user.id})")
                     try:
-                        embed = discord.Embed(title="\U0001F517  Link Roblox To Discord", color=discord.Colour.from_rgb(111, 141, 222)) #\U0001F517: chain link emoji
-                        embed.add_field(name="__Phrase__", value=phrase, inline=False)
-                        msg =   f"""
-                                1. Copy the phrase above.
-                                2. Paste the entire phrase into your About section on Roblox.
-                                3. Do '{self.bot.command_prefix}link'.
-                                4. If the phrase is in your description then you will be linked. That's it!
-                                Note: the phrase expires after ***15 minutes***. You will need to use this command again to generate a new one if you wait too long.
-                                """
-                        embed.add_field(name="__How to link your Roblox account__", value=msg, inline=False)
-                        embed.set_footer(text=f"Linking username {user.username} ({user.id})")
                         await ctx.author.send(embed=embed)
                         await ctx.send(utils.fmt_md_code("DM sent."))
                     except discord.Forbidden:

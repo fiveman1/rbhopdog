@@ -101,6 +101,8 @@ class ArgumentValidator:
                         return False, err
                     user = roblox_user
         try:
+            if isinstance(user, str) and len(user) > 64:
+                return False, "Username is too long!"
             self.user.value = await self.strafes.get_user_data(user)
         except NotFoundError:
             return False, f"Invalid username (username '{user}' does not exist on Roblox)."
@@ -173,6 +175,8 @@ class ArgumentValidator:
                 return False, "Missing map."
             if not self.user.is_required():
                 map_name = " ".join(args)
+                if len(map_name) > 128:
+                    return False, "Map name is too long!"
                 smap = await self.strafes.map_from_name(map_name, self.game.value)
                 if not smap:
                     if self.game.value is not None:
@@ -188,6 +192,8 @@ class ArgumentValidator:
                 else:
                     username = args[0]
                     map_name = " ".join(args[1:])
+                    if len(map_name) > 128:
+                        return False, "Map name is too long!"
                     smap = await self.strafes.map_from_name(map_name, self.game.value)
                     if not smap:
                         smap = await self.strafes.map_from_name(" ".join(args[:-1]), self.game.value)
