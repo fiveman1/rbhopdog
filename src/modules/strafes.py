@@ -100,6 +100,7 @@ async def response_handler(res : aiohttp.ClientResponse, url : str, api_name : s
             body = await res.text()
         except:
             body = "n/a"
+        print(res)
         raise err(url, headers, params, res.status, body, api_name, res=res)
     try:
         json = await res.json()
@@ -823,10 +824,22 @@ class StrafesClient:
 
     @cached(ttl=60*60)
     async def get_user_headshot_url(self, user_id : int) -> str:
-        res = await self.get_request(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=180x180&format=Png&isCircular=false", "Roblox Avatar")
+        params = {
+            "userIds": user_id,
+            "size": "180x180",
+            "format": "Png",
+            "isCircular": "false"
+        }
+        res = await self.get_request(f"https://thumbnails.roblox.com/v1/users/avatar-headshot", "Roblox Avatar", params=params)
         return f"{res.json['data'][0]['imageUrl']}?{random.randint(0, 100000)}"
 
     @cached()
     async def get_asset_thumbnail(self, asset_id : int) -> str:
-        res = await self.get_request(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size=250x250&format=Png&isCircular=false", "Roblox Asset")
+        params = {
+            "assetIds": asset_id,
+            "size": "250x250",
+            "format": "Png",
+            "isCircular": "false"
+        }
+        res = await self.get_request(f"https://thumbnails.roblox.com/v1/assets", "Roblox Asset", params=params)
         return res.json["data"][0]["imageUrl"]
