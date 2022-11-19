@@ -507,15 +507,12 @@ class StrafesClient:
                 the_res = results[1]
                 data = the_res.json
                 page = converted_page_count
-        ls = []
         if page % 2 == 1:
             data = data[:25]
-        elif page % 2 == 0:
+        else:
             data = data[25:]
-        users = []
-        for i in data:
-            users.append(i["User"])
-        user_lookup = await self.get_user_data_from_list(users)
+        user_lookup = await self.get_user_data_from_list([i["User"] for i in data])
+        ls = []
         for i in data:
             ls.append(Rank.from_dict(i, user_lookup[i["User"]]))
         return ls, converted_page_count
