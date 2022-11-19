@@ -39,7 +39,7 @@ class StrafesBot(commands.Bot):
                 print(error.original.create_debug_message(), file=sys.stderr)
                 await ctx.send(utils.fmt_md_code(str(error.original)))
             else:
-                await ctx.send(utils.fmt_md_code(f"Command invokation error: {error.original}."))
+                await ctx.send(utils.fmt_md_code("An unexpected error occurred."))
             traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
             await self.send_traceback(ctx, error)
         else:
