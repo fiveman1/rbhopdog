@@ -392,9 +392,12 @@ class StrafesClient:
     async def get_user_data_from_list(self, users : List[int]) -> Dict[int, User]:
         res = await self.post_request("https://users.roblox.com/v1/users", "Roblox Users", {"userIds":users})
         user_lookup = {}
-        for user_dict in res.json["data"]:
+        data = res.json["data"]
+        if len(data) != len(users):
+            raise Exception(f"users does not match data\nusers: {users}\nres:{res.json}")
+        for user_dict in data:
             user = User.from_dict(user_dict)
-            user_lookup[user_dict["id"]] = user
+            user_lookup[user.id] = user
         return user_lookup
 
     #include user or map if they are known already
