@@ -140,7 +140,7 @@ class StrafesClient:
     async def post_request(self, url : str, api_name : str, data={}, headers={}, 
             callback : Callable[[aiohttp.ClientResponse, str, str, Any, Any], Awaitable[T]] = response_handler) -> T:
         try:
-            async with self._session.post(url, headers=headers, data=data) as res:
+            async with self._session.post(url, headers=headers, json=data) as res:
                 return await callback(res, url, api_name, data, headers)
         except asyncio.TimeoutError:
             raise TimeoutError(self._session.timeout.total, url, headers, data, api_name)
@@ -389,15 +389,10 @@ class StrafesClient:
     async def get_user_data(self, user : Union[str, int]) -> User:
         return await self.get_user_data_no_cache(user)
 
-    async def get_user_data_from_list(self, users : List[int], retries=0) -> Dict[int, User]:
-        if retries >= 5:
-            raise Exception(f"Hit max retries getting user data from IDs ({users})")
+    async def get_user_data_from_list(self, users : List[int]) -> Dict[int, User]:
         res = await self.post_request("https://users.roblox.com/v1/users", "Roblox Users", {"userIds":users})
         user_lookup = {}
-        data = res.json["data"]
-        if len(data) != len(users):
-            return await self.get_user_data_from_list(users, retries+1)
-        for user_dict in data:
+        for user_dict in res.json["data"]:
             user = User.from_dict(user_dict)
             user_lookup[user.id] = user
         return user_lookup
