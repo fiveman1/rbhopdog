@@ -117,6 +117,8 @@ class UserActiveCommandManager:
 
 def before_strafes(max_allowed_per_user=1):
     async def before(ctx : Context):
+        await ctx.send(utils.fmt_md_code("The strafes.net API is unavailable. All API commands have been disabled. The bot will be updated when a new API is released."))
+        return
         cog : "MainCog" = ctx.cog
         user = ctx.author.id
         success = True
@@ -150,17 +152,17 @@ class MainCog(commands.Cog):
         self.strafes = StrafesClient(self.bot.strafes_key, self.bot.verify_key)
         print("Loading maps")
         start = time.monotonic()
-        await self.strafes.load_maps()
+        #await self.strafes.load_maps()
         end = time.monotonic()
         print(f"Done loading maps ({end-start:.3f}s)")
-        self.update_maps.start()
-        self.global_announcements.start()
+        #self.update_maps.start()
+        #self.global_announcements.start()
         print("Maincog loaded")
     
     async def cog_unload(self):
         print("Unloading maincog")
-        self.global_announcements.cancel()
-        self.update_maps.cancel()
+        #self.global_announcements.cancel()
+        #self.update_maps.cancel()
         await self.strafes.close()
 
     async def task_wrapper(self, task : Coroutine[Any, Any, None], task_name : str):
@@ -452,6 +454,7 @@ class MainCog(commands.Cog):
                     await ctx.send(file=discord.File(f, filename=f"wrs_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="map")
+    @before_strafes() # remove this when new API
     async def map_info(self, ctx:Context, *args):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
@@ -677,6 +680,7 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(message))
     
     @commands.command(name="mapcount")
+    @before_strafes() # remove this when new API
     async def map_count(self, ctx:Context):
         embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
         embed.add_field(name="Bhop Maps", value=str(await self.strafes.get_map_count(Game.BHOP)))
@@ -916,6 +920,7 @@ class MainCog(commands.Cog):
                 await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="maps")
+    @before_strafes() # remove this when new API
     async def maps(self, ctx:Context, *args):
         creator = None
         page = 1
