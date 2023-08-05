@@ -275,7 +275,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="recentwrs")
     @before_strafes()
-    async def get_recent_wrs(self, ctx:Context, *args):
+    async def get_recent_wrs(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
         arguments.style.make_required()
@@ -296,7 +296,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="pb", aliases=["record"])
     @before_strafes()
-    async def get_user_pb(self, ctx:Context, *args):
+    async def get_user_pb(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
         arguments.style.make_required()
@@ -326,7 +326,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="wrmap")
     @before_strafes()
-    async def get_wrmap(self, ctx:Context, *args):
+    async def get_wrmap(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
         arguments.style.make_required()
@@ -358,7 +358,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="wrlist")
     @before_strafes()
-    async def wr_list(self, ctx:Context, *args):
+    async def wr_list(self, ctx:Context, *args : str):
         valid_sorts = ["date", "time", "name"]
         sort = ""
         args = list(args)
@@ -455,7 +455,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="map")
     @before_strafes() # remove this when new API
-    async def map_info(self, ctx:Context, *args):
+    async def map_info(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
         arguments.map.make_required()
@@ -478,7 +478,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="wrcount")
     @before_strafes()
-    async def wr_count(self, ctx:Context, *args):
+    async def wr_count(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.user.make_required()
         valid, err = await arguments.evaluate(args, ctx.author.id)
@@ -533,7 +533,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="profile")
     @before_strafes()
-    async def user_rank(self, ctx:Context, *args):
+    async def user_rank(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
         arguments.style.make_required()
@@ -563,7 +563,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="ranks")
     @before_strafes()
-    async def ranks(self, ctx:Context, *args):
+    async def ranks(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
         arguments.style.make_required()
@@ -591,7 +591,7 @@ class MainCog(commands.Cog):
     
     @commands.command(name="times")
     @before_strafes()
-    async def times(self, ctx:Context, *args):
+    async def times(self, ctx:Context, *args : str):
         valid_sorts = ["date", "time", "name"]
         sort = ""
         args = list(args)
@@ -690,7 +690,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="compare")
     @before_strafes()
-    async def compare(self, ctx:Context, *args):
+    async def compare(self, ctx:Context, *args : str):
         game : Game = None
         txt : bool = False
         styles : List[Style] = []
@@ -886,7 +886,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="mapstatus")
     @before_strafes()
-    async def map_status(self, ctx:Context, *args):
+    async def map_status(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
         arguments.style.make_required()
@@ -921,7 +921,7 @@ class MainCog(commands.Cog):
 
     @commands.command(name="maps")
     @before_strafes() # remove this when new API
-    async def maps(self, ctx:Context, *args):
+    async def maps(self, ctx:Context, *args : str):
         creator = None
         page = 1
         if len(args) > 1:
@@ -979,7 +979,7 @@ class MainCog(commands.Cog):
                 await ctx.send(file=discord.File(f, filename=fname))
 
     @commands.command(name="user")
-    async def user_info(self, ctx:Context, *args):
+    async def user_info(self, ctx:Context, *args : str):
         async with ctx.typing():
             arguments = ArgumentValidator(self.bot, self.strafes)
             arguments.user.make_required()
@@ -1055,7 +1055,7 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="link")
-    async def link(self, ctx : Context, *args):
+    async def link(self, ctx : Context, *args : str):
         async with ctx.typing():
             if len(args) > 0:
                 arguments = ArgumentValidator(self.bot, self.strafes)

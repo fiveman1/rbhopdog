@@ -1,5 +1,5 @@
 # arguments.py
-from typing import List, Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple, Union
 from modules.strafes_base import Game, Style, User, UserState
 from modules.strafes import StrafesClient, NotFoundError
 from discord.ext.commands import Bot
@@ -124,7 +124,7 @@ class ArgumentValidator:
                 return False, f"{user.username} is pending moderation."
         return True, ""
     
-    async def evaluate(self, args : List[str], author_id : int = None) -> Tuple[bool, str]:
+    async def evaluate(self, args : Iterable[str], author_id : int = None) -> Tuple[bool, str]:
         args = list(args)
         if not self.game.is_not_required():
             if len(args) == 0 and self.game.is_required():
