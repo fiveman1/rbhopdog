@@ -1138,16 +1138,16 @@ class MainCog(commands.Cog):
         await ctx.send(utils.fmt_md_code("Maps updated."))
 
     def get_ordinal(self, num:int) -> str:
-        ordinal = "th"
-        if num % 100 > 13 or num % 100 < 11:
-            n = num % 10
+        remainder = num % 100
+        if remainder > 13 or remainder < 11:
+            n = remainder % 10
             if n == 1:
-                ordinal = "st"
+                return "st"
             elif n == 2:
-                ordinal = "nd"
+                return "nd"
             elif n == 3:
-                ordinal = "rd"
-        return ordinal
+                return "rd"
+        return "th"
     
     async def make_global_embed(self, record:Record):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
