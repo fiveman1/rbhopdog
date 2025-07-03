@@ -117,7 +117,7 @@ class UserActiveCommandManager:
 
 def before_strafes(max_allowed_per_user=1):
     async def before(ctx : Context):
-        await ctx.send(utils.fmt_md_code("The strafes.net API is unavailable. All API commands have been disabled. The bot will be updated when a new API is released."))
+        await ctx.send("https://strafes.fiveman1.net/")
         return
         cog : "MainCog" = ctx.cog
         user = ctx.author.id
