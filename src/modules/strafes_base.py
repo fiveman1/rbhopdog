@@ -3,6 +3,8 @@ import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from modules.utils import utc2local
+
 def create_str_to_val(dict : Dict[Any, List[str]]):
     str_to_val = {}
     for key, values in dict.items():
@@ -105,7 +107,7 @@ class Time:
 
 class Date:
     def __init__(self, timestamp):
-        self.timestamp : int = timestamp
+        self.timestamp : int = int(timestamp)
         self._date_str = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
 
     def __str__(self):
@@ -133,12 +135,13 @@ class Map:
     @staticmethod
     def from_dict(d) -> "Map":
         return Map(
-            d["ID"],
-            d["DisplayName"].replace(u'\u200a', ' '),
-            d["Creator"],
+            d["id"],
+            d["display_name"].replace(u'\u200a', ' '),
+            d["creator"],
             Game(d["Game"]),
-            Date(d["Date"]),
-            d["PlayCount"]
+            Date(utc2local(d["date"])),
+            #d["playCount"]
+            0
         )
 
 class UserState(Enum):
@@ -216,12 +219,12 @@ class Record:
     @staticmethod
     def from_dict(d, user : User, map : Map) -> "Record":
         return Record(
-            d["ID"],
-            Time(d["Time"]),
+            d["id"],
+            Time(d["time"]),
             user,
             map,
-            Date(d["Date"]),
-            Style(d["Style"]),
-            d["Mode"],
-            Game(d["Game"])
+            Date(utc2local(d["date"])),
+            Style(d["style_id"]),
+            d["mode_id"],
+            Game(d["game_id"])
         )

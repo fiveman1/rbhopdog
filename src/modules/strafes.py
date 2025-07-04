@@ -10,7 +10,7 @@ import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union, TypeVar
 
 from modules.strafes_base import *
-from modules.utils import Incrementer, fix_path, open_json, between
+from modules.utils import Incrementer, fix_path, open_json, between, utc2local
 
 T = TypeVar("T")
 
@@ -110,7 +110,7 @@ async def response_handler(res : aiohttp.ClientResponse, url : str, api_name : s
 
 class StrafesClient:
     def __init__(self, strafes_key : str, verify_key : str):
-        self._strafes_headers = {"api-key" : strafes_key}
+        self._strafes_headers = {"X-API-Key" : strafes_key}
         self._verify_headers = {"api-key": verify_key}
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         self._bhop_map_pairs : List[Tuple[str, Map]] = []
@@ -169,7 +169,7 @@ class StrafesClient:
             raise TimeoutError(self._session.timeout.total, url, {}, {}, None, f"Timeout occurred attempting to download {url}")
 
     async def update_ratelimit_info(self, res : aiohttp.ClientResponse):
-        reset = int(res.headers["RateLimit-Reset"])
+        reset = int(res.headers["x-rate-limit-burst"])
         now = time.monotonic()
         async with self._ratelimit_lock:
             if self._last_strafes_response is None or now - self._last_strafes_response > self._ratelimit_reset:
@@ -181,15 +181,16 @@ class StrafesClient:
 
     async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
         try:
-            data = await self.get_request(f"https://api.strafes.net/v1/{end_of_url}", "strafes.net", params, self._strafes_headers)
-            await self.update_ratelimit_info(data.res)
+            data = await self.get_request(f"https://api.strafes.net/api/v1/{end_of_url}", "strafes.net", params, self._strafes_headers)
+            print("AFTER STRAFES DATA AWAIT")
+            #await self.update_ratelimit_info(data.res)
         except TimeoutError:
             raise
         except APIError as err:
-            await self.update_ratelimit_info(err.res)
+            #await self.update_ratelimit_info(err.res)
             raise
         except NotFoundError as err:
-            await self.update_ratelimit_info(err.res)
+            #await self.update_ratelimit_info(err.res)
             raise
         return data
 
@@ -400,9 +401,13 @@ class StrafesClient:
     #include user or map if they are known already
     async def record_from_dict(self, d, user : User = None, map : Map = None) -> Record:
         if not user:
-            user = await self.get_user_data(d["User"])
+            user_dict = d["user"]
+            user = User(user_dict["id"], user_dict["username"])
+            # user = await self.get_user_data(d["User"])
         if not map:
-            map = await self.map_from_id(d["Map"])
+            map_dict = d["map"]
+            map = Map(map_dict["id"], map_dict["display_name"].replace(u'\u200a', ' '), map_dict["creator"], Game(map_dict["game_id"]), utc2local(map_dict["date"]), 0)
+            # map = await self.map_from_id(d["Map"])
         return Record.from_dict(d, user, map)
 
     #include user or map if they are known already
@@ -590,51 +595,60 @@ class StrafesClient:
     #records is a list of records from a given map
     @staticmethod
     def sort_map(records:List[Dict[str, Any]]):
-        records.sort(key=lambda i: (i["Time"], i["Date"]))
+        records.sort(key=lambda i: (i["time"], utc2local(i["date"])))
 
     #changes a WR's diff and previous_record in place by comparing first and second place
     #times on the given map
     async def calculate_wr_diff(self, record : Record) -> bool:
         if record.previous_record is not None:
             return True
-        res = await self.get_strafes(f"time/map/{record.map.id}", {
-            "style":record.style.value,
+        res = await self.get_strafes(f"time", {
+            "map_id": record.map.id,
+            "mode_id": 0,
+            "style_id": record.style.value,
         })
-        data = res.json
-        data = data[:20]
+        data = res.json["data"]
         if len(data) > 1:
             self.sort_map(data)
-            if data[0]["ID"] != record.id:
+            if data[0]["id"] != record.id:
                 return False
             record.previous_record = await self.record_from_dict(data[1])
             record.diff = round((record.time.millis - record.previous_record.time.millis) / 1000.0, 3)
         return True
 
     # returns a list of lists of wrs, each list is a unique game/style combination
-    async def get_wrs(self):
-        tasks = []
-        for game in DEFAULT_GAMES:
-            for style in DEFAULT_STYLES:
-                if not (game == Game.SURF and style == Style.SCROLL):
-                    tasks.append(self.get_strafes("time/recent/wr", {
-                            "game":game.value,
-                            "style":style.value,
-                            "whitelist":"true"
-                        }))
-        wrs = []
-        responses = await asyncio.gather(*tasks)
-        for res in responses:
-            wrs.append(res.json)
-        return wrs
+    async def get_wrs(self) -> List[Dict]:
+        # tasks = []
+        # for game in DEFAULT_GAMES:
+        #     for style in DEFAULT_STYLES:
+        #         if not (game == Game.SURF and style == Style.SCROLL):
+        #             tasks.append(self.get_strafes("time/recent/wr", {
+        #                     "game":game.value,
+        #                     "style":style.value,
+        #                     "whitelist":"true"
+        #                 }))
+        # wrs = []
+        # responses = await asyncio.gather(*tasks)
+        # for res in responses:
+        #     wrs.append(res.json)
+        res = await self.get_strafes("time/worldrecord", {
+            "page_size": 100,
+            "page_number": 1,
+            "mode_id": 0
+        })
+        wrs: List[Dict] = res.json["data"]
+        # filter out fly trials
+        return list(filter(lambda wr : wr["game_id"] == Game.BHOP.value or wr["game_id"] == Game.SURF.value, wrs))
 
     async def write_wrs(self):
         with open(fix_path("files/recent_wrs.json"), "w") as file:
-            json.dump(await self.get_wrs(), file)
+            wrs = await self.get_wrs()
+            json.dump(wrs, file)
 
     @staticmethod
     def search(ls, record):
         for i in ls:
-            if record["ID"] == i["ID"]:
+            if record["id"] == i["id"]:
                 return i
         return None
 
@@ -646,27 +660,29 @@ class StrafesClient:
             return []
         new_wrs = await self.get_wrs()
         globals:List[Record] = []
-        for i in range(len(new_wrs)):
-            for record in new_wrs[i]:
-                match = self.search(old_wrs[i], record)
-                if match:
-                    #records by the same person on the same map have the same id even if they beat it
-                    if record["Time"] != match["Time"]:
-                        r = await self.record_from_dict(record)
-                        r.diff = round((int(record["Time"]) - int(match["Time"])) / 1000.0, 3)
-                        r.previous_record = await self.record_from_dict(match)
-                        globals.append(r)
-                    #we can break here because the lists are sorted in the same fashion
-                    else:
-                        break
+        for record in new_wrs:
+            match = self.search(old_wrs, record)
+            if match:
+                #records by the same person on the same map have the same id even if they beat it
+                if record["time"] != match["time"]:
+                    r = await self.record_from_dict(record)
+                    r.diff = round((int(record["time"]) - int(match["time"])) / 1000.0, 3)
+                    r.previous_record = await self.record_from_dict(match)
+                    globals.append(r)
+                #we can break here because the lists are sorted in the same fashion
                 else:
-                    globals.append(await self.record_from_dict(record))
+                    break
+            else:
+                globals.append(await self.record_from_dict(record))
 
         #overwrite recent_wrs.json with new wrs if they exist
         if len(globals) > 0:
             with open(fix_path("files/recent_wrs.json"), "w") as file:
                 json.dump(new_wrs, file)
         
+        print("globals")
+        print(globals)
+
         tasks = []
         for wr in globals:
             tasks.append(self.calculate_wr_diff(wr))
@@ -677,6 +693,9 @@ class StrafesClient:
             if rets[i]:
                 checked_globals.append(wr)
         
+        print("checked globals")
+        print(checked_globals)
+
         checked_globals.sort(key = lambda i: i.date.timestamp)
         return checked_globals
 

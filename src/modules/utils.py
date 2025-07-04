@@ -1,6 +1,8 @@
 # utils.py
+import datetime
 import json
 import os
+import time
 from typing import List
 
 TRACEBACK_CHANNEL = 812768023920115742
@@ -19,6 +21,12 @@ def fmt_md_code(s : str) -> str:
 
 def between(lo, val, hi):
     return val >= lo and val <= hi
+
+def utc2local(date: str):
+    utc = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+    epoch = time.mktime(utc.timetuple())
+    offset = datetime.datetime.fromtimestamp(epoch) - datetime.datetime.utcfromtimestamp(epoch)
+    return int((utc + offset).timestamp())
 
 # increment(inc=1): returns i then increments it by inc (default i++)
 # get(): returns i

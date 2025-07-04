@@ -156,12 +156,12 @@ class MainCog(commands.Cog):
         end = time.monotonic()
         print(f"Done loading maps ({end-start:.3f}s)")
         #self.update_maps.start()
-        #self.global_announcements.start()
+        self.global_announcements.start()
         print("Maincog loaded")
     
     async def cog_unload(self):
         print("Unloading maincog")
-        #self.global_announcements.cancel()
+        self.global_announcements.cancel()
         #self.update_maps.cancel()
         await self.strafes.close()
 
@@ -254,7 +254,7 @@ class MainCog(commands.Cog):
             end = time.time()
             print(f"embeds posted: {end-start}s")
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(minutes=3)
     async def global_announcements(self):
         await self.task_wrapper(self.globals_task(), "globals_announcements")
             
