@@ -182,7 +182,6 @@ class StrafesClient:
     async def _get_strafes(self, end_of_url, params={}) -> JSONRes:
         try:
             data = await self.get_request(f"https://api.strafes.net/api/v1/{end_of_url}", "strafes.net", params, self._strafes_headers)
-            print("AFTER STRAFES DATA AWAIT")
             #await self.update_ratelimit_info(data.res)
         except TimeoutError:
             raise
@@ -679,9 +678,6 @@ class StrafesClient:
         if len(globals) > 0:
             with open(fix_path("files/recent_wrs.json"), "w") as file:
                 json.dump(new_wrs, file)
-        
-        print("globals")
-        print(globals)
 
         tasks = []
         for wr in globals:
@@ -692,9 +688,6 @@ class StrafesClient:
         for i, wr in enumerate(globals):
             if rets[i]:
                 checked_globals.append(wr)
-        
-        print("checked globals")
-        print(checked_globals)
 
         checked_globals.sort(key = lambda i: i.date.timestamp)
         return checked_globals

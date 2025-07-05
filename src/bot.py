@@ -13,10 +13,15 @@ from modules.strafes import APIError
 
 class StrafesBot(commands.Bot):
 
-    def __init__(self, strafes_key : str, verify_key : str, **kwargs):
+    def __init__(self, strafes_key : str, verify_key : str, bhop_auto_globals : int, bhop_styles_globals : int, surf_auto_globals : int, surf_styles_globals : int, globals : int, **kwargs):
         super().__init__(**kwargs)
         self.strafes_key = strafes_key
         self.verify_key = verify_key
+        self.bhop_auto_globals = bhop_auto_globals
+        self.bhop_styles_globals = bhop_styles_globals
+        self.surf_auto_globals = surf_auto_globals
+        self.surf_styles_globals = surf_styles_globals
+        self.globals = globals
 
     async def on_ready(self):
         print(f"{self.user} has connected to Discord!")
@@ -89,10 +94,15 @@ async def main():
     COMMAND = config["COMMAND"]
     STRAFES = config["STRAFES_KEY"]
     VERIFY = config["VERIFY_KEY"]
+    BHOP_AUTO_GLOBALS = config["BHOP_AUTO_GLOBALS"]
+    BHOP_STYLES_GLOBALS = config["BHOP_STYLES_GLOBALS"]
+    SURF_AUTO_GLOBALS = config["SURF_AUTO_GLOBALS"]
+    SURF_STYLES_GLOBALS = config["SURF_STYLES_GLOBALS"]
+    GLOBALS = config["GLOBALS"]
 
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = StrafesBot(STRAFES, VERIFY, command_prefix=COMMAND, intents=intents)
+    bot = StrafesBot(STRAFES, VERIFY, BHOP_AUTO_GLOBALS, BHOP_STYLES_GLOBALS, SURF_AUTO_GLOBALS, SURF_STYLES_GLOBALS, GLOBALS, command_prefix=COMMAND, intents=intents)
 
     #shamelessly adapted from here
     #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot
