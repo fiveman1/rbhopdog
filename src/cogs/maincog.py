@@ -196,8 +196,8 @@ class MainCog(commands.Cog):
         except:
             pass
 
-    async def create_global_embed(self, record : Record):
-        return (record.game, record.style, await self.make_global_embed(record))
+    async def create_global_embed(self, record : Record, thumbs: Dict[int, str]):
+        return (record.game, record.style, await self.make_global_embed(record, thumbs))
     
     @staticmethod
     async def post_global(embed : discord.Embed, channel : discord.channel.TextChannel):
@@ -216,10 +216,11 @@ class MainCog(commands.Cog):
             end = time.time()
             print(f"get new wrs: {end-start}s")
             start = time.time()
+            thumbs = await self.safe_get_map_thumbs(records)
             embed_tasks = []
             for record in records:
                 print(f"New global:\n{record}")
-                embed_tasks.append(self.create_global_embed(record))
+                embed_tasks.append(self.create_global_embed(record, thumbs))
             all_embeds = await asyncio.gather(*embed_tasks)
             end = time.time()
             print(f"embeds created: {end-start}s")
@@ -1152,7 +1153,7 @@ class MainCog(commands.Cog):
                 return "rd"
         return "th"
     
-    async def make_global_embed(self, record:Record):
+    async def make_global_embed(self, record: Record, thumbs: Dict[int, str]):
         embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         url = await self.safe_get_user_headshot_url(record.user.id)
@@ -1169,6 +1170,9 @@ class MainCog(commands.Cog):
             info += f"{record.previous_record.time} ({record.previous_record.user.username})"
         embed.add_field(name="Time", value=time, inline=True)
         embed.add_field(name="Info", value=info, inline=False)
+        map_url = thumbs.get(record.map.id)
+        if map_url:
+            embed.set_image(url=map_url)
         embed.set_footer(text="World Record")
         return embed
     
@@ -1200,6 +1204,12 @@ class MainCog(commands.Cog):
             return await self.strafes.get_asset_thumbnail(asset_id)
         except APIError:
             return None
+        
+    async def safe_get_map_thumbs(self, records: List[Record]):
+        try:
+            return await self.strafes.get_map_thumbs(records)
+        except APIError:
+            return {}
 
 async def setup(bot : commands.Bot):
     await bot.add_cog(MainCog(bot))

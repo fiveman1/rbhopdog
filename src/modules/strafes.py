@@ -855,3 +855,28 @@ class StrafesClient:
         }
         res = await self.get_request(f"https://thumbnails.roblox.com/v1/assets", "Roblox Asset", params=params)
         return res.json["data"][0]["imageUrl"]
+    
+    async def get_map_thumbs(self, records: List[Record]) -> Dict[int, str]:
+        asset_to_map = {}
+        for record in records:
+            asset_id = MAP_TO_THUMB.get(record.map.id)
+            if asset_id is not None:
+                asset_to_map[asset_id] = record.map.id
+        
+        params = {
+            "assetIds": list(asset_to_map.keys()),
+            "size": "420x420",
+            "format": "Png"
+        }
+        res = await self.get_request(f"https://thumbnails.roblox.com/v1/assets", "Roblox Asset", params=params)
+        data = res.json["data"]
+        
+        map_to_url = {}
+        for asset_info in data:
+            target_id = asset_info["targetId"]
+            url = asset_info["imageUrl"]
+            map_id = asset_to_map.get(target_id)
+            if map_id is not None:
+                map_to_url[map_id] = url
+
+        return map_to_url
