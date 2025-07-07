@@ -1154,12 +1154,14 @@ class MainCog(commands.Cog):
         return "th"
     
     async def make_global_embed(self, record: Record, thumbs: Dict[int, str]):
-        embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80)
+        map_url = f"https://strafes.fiveman1.net/maps/{record.map.id}?game={record.game.value}&style={record.style.value}"
+        embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80, url=map_url)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
         url = await self.safe_get_user_headshot_url(record.user.id)
         if url:
             embed.set_thumbnail(url=url)
-        embed.add_field(name="Player", value=record.user.username, inline=True)
+        player_url = f"https://strafes.fiveman1.net/users/{record.user.id}?game={record.game.value}&style={record.style.value}"
+        embed.add_field(name="Player", value=f"[{record.user.username}]({player_url})", inline=True)
         time = f"{record.time} "
         info = f"**Game:** {record.game}\n**Style:** {record.style}\n**Date:** <t:{record.date.timestamp}:f>\n**Previous WR:** "
         if not record.previous_record:
