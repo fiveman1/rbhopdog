@@ -1172,9 +1172,9 @@ class MainCog(commands.Cog):
             info += f"{record.previous_record.time} ({record.previous_record.user.username})"
         embed.add_field(name="Time", value=time, inline=True)
         embed.add_field(name="Info", value=info, inline=False)
-        map_url = thumbs.get(record.map.id)
-        if map_url:
-            embed.set_image(url=map_url)
+        map_thumb_url = thumbs.get(record.map.id)
+        if map_thumb_url:
+            embed.set_image(url=map_thumb_url)
         embed.set_footer(text="World Record")
         return embed
     
