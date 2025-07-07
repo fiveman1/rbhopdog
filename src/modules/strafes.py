@@ -685,8 +685,9 @@ class StrafesClient:
         rets = await asyncio.gather(*tasks)
 
         checked_globals = []
+        two_hours_ago = (datetime.datetime.now() - datetime.timedelta(hours=2)).timestamp()
         for i, wr in enumerate(globals):
-            if rets[i]:
+            if rets[i] and wr.date.timestamp >= two_hours_ago:
                 checked_globals.append(wr)
 
         checked_globals.sort(key = lambda i: i.date.timestamp)
