@@ -200,9 +200,10 @@ class MainCog(commands.Cog):
         return (record.game, record.style, await self.make_global_embed(record, thumbs))
     
     @staticmethod
-    async def post_global(embed : discord.Embed, channel : discord.channel.TextChannel):
-        msg = await channel.send(embed=embed)
-        await msg.publish()
+    async def post_globals(embeds : List[discord.Embed], channel : discord.channel.TextChannel):
+        for embed in embeds:
+            msg = await channel.send(embed=embed)
+            await msg.publish()
 
     async def globals_task(self):
         # when the bot first runs, overwrite globals then stop
@@ -229,7 +230,9 @@ class MainCog(commands.Cog):
             bhop_style = []
             surf_auto = []
             surf_style = []
+            all_globals = []
             for game, style, embed in all_embeds:
+                all_globals.append(embed)
                 if game == Game.BHOP and style == Style.AUTOHOP:
                     bhop_auto.append(embed)
                 elif game == Game.BHOP and style != Style.AUTOHOP:
@@ -244,16 +247,11 @@ class MainCog(commands.Cog):
             surf_auto_channel = self.bot.get_channel(self.bot.surf_auto_globals)
             surf_styles_channel = self.bot.get_channel(self.bot.surf_styles_globals)
             all_channel = self.bot.get_channel(self.bot.globals)
-            for _,_,embed in all_embeds:
-                tasks.append(self.try_except(self.post_global(embed, all_channel)))
-            for embed in bhop_auto:
-                tasks.append(self.try_except(self.post_global(embed, bhop_auto_channel)))
-            for embed in bhop_style:
-                tasks.append(self.try_except(self.post_global(embed, bhop_styles_channel)))
-            for embed in surf_auto:
-                tasks.append(self.try_except(self.post_global(embed, surf_auto_channel)))
-            for embed in surf_style:
-                tasks.append(self.try_except(self.post_global(embed, surf_styles_channel)))
+            tasks.append(self.try_except(self.post_globals(all_globals, all_channel)))
+            tasks.append(self.try_except(self.post_globals(bhop_auto, bhop_auto_channel)))
+            tasks.append(self.try_except(self.post_globals(bhop_style, bhop_styles_channel)))
+            tasks.append(self.try_except(self.post_globals(surf_auto, surf_auto_channel)))
+            tasks.append(self.try_except(self.post_globals(surf_style, surf_styles_channel)))
             await asyncio.gather(*tasks)
             end = time.time()
             print(f"embeds posted: {end-start}s")

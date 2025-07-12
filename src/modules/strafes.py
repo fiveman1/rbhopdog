@@ -659,7 +659,10 @@ class StrafesClient:
             return []
         new_wrs = await self.get_wrs()
         globals:List[Record] = []
+        two_hours_ago = (datetime.datetime.now() - datetime.timedelta(hours=2)).timestamp()
         for record in new_wrs:
+            if utc2local(record["date"]) < two_hours_ago:
+                break
             match = self.search(old_wrs, record)
             if match:
                 #records by the same person on the same map have the same id even if they beat it
@@ -668,9 +671,6 @@ class StrafesClient:
                     r.diff = round((int(record["time"]) - int(match["time"])) / 1000.0, 3)
                     r.previous_record = await self.record_from_dict(match)
                     globals.append(r)
-                #we can break here because the lists are sorted in the same fashion
-                else:
-                    break
             else:
                 globals.append(await self.record_from_dict(record))
 
@@ -685,9 +685,9 @@ class StrafesClient:
         rets = await asyncio.gather(*tasks)
 
         checked_globals = []
-        two_hours_ago = (datetime.datetime.now() - datetime.timedelta(hours=2)).timestamp()
+        
         for i, wr in enumerate(globals):
-            if rets[i] and wr.date.timestamp >= two_hours_ago:
+            if rets[i]:
                 checked_globals.append(wr)
 
         checked_globals.sort(key = lambda i: i.date.timestamp)
