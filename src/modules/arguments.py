@@ -106,10 +106,10 @@ class ArgumentValidator:
             self.user.value = await self.strafes.get_user_data(user)
         except NotFoundError:
             return False, f"Invalid username (username '{user}' does not exist on Roblox)."
-        if self.user.check_status:
-            valid, err = await self.check_user_status(self.user.value)
-            if not valid:
-                return False, err
+        # if self.user.check_status:
+        #     valid, err = await self.check_user_status(self.user.value)
+        #     if not valid:
+        #         return False, err
         return True, ""
 
     async def check_user_status(self, user : User) -> Tuple[bool, str]:

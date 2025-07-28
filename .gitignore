@@ -7,3 +7,4 @@ src/files/surf_maps.json
 src/files/recent_wrs.json
 src/config.json
 .vscode
+.venv

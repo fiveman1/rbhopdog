@@ -13,16 +13,15 @@ def create_str_to_val(dict : Dict[Any, List[str]]):
     return str_to_val
 
 GAME_ENUM = {
-    0: ["maptest"],
     1: ["bhop"],
     2: ["surf"]
 }
 _STR_TO_GAME = create_str_to_val(GAME_ENUM)
 
 class Game(Enum):
-    MAPTEST = 0
     BHOP = 1
     SURF = 2
+    FLY_TRIALS = 5
 
     @property
     def name(self):
@@ -47,7 +46,7 @@ STYLE_ENUM = {
     6: ["a-only", "aonly", "ao"],
     7: ["backwards", "bw"],
     8: ["faste"],
-    9: ["sustain", "sus"]
+    14: ["lg"]
 }
 _STR_TO_STYLE = create_str_to_val(STYLE_ENUM)
 
@@ -60,7 +59,7 @@ class Style(Enum):
     AONLY = 6
     BACKWARDS = 7
     FASTE = 8
-    SUSTAIN = 9
+    LOW_GRAV = 14
 
     @property
     def name(self):
@@ -75,7 +74,7 @@ class Style(Enum):
 
 # This allows us to get an enum via the value, name, or name alias (ex. Style(1), Style("autohop"), Style("auto"))
 setattr(Style, "__new__", lambda cls, value: super(Style, cls).__new__(cls, _STR_TO_STYLE[value] if isinstance(value, str) else value))
-DEFAULT_STYLES:List[Style] = [style for style in Style if style != Style.FASTE and style != Style.SUSTAIN]
+DEFAULT_STYLES:List[Style] = [style for style in Style if style != Style.FASTE and style != Style.LOW_GRAV]
 
 class Time:
     def __init__(self, millis):

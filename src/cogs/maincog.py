@@ -276,7 +276,6 @@ class MainCog(commands.Cog):
             pass
 
     @commands.command(name="recentwrs")
-    @before_strafes()
     async def get_recent_wrs(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -285,6 +284,11 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
+
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        await ctx.send(f"https://strafes.fiveman1.net/globals?game={game.value}&style={style.value}")
+        return
 
         async with ctx.typing():
             game : Game = arguments.game.value
@@ -297,8 +301,10 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="pb", aliases=["record"])
-    @before_strafes()
     async def get_user_pb(self, ctx:Context, *args : str):
+        await ctx.send(f"https://strafes.fiveman1.net/users")
+        return
+    
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
         arguments.style.make_required()
@@ -327,8 +333,9 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="wrmap")
-    @before_strafes()
     async def get_wrmap(self, ctx:Context, *args : str):
+        await ctx.send(f"https://strafes.fiveman1.net/maps")
+        return
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
         arguments.style.make_required()
@@ -359,7 +366,6 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(msg))
 
     @commands.command(name="wrlist")
-    @before_strafes()
     async def wr_list(self, ctx:Context, *args : str):
         valid_sorts = ["date", "time", "name"]
         sort = ""
@@ -392,6 +398,13 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
+        
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+        await ctx.send(f"https://strafes.fiveman1.net/users/{user.id}?game={999 if game is None else game.value}&style={999 if style is None else style.value}&wrs=true")
+        return
+    
         game : Game = arguments.game.value
         style : Style = arguments.style.value
         user : User = arguments.user.value
@@ -456,8 +469,9 @@ class MainCog(commands.Cog):
                     await ctx.send(file=discord.File(f, filename=f"wrs_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="map")
-    @before_strafes() # remove this when new API
     async def map_info(self, ctx:Context, *args : str):
+        await ctx.send(f"https://strafes.fiveman1.net/maps")
+        return
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_optional()
         arguments.map.make_required()
@@ -479,7 +493,6 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="wrcount")
-    @before_strafes()
     async def wr_count(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.user.make_required()
@@ -488,6 +501,8 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(err))
             return
         user : User = arguments.user.value
+        await ctx.send(f"https://strafes.fiveman1.net/users/{user.id}?game={999}&style={999}&wrs=true")
+        return
 
         async with ctx.typing():
             count = 0
@@ -534,7 +549,6 @@ class MainCog(commands.Cog):
             await ctx.send(embed=embed)
 
     @commands.command(name="profile")
-    @before_strafes()
     async def user_rank(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -547,6 +561,8 @@ class MainCog(commands.Cog):
         game : Game = arguments.game.value
         style : Style = arguments.style.value
         user : User = arguments.user.value
+        await ctx.send(f"https://strafes.fiveman1.net/users/{user.id}?game={game.value}&style={style.value}")
+        return
 
         async with ctx.typing():
             tasks = [
@@ -564,7 +580,6 @@ class MainCog(commands.Cog):
                 await ctx.send(embed= await self.make_user_embed(user, rank_data, game, style, completions, total_maps, wrs))
 
     @commands.command(name="ranks")
-    @before_strafes()
     async def ranks(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -577,6 +592,8 @@ class MainCog(commands.Cog):
         game : Game = arguments.game.value
         style : Style = arguments.style.value
         page : int = arguments.page.value
+        await ctx.send(f"https://strafes.fiveman1.net/ranks?game={game.value}&style={style.value}")
+        return
 
         async with ctx.typing():
             ranks, page_count = await self.strafes.get_ranks(game, style, page)
@@ -592,7 +609,6 @@ class MainCog(commands.Cog):
             await ctx.send(utils.fmt_md_code(msg))
     
     @commands.command(name="times")
-    @before_strafes()
     async def times(self, ctx:Context, *args : str):
         valid_sorts = ["date", "time", "name"]
         sort = ""
@@ -625,6 +641,12 @@ class MainCog(commands.Cog):
         if not valid:
             await ctx.send(utils.fmt_md_code(err))
             return
+        
+        game : Game = arguments.game.value
+        style : Style = arguments.style.value
+        user : User = arguments.user.value
+        await ctx.send(f"https://strafes.fiveman1.net/users/{user.id}?game={999 if game is None else game.value}&style={999 if style is None else style.value}")
+        return
 
         async with ctx.typing():
             game : Game = arguments.game.value
@@ -682,8 +704,9 @@ class MainCog(commands.Cog):
                 await ctx.send(utils.fmt_md_code(message))
     
     @commands.command(name="mapcount")
-    @before_strafes() # remove this when new API
     async def map_count(self, ctx:Context):
+        await ctx.send(f"https://strafes.fiveman1.net/maps")
+        return
         embed = discord.Embed(title=f"\N{CLIPBOARD}  Map Count", color=0xfc9c00)
         embed.add_field(name="Bhop Maps", value=str(await self.strafes.get_map_count(Game.BHOP)))
         embed.add_field(name="Surf Maps", value=str(await self.strafes.get_map_count(Game.SURF)))
@@ -691,8 +714,9 @@ class MainCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="compare")
-    @before_strafes()
     async def compare(self, ctx:Context, *args : str):
+        await ctx.send(f"https://strafes.fiveman1.net/compare")
+        return
         game : Game = None
         txt : bool = False
         styles : List[Style] = []
@@ -887,7 +911,6 @@ class MainCog(commands.Cog):
         return comparables[ComparableUserStyle(record.user, record.style)]
 
     @commands.command(name="mapstatus")
-    @before_strafes()
     async def map_status(self, ctx:Context, *args : str):
         arguments = ArgumentValidator(self.bot, self.strafes)
         arguments.game.make_required()
@@ -900,6 +923,9 @@ class MainCog(commands.Cog):
         game : Game = arguments.game.value
         style : Style = arguments.style.value
         user : User = arguments.user.value
+        
+        await ctx.send(f"https://strafes.fiveman1.net/users/{user.id}?game={game.value}&style={style.value}")
+        return
 
         async with ctx.typing():
             records, _ = await self.strafes.get_user_times(user, game, style, -1)
@@ -922,8 +948,9 @@ class MainCog(commands.Cog):
                 await ctx.send(file=discord.File(f, filename=f"incomplete_maps_{user.username}_{game}_{style}.txt"))
 
     @commands.command(name="maps")
-    @before_strafes() # remove this when new API
     async def maps(self, ctx:Context, *args : str):
+        await ctx.send(f"https://strafes.fiveman1.net/maps")
+        return
         creator = None
         page = 1
         if len(args) > 1:
