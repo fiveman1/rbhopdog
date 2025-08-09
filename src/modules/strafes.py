@@ -398,14 +398,14 @@ class StrafesClient:
         return user_lookup
 
     #include user or map if they are known already
-    async def record_from_dict(self, d, user : User = None, map : Map = None) -> Record:
+    async def record_from_dict(self, d : Dict, user : User = None, map : Map = None) -> Record:
         if not user:
             user_dict = d["user"]
             user = User(user_dict["id"], user_dict["username"])
             # user = await self.get_user_data(d["User"])
         if not map:
-            map_dict = d["map"]
-            map = Map(map_dict["id"], map_dict["display_name"].replace(u'\u200a', ' '), map_dict["creator"], Game(map_dict["game_id"]), utc2local(map_dict["date"]), 0)
+            map_dict : Dict = d["map"]
+            map = Map(map_dict["id"], map_dict["display_name"].replace(u'\u200a', ' '), "", Game(map_dict["game_id"]), Date(0), 0, map_dict.get("thumbnail"))
             # map = await self.map_from_id(d["Map"])
         return Record.from_dict(d, user, map)
 
@@ -860,7 +860,7 @@ class StrafesClient:
     async def get_map_thumbs(self, records: List[Record]) -> Dict[int, str]:
         asset_to_map = {}
         for record in records:
-            asset_id = MAP_TO_THUMB.get(record.map.id)
+            asset_id = record.map.thumbnail
             if asset_id is not None:
                 asset_to_map[asset_id] = record.map.id
         
