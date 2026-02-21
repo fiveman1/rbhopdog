@@ -405,9 +405,21 @@ class StrafesClient:
             # user = await self.get_user_data(d["User"])
         if not map:
             map_dict : Dict = d["map"]
-            map = Map(map_dict["id"], map_dict["display_name"].replace(u'\u200a', ' '), "", Game(map_dict["game_id"]), Date(0), 0, map_dict.get("thumbnail"))
+            map = Map(map_dict["id"], map_dict["display_name"].replace(u'\u200a', ' '), "", Game(map_dict["game_id"]), Date(0), 0, None)
             # map = await self.map_from_id(d["Map"])
         return Record.from_dict(d, user, map)
+    
+    async def record_from_strafes_globals(self, d : Dict, user : User = None, map : Map = None) -> Record:
+        if not user:
+            user_dict = d["user"]
+            user = User(user_dict["id"], user_dict["username"])
+            user.thumbnail = user_dict["thumbnail"]
+            # user = await self.get_user_data(d["User"])
+        if not map:
+            map_dict : Dict = d["map"]
+            map = Map(map_dict["id"], map_dict["display_name"].replace(u'\u200a', ' '), "", Game(map_dict["game_id"]), Date(0), 0, map_dict.get("thumbnail"))
+            # map = await self.map_from_id(d["Map"])
+        return Record.from_dict_strafes_globals(d, user, map)
 
     #include user or map if they are known already
     async def make_record_list(self, records : List, user : User = None, map : Map = None) -> List[Record]:
@@ -630,10 +642,9 @@ class StrafesClient:
         # responses = await asyncio.gather(*tasks)
         # for res in responses:
         #     wrs.append(res.json)
-        res = await self.get_strafes("time/worldrecord", {
-            "page_size": 100,
-            "page_number": 1,
-            "mode_id": 0
+        res = await self.get_request("https://strafes.fiveman1.net/public-api/wrs", "fiveman1 strafes", {
+            "page": 1,
+            "course": 0
         })
         wrs: List[Dict] = res.json["data"]
         # filter out fly trials
@@ -667,12 +678,12 @@ class StrafesClient:
             if match:
                 #records by the same person on the same map have the same id even if they beat it
                 if record["time"] != match["time"]:
-                    r = await self.record_from_dict(record)
+                    r = await self.record_from_strafes_globals(record)
                     r.diff = round((int(record["time"]) - int(match["time"])) / 1000.0, 3)
-                    r.previous_record = await self.record_from_dict(match)
+                    r.previous_record = await self.record_from_strafes_globals(match)
                     globals.append(r)
             else:
-                globals.append(await self.record_from_dict(record))
+                globals.append(await self.record_from_strafes_globals(record))
 
         #overwrite recent_wrs.json with new wrs if they exist
         if len(globals) > 0:
@@ -684,7 +695,7 @@ class StrafesClient:
             tasks.append(self.calculate_wr_diff(wr))
         rets = await asyncio.gather(*tasks)
 
-        checked_globals = []
+        checked_globals:List[Record] = []
         
         for i, wr in enumerate(globals):
             if rets[i]:

@@ -23,7 +23,10 @@ def between(lo, val, hi):
     return val >= lo and val <= hi
 
 def utc2local(date: str):
-    utc = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+    try:
+        utc = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        utc = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%fZ")
     epoch = time.mktime(utc.timetuple())
     offset = datetime.datetime.fromtimestamp(epoch) - datetime.datetime.utcfromtimestamp(epoch)
     return int((utc + offset).timestamp())

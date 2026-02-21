@@ -196,8 +196,8 @@ class MainCog(commands.Cog):
         except:
             pass
 
-    async def create_global_embed(self, record : Record, thumbs: Dict[int, str]):
-        return (record.game, record.style, await self.make_global_embed(record, thumbs))
+    def create_global_embed(self, record : Record):
+        return (record.game, record.style, self.make_global_embed(record))
     
     @staticmethod
     async def post_globals(embeds : List[discord.Embed], channel : discord.channel.TextChannel):
@@ -216,15 +216,10 @@ class MainCog(commands.Cog):
         if len(records) > 0:
             end = time.time()
             print(f"get new wrs: {end-start}s")
-            start = time.time()
-            thumbs = await self.safe_get_map_thumbs(records)
-            embed_tasks = []
+            all_embeds = []
             for record in records:
+                all_embeds.append(self.create_global_embed(record))
                 print(f"New global:\n{record}")
-                embed_tasks.append(self.create_global_embed(record, thumbs))
-            all_embeds = await asyncio.gather(*embed_tasks)
-            end = time.time()
-            print(f"embeds created: {end-start}s")
             start = time.time()
             bhop_auto = []
             bhop_style = []
@@ -256,7 +251,7 @@ class MainCog(commands.Cog):
             end = time.time()
             print(f"embeds posted: {end-start}s")
 
-    @tasks.loop(minutes=5)
+    @tasks.loop(seconds=30)
     async def global_announcements(self):
         await self.task_wrapper(self.globals_task(), "globals_announcements")
             
@@ -1178,11 +1173,11 @@ class MainCog(commands.Cog):
                 return "rd"
         return "th"
     
-    async def make_global_embed(self, record: Record, thumbs: Dict[int, str]):
+    def make_global_embed(self, record: Record):
         map_url = f"https://strafes.fiveman1.net/maps/{record.map.id}?game={record.game.value}&style={record.style.value}"
         embed = discord.Embed(title=f"\N{CROWN}  {record.map.displayname}", color=0x80ff80, url=map_url)
         embed.set_author(name="New WR", icon_url="https://i.imgur.com/PtLyW2j.png")
-        url = await self.safe_get_user_headshot_url(record.user.id)
+        url = record.user.thumbnail
         if url:
             embed.set_thumbnail(url=url)
         player_url = f"https://strafes.fiveman1.net/users/{record.user.id}?game={record.game.value}&style={record.style.value}"
@@ -1197,7 +1192,7 @@ class MainCog(commands.Cog):
             info += f"{record.previous_record.time} ({record.previous_record.user.username})"
         embed.add_field(name="Time", value=time, inline=True)
         embed.add_field(name="Info", value=info, inline=False)
-        map_thumb_url = thumbs.get(record.map.id)
+        map_thumb_url = record.map.thumbnail
         if map_thumb_url:
             embed.set_image(url=map_thumb_url)
         embed.set_footer(text="World Record")

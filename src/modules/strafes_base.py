@@ -121,7 +121,7 @@ class Map:
         self.game : Game = game
         self.date : Date = date
         self.playcount : int = playcount
-        self.thumbnail : int | None = thumbnail
+        self.thumbnail : Optional[str] = thumbnail
 
     def __str__(self):
         return self.displayname
@@ -164,6 +164,7 @@ class User:
         self.displayname = displayname
         self.description = description
         self.state = UserState.DEFAULT
+        self.thumbnail: Optional[str] = None
 
     def __str__(self):
         return self.username
@@ -226,5 +227,18 @@ class Record:
             Date(utc2local(d["date"])),
             Style(d["style_id"]),
             d["mode_id"],
+            Game(d["game_id"])
+        )
+    
+    @staticmethod
+    def from_dict_strafes_globals(d, user : User, map : Map) -> "Record":
+        return Record(
+            d["id"],
+            Time(d["time"]),
+            user,
+            map,
+            Date(utc2local(d["date"])),
+            Style(d["style_id"]),
+            d["course"],
             Game(d["game_id"])
         )
