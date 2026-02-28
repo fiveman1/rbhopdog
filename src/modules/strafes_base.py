@@ -202,7 +202,7 @@ class Rank:
         )
 
 class Record:
-    def __init__(self, id, time, user, map, date, style, mode, game):
+    def __init__(self, id, time, user, map, date, style, mode, game, has_bot):
         self.id : int = id
         self.time : Time = time
         self.user : User = user
@@ -211,6 +211,7 @@ class Record:
         self.style : Style = style
         self.mode : int = mode
         self.game : Game = game
+        self.has_bot : bool = has_bot
         self.diff : float = -1.0
         self.previous_record: Optional[Record] = None
 
@@ -227,7 +228,8 @@ class Record:
             Date(utc2local(d["date"])),
             Style(d["style_id"]),
             d["mode_id"],
-            Game(d["game_id"])
+            Game(d["game_id"]),
+            d["has_bot"]
         )
     
     @staticmethod
@@ -240,5 +242,6 @@ class Record:
             Date(utc2local(d["date"])),
             Style(d["style_id"]),
             d["course"],
-            Game(d["game_id"])
+            Game(d["game_id"]),
+            d["has_bot"]
         )

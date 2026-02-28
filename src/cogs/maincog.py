@@ -1191,6 +1191,9 @@ class MainCog(commands.Cog):
             time += f"({record.diff:+.3f} s)"
             info += f"{record.previous_record.time} ({record.previous_record.user.username})"
         embed.add_field(name="Time", value=time, inline=True)
+        if record.has_bot:
+            replay_url = f"https://strafes.fiveman1.net/replays/{record.id}"
+            embed.add_field(name="Replay", value=f"[Watch replay]({replay_url})", inline=False)
         embed.add_field(name="Info", value=info, inline=False)
         map_thumb_url = record.map.thumbnail
         if map_thumb_url:
