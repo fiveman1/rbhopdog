@@ -251,7 +251,7 @@ class MainCog(commands.Cog):
             end = time.time()
             print(f"embeds posted: {end-start}s")
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=1)
     async def global_announcements(self):
         await self.task_wrapper(self.globals_task(), "globals_announcements")
             
