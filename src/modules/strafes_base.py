@@ -46,7 +46,8 @@ STYLE_ENUM = {
     6: ["a-only", "aonly", "ao"],
     7: ["backwards", "bw"],
     8: ["faste"],
-    14: ["lg"]
+    14: ["lg"],
+    18: ["boost"]
 }
 _STR_TO_STYLE = create_str_to_val(STYLE_ENUM)
 
@@ -60,6 +61,7 @@ class Style(Enum):
     BACKWARDS = 7
     FASTE = 8
     LOW_GRAV = 14
+    BOOST = 18
 
     @property
     def name(self):
