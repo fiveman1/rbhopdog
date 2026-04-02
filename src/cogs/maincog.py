@@ -203,7 +203,8 @@ class MainCog(commands.Cog):
     async def post_globals(embeds : List[discord.Embed], channel : discord.channel.TextChannel):
         for embed in embeds:
             msg = await channel.send(embed=embed)
-            await msg.publish()
+            # Not awaiting, we can only publish up to 10 messages per channel per hour, and this will actually block for an hour if we reach that limit
+            asyncio.create_task(msg.publish())
 
     async def globals_task(self):
         # when the bot first runs, overwrite globals then stop

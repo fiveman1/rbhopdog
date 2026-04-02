@@ -102,7 +102,7 @@ async def main():
 
     intents = discord.Intents.default()
     intents.message_content = True
-    bot = StrafesBot(STRAFES, VERIFY, BHOP_AUTO_GLOBALS, BHOP_STYLES_GLOBALS, SURF_AUTO_GLOBALS, SURF_STYLES_GLOBALS, GLOBALS, command_prefix=COMMAND, intents=intents)
+    bot = StrafesBot(STRAFES, VERIFY, BHOP_AUTO_GLOBALS, BHOP_STYLES_GLOBALS, SURF_AUTO_GLOBALS, SURF_STYLES_GLOBALS, GLOBALS, command_prefix=COMMAND, intents=intents, max_ratelimit_timeout=30.0)
 
     #shamelessly adapted from here
     #https://stackoverflow.com/questions/40667445/how-would-i-make-a-reload-command-in-python-for-a-discord-bot
