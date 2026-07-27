@@ -1086,7 +1086,6 @@ class MainCog(commands.Cog):
                 arguments = ArgumentValidator(self.bot, self.strafes)
                 arguments.user.make_required()
                 arguments.user.check_status = False
-                arguments.user.allow_id = True
                 arguments.user.allow_discord = False
                 valid, err = await arguments.evaluate(args)
                 if not valid:
